@@ -141,7 +141,7 @@ class PyTickle:
 
     def getTF(self, probeName, driveNames, phase2freq=False):
         """Compute a transfer function
-        
+
         Inputs:
           probeName: name of the probe at which the TF is calculated
           driveNames: names of the drives from which the TF is calculated
