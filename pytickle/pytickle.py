@@ -41,6 +41,23 @@ def str2mat(string):
     return ''.join("'{0}'".format(string))
 
 
+def addOpticklePath(eng, path=None):
+    """Add the Optickle path to the matlab path
+
+    This must be run once everytime a matlab engine is initialized
+    
+    Inputs:
+      eng: the matlab engine
+      path: If None (default) the path is taken from 'OPTICKLE_PATH'
+            if a string, adds that string to the path
+    """
+    if path is None:
+        cmd = "addpath(genpath(getenv('OPTICKLE_PATH')));"
+    else:
+        cmd = "addpath(genpath({:s}));".format(str2mat(path))
+    eng.eval(cmd, nargout=0)
+
+
 class PyTickle:
     """A class for an Optickle model
 

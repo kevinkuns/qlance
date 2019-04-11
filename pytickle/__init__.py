@@ -1,2 +1,2 @@
-from .pytickle import PyTickle
+from .pytickle import PyTickle, addOpticklePath
 from .plotting import plotTF
