@@ -98,7 +98,7 @@ def plotTF(f, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
     plt.setp(mag_ax.get_xticklabels(), visible=False)
     mag_ax.grid(True, which='both', alpha=0.5)
     mag_ax.grid(alpha=0.25, which='minor')
-    phase_ax.grid(True, which='both')
+    phase_ax.grid(True, which='both', alpha=0.5)
     phase_ax.grid(alpha=0.25, which='minor')
     if newFig:
         return fig

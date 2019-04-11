@@ -217,22 +217,22 @@ class PyTickle:
         fig = plt.figure()
         if Larm is None:
             fig.gca().set_ylabel(
-                r'displacement $[\mathrm{m}/\sqrt{\mathrm{Hz}}]$')
+                r'Displacement $[\mathrm{m}/\mathrm{Hz}^{1/2}]$')
             Larm = 1
         else:
             fig.gca().set_ylabel(
-                r'strain $[1/\sqrt{\mathrm{Hz}}]$')
+                r'Strain $[1/\mathrm{Hz}^{1/2}]$')
         fig.gca().loglog(f, noiseASD/Larm, **kwargs)
         if mass:
             hSQL = np.sqrt(8*scc.hbar/(mass*(2*np.pi*f)**2))
             fig.gca().loglog(f, hSQL/Larm, 'k--', label='SQL', alpha=0.7)
             fig.gca().legend()
         fig.gca().set_xlim([min(f), max(f)])
-        fig.gca().set_xlabel('frequency [Hz]')
-        fig.gca().xaxis.grid('on', which='both')
-        fig.gca().xaxis.grid(alpha=0.1, which='minor')
-        fig.gca().yaxis.grid('on', which='both')
-        fig.gca().yaxis.grid(alpha=0.1, which='minor')
+        fig.gca().set_xlabel('Frequency [Hz]')
+        fig.gca().xaxis.grid('on', which='both', alpha=0.5)
+        fig.gca().xaxis.grid(alpha=0.25, which='minor')
+        fig.gca().yaxis.grid('on', which='both', alpha=0.5)
+        fig.gca().yaxis.grid(alpha=0.25, which='minor')
         return fig
 
     def plotErrSig(self, probeName, driveName, quad=False, ax=None):
