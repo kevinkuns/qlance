@@ -1,9 +1,9 @@
 # pytickle
-PyTickle is a wrapper for the Matlab ![Optickle](https://github.com/Optickle/Optickle/tree/Optickle2) simulation.
+PyTickle is a wrapper for the Matlab [Optickle](https://github.com/Optickle/Optickle/tree/Optickle2) simulation.
 
 ## Getting started
-  1. Clone Optickle2 from ![this](https://github.com/Optickle/Optickle/tree/Optickle2) repository. It is important to get Optickle2 and not Optickle.
-  1. Install the python Matlab engine as described ![here](https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html)
+  1. Clone Optickle2 from [this](https://github.com/Optickle/Optickle/tree/Optickle2) repository. It is important to get Optickle2 and not Optickle.
+  1. Install the python Matlab engine as described [here](https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html)
   1. Clone this repository
   1. Optionally, set the variable `OPTICKLE_PATH` to the path to the Optickle2 directory.
   
