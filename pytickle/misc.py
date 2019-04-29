@@ -76,32 +76,3 @@ def printHeader(freqs, pad):
         else:
             line += '{:+{pad1}.0f} {:s}Hz|'.format(freq, pref, pad1=pad1)
     return line
-
-
-def addOMC(opt, par, omcName):
-    # Adds a bow-tie cavity to an Optickle model
-    # Inputs:
-    # opt: the Optickle model
-    # par: parameters used for the model
-    # omcName: the base name to use for the bow-tie cavity's optic names
-    #
-    # The input to the cavity should be connected to 'bkA' of 'omcName_IC'.
-    # The output from the cavity should be connected to 'bkA' of 'omcName_OC'.
-    IC = omcName + '_IC'
-    OC = omcName + '_OC'
-    CM1 = omcName + '_CM1'
-    CM2 = omcName + '_CM2'
-    # Add optics.
-    mirrors = ['IC', 'OC', 'CM1', 'CM2']
-    for mirror in mirrors:
-        mname = omcName + '_' + mirror
-        p = par[mirror]
-        opt.addBeamSplitter(mname, p['aoi'], p['Chr'], p['Thr'], p['Lhr'],
-                            p['Rar'], p['Lmd'])
-    # Add links.
-    LL = par['Length']['OMCL']
-    LS = par['Length']['OMCS']
-    opt.addLink(IC, 'frA', OC, 'frA', LS)
-    opt.addLink(OC, 'frA', CM1, 'frB', LL)
-    opt.addLink(CM1, 'frB', CM2, 'frB', LS)
-    opt.addLink(CM2, 'frB', IC, 'frA', LL)

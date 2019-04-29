@@ -45,7 +45,7 @@ def addOpticklePath(eng, path=None):
     """Add the Optickle path to the matlab path
 
     This must be run once everytime a matlab engine is initialized
-    
+
     Inputs:
       eng: the matlab engine
       path: If None (default) the path is taken from 'OPTICKLE_PATH'
@@ -110,12 +110,6 @@ class PyTickle:
         self.sigDC = None
         self.fDCsweep = None
         self.rotatedBasis = False
-
-    def loadMatModel(self, optFunc, par):
-        self.eng.workspace['par'] = par
-        self.eng.eval(self.opt + " = " + optFunc + "(par);", nargout=0)
-        self.vRF = mat2py(self.eng.eval(self.opt + ".vFrf"))
-        self._updateNames()
 
     def tickle(self, f, noise=True):
         """Compute the Optickle model (Runs Optickle's tickle function)
