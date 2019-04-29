@@ -64,8 +64,8 @@ class PyTickle:
     Inputs:
       eng: the python matlab engine
       opt: the name for the optical model (Default: 'opt')
-      vRF: vector of RF frequencies (Default: 0)
-      lambda0: carrier wavelength (Default: 1064e-9)
+      vRF: vector of RF frequencies [Hz] (Default: 0)
+      lambda0: carrier wavelength [m] (Default: 1064e-9)
       pol: polarization (Default: 'S')
     """
     def __init__(self, eng, opt='opt', vRF=0, lambda0=1064e-9, pol='S'):
@@ -109,7 +109,7 @@ class PyTickle:
         self.poses = None
         self.sigDC = None
         self.fDCsweep = None
-        self.rotatedBasis = False
+        self._rotatedBasis = False
 
     def tickle(self, f, noise=True):
         """Compute the Optickle model (Runs Optickle's tickle function)
@@ -156,13 +156,29 @@ class PyTickle:
         Inputs:
           probeName: name of the probe at which the TF is calculated
           driveNames: names of the drives from which the TF is calculated
+          phase2freq: If True, a phase transfer function is divided by the
+            frequency to return a frequency transfer function (Default: False)
 
         Returns:
           tf: the transfer function
+
+        Examples:
+          * If only a single drive is used, the drive names can be a string
+            To compute the phase transfer function in reflection from a FP
+            cavity
+              tf = opt.getTF('REFL', 'PM.drive')
+            To get the frequency transfer function, call getTF with
+            phase2freq=True
+
+          * If multiple drives are used, the drive names should be a dict
+            To compute the DARM transfer function to the AS_DIFF PD
+              DARM = {'EX.pos': 1, 'EY.pos': -1}
+              tf = opt.getTF('AS_DIFF', DARM)
         """
         if self.sigAC is None:
             raise ValueError(
                 'Must run tickle before calculating a transfer function.')
+
         probeNum = self.probes.index(probeName)
         if isinstance(driveNames, str):
             driveNames = {driveNames: 1}
@@ -170,18 +186,23 @@ class PyTickle:
             tf = 0
         else:
             tf = np.zeros(len(self.f), dtype='complex')
+
         for driveName, drivePos in driveNames.items():
             driveNum = self.drives.index(driveName)
             try:
                 tf += drivePos * self.sigAC[probeNum, driveNum]
             except IndexError:
                 tf += drivePos * self.sigAC[driveNum]
+
         if phase2freq:
             tf = tf/self.f
+
         return tf
 
     def getQuantumNoise(self, probeName):
         """Compute the quantum noise at a probe
+
+        Returns the quantum noise at a given probe in [W/rtHz]
         """
         probeNum = self.probes.index(probeName)
         try:
@@ -193,7 +214,8 @@ class PyTickle:
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
                dB=False, phase2freq=False, **kwargs):
         """Plot a transfer function.
-        See documentation in plotting
+
+        See documentation for plotTF in plotting
         """
         f = self.f
         tf = self.getTF(probeName, driveNames)
@@ -203,11 +225,24 @@ class PyTickle:
 
     def plotQuantumASD(self, probeName, driveNames, Larm=None, mass=None,
                        **kwargs):
-        """Plot the quantum ASD
+        """Plot the quantum ASD of a probe
+
+        Plots the ASD of a probe referenced the the transfer function for
+        some signal, such as DARM. Optionally plots the SQL.
+
+        Inputs:
+          probeName: name of the probe
+          driveNames: names of the drives from which the TF to refer the
+            noise to
+          Larm: If not None (default), divide by the arm length to convert
+            displacement noise to strain noise
+          mass: If not None (default) plots the SQL with the given mass [kg]
+          **kwargs: extra keyword arguments to pass to the plot
         """
         f = self.f
         tf = self.getTF(probeName, driveNames)
         noiseASD = np.abs(self.getQuantumNoise(probeName)/tf)
+
         fig = plt.figure()
         if Larm is None:
             fig.gca().set_ylabel(
@@ -217,16 +252,19 @@ class PyTickle:
             fig.gca().set_ylabel(
                 r'Strain $[1/\mathrm{Hz}^{1/2}]$')
         fig.gca().loglog(f, noiseASD/Larm, **kwargs)
+
         if mass:
             hSQL = np.sqrt(8*scc.hbar/(mass*(2*np.pi*f)**2))
             fig.gca().loglog(f, hSQL/Larm, 'k--', label='SQL', alpha=0.7)
             fig.gca().legend()
+
         fig.gca().set_xlim([min(f), max(f)])
         fig.gca().set_xlabel('Frequency [Hz]')
-        fig.gca().xaxis.grid('on', which='both', alpha=0.5)
+        fig.gca().xaxis.grid(True, which='both', alpha=0.5)
         fig.gca().xaxis.grid(alpha=0.25, which='minor')
-        fig.gca().yaxis.grid('on', which='both', alpha=0.5)
+        fig.gca().yaxis.grid(True, which='both', alpha=0.5)
         fig.gca().yaxis.grid(alpha=0.25, which='minor')
+
         return fig
 
     def plotErrSig(self, probeName, driveName, quad=False, ax=None):
@@ -248,8 +286,8 @@ class PyTickle:
             sigDC = self.sigDC[probeNum, :]
             ax.plot(poses, sigDC, label=probeName)
         # ax.plot(poses, np.zeros(len(poses)), 'C7--', alpha=0.5)
-        ax.xaxis.grid('on', which='major', alpha=0.4)
-        ax.yaxis.grid('on', which='major', alpha=0.4)
+        ax.xaxis.grid(True, which='major', alpha=0.4)
+        ax.yaxis.grid(True, which='major', alpha=0.4)
         # ax.axvline(0, color='C7', linestyle='--', alpha=0.5)
         ax.set_xlabel('drive position [m]')
         ax.set_ylabel('probe power [W]')
@@ -385,10 +423,6 @@ class PyTickle:
             pad3 = pad2 - len(pref) - 2
             print('{:{pad1}s}| {:{pad3}.1f} {:s}W|'.format(
                 probe, num, pref, pad1=pad1, pad3=pad3))
-
-    def _updateNames(self):
-        self.probes = self.eng.eval(self.opt + ".getProbeName")
-        self.drives = self.eng.eval(self.opt + ".getDriveNames")
 
     def addMirror(self, name, aoi=0, Chr=0, Thr=0, Lhr=0,
                   Rar=0, Lmd=0, Nmd=1.45):
@@ -633,7 +667,7 @@ class PyTickle:
         self._updateNames()
 
     def addProbeIn(self, name, sinkName, sinkPort, freq, phase):
-        if self.rotatedBasis:
+        if self._rotatedBasis:
             msg = ('The probe basis has already been rotated to do homodyne'
                    + ' detection. No further probes can be added.\n'
                    + 'Rewrite the model so that all probes are added before'
@@ -774,42 +808,92 @@ class PyTickle:
         self.setProbeBasis(mProbeOut)
 
     def setProbeBasis(self, mProbeOut):
+        """Set the probe basis
+        """
         self.eng.workspace['mProbeOut'] = py2mat(mProbeOut)
         self.eng.eval(self.opt + ".mProbeOut = mProbeOut;", nargout=0)
-        self.rotatedBasis = True
+        self._rotatedBasis = True
 
     def setCavityBasis(self, name1, name2):
+        """Set the cavity basis for a two mirror cavity
+
+        Inputs:
+          name1, name2: the names of the optics
+        """
         cmd = self.opt + ".setCavityBasis("
         cmd += str2mat(name1) + ", " + str2mat(name2) + ");"
         self.eng.eval(cmd, nargout=0)
 
     def setOpticParam(self, name, param, val):
+        """Set the value of an optic's parameter
+
+        Inputs:
+          name: name of the optic
+          param: name of the parameter
+          val: value of the paramter
+        """
         cmd = self.opt + ".setOpticParam("
         cmd += str2mat(name) + ", " + str2mat(param)
         cmd += ", " + str(val) + ");"
         self.eng.eval(cmd, nargout=0)
 
     def getOpticParam(self, name, param):
+        """Get the value of an optic's paramter
+
+        Inputs:
+          name: name of the optic
+          param: name of the parameter
+        """
         cmd = self.opt + ".getOptic(" + str2mat(name) + ");"
         self.eng.eval(cmd, nargout=0)
         return self.eng.eval("ans." + param + ";")
 
     def getProbePhase(self, name):
+        """Get the phase of a probe
+
+        Inputs:
+          name: name of the probe
+
+        Returns:
+          phase: phase of the probe [deg]
+        """
         cmd = self.opt + ".getProbePhase(" + str2mat(name) + ");"
         return self.eng.eval(cmd, nargout=1)
 
     def setProbePhase(self, name, phase):
+        """Set the phase of a probe
+
+        Inputs:
+          name: name of the probe
+          phase: phase of the probe [deg]
+        """
         cmd = self.opt + ".setProbePhase("
         cmd += str2mat(name) + ", " + str(phase) + ");"
         self.eng.eval(cmd, nargout=0)
 
     def getSourceName(self, linkNum):
+        """Find the name of the optic that is the source for a link
+
+        Inputs:
+          linkNum: the link number
+        """
         cmd = self.opt + ".getSourceName(" + str(linkNum) + ");"
         return self.eng.eval(cmd, nargout=1)
 
     def getSinkName(self, linkNum):
+        """Find hte name of the optic that is the sink for a link
+
+        Inputs:
+          linkNum: the link number
+        """
         cmd = self.opt + ".getSinkName(" + str(linkNum) + ");"
         return self.eng.eval(cmd, nargout=1)
+
+    def _updateNames(self):
+        """Refresh the pytickle model's list of probe and drive names
+        """
+        self.probes = self.eng.eval(self.opt + ".getProbeName")
+        self.drives = self.eng.eval(self.opt + ".getDriveNames")
 
     def _pol2opt(self, pol):
         """Convert S and P polarizations to 1s and 0s for Optickle
