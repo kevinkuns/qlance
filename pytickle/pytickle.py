@@ -526,7 +526,7 @@ class PyTickle:
         self.eng.eval(cmd, nargout=0)
         self._updateNames()
 
-    def addSqueezer(self, name, lambda0=1064e-9, fRF=0, pol='S', sqzAng=0,
+    def addSqueezer(self, name, lambda0=1064e-9, fRF=0, pol='S', sqAng=0,
                     **sqzKwargs):
         """Add a squeezer
 
@@ -558,13 +558,13 @@ class PyTickle:
             opt.addSqueezer('sqz', sqdB=10, antidB=15, sqAng=90)
         3) add an amplitude squeezed field with escape efficiency 0.9
            and nonlinear gain 0.5 at 45 deg:
-            opt.addSqueezer('sqz', sqzAng=45, x=0.5, escEff=0.9)
+            opt.addSqueezer('sqz', sqAng=45, x=0.5, escEff=0.9)
         """
         # parse squeezing definitions
-        sqzAng = sqzAng * np.pi/180
+        sqAng = sqAng * np.pi/180
         for kwarg in sqzKwargs:
             if kwarg not in ['sqdB', 'antidB', 'x', 'escEff']:
-                raise ValueError('Unrecognized keyword + ' + str(kwarg))
+                raise ValueError('Unrecognized keyword ' + str(kwarg))
         msg = 'Cannot specify both sqdB/antidB and x/escEff'
         if len(sqzKwargs) == 0:
             sqzOption = 0
@@ -601,11 +601,11 @@ class PyTickle:
         self.eng.workspace['lambda0'] = py2mat(lambda0)
         self.eng.workspace['fRF'] = py2mat(fRF)
         self.eng.workspace['npol'] = py2mat(self._pol2opt(pol))
-        self.eng.workspace['sqzAng'] = py2mat(sqzAng)
+        self.eng.workspace['sqAng'] = py2mat(sqAng)
         self.eng.workspace['sqzOption'] = py2mat(sqzOption)
 
         cmd = self.opt + ".addSqueezer(" + str2mat(name)
-        cmd += ", lambda0, fRF, npol, sqzAng, "
+        cmd += ", lambda0, fRF, npol, sqAng, "
 
         if sqzOption == 0:
             self.eng.workspace['sqdB'] = py2mat(sqdB)
