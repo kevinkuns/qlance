@@ -72,8 +72,8 @@ class PyTickle:
         # convert RF and polarization information
         if isinstance(vRF, Number):
             vRF = [vRF]
-        if isinstance(pol, str) or isinstance(pol, Number):
-            pol = [pol]
+        if isinstance(pol, str):
+            pol = [pol] * len(vRF)
         if len(vRF) != len(pol):
             raise ValueError(
                 'RF vector and polarization vector must be the same length')
