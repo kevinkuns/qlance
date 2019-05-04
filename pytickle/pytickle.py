@@ -296,6 +296,40 @@ class PyTickle:
         ax.set_xlim([min(poses), max(poses)])
         # return fig
 
+    def getSweepPower(self, driveName, linkStart, linkEnd, fRF=0):
+        """Get the power along a link between two optics as a drive is swept
+
+        Inputs:
+          linkStart: name of the start of the link
+          linkEnd: name of the end of the link
+          fRF: frequency of the sideband power to return [Hz]
+            (Default: 0, i.e. the carrier)
+        """
+        if self.fDCsweep is None:
+            raise ValueError(
+                'Must run sweepLinear before plotting sweep power')
+        # find the link and the drive
+        linkStart = str2mat(linkStart)
+        linkEnd = str2mat(linkEnd)
+        linkNum = self.eng.eval(
+            self.opt + ".getLinkNum(" + linkStart + ", " + linkEnd + ");")
+        try:
+            linkNum = int(linkNum) - 1
+        except TypeError:
+            msg = "Link from " + linkStart + " to " + linkEnd
+            msg += " does not appear to exist."
+            raise ValueError(msg)
+        driveNum = self.drives.index(driveName)
+
+        poses = self.poses[driveNum, :]
+        if self.vRF.size == 1:
+            power = np.abs(self.fDCsweep[linkNum, :])**2
+        else:
+            nRF = self._getSidebandInd(fRF)
+            power = np.abs(self.fDCsweep[linkNum, nRF, :])
+
+        return poses, power
+
     def plotSweepPower(self, driveName, linkStart, linkEnd, nRFs='all',
                        wavelength=False, ax=None):
         """Plot the power along a link between two optics as a drive is swept
