@@ -905,3 +905,26 @@ class PyTickle:
         else:
             raise ValueError('Unrecognized polarization ' + str(pol)
                              + '. Use \'S\' or \'P\'')
+
+    def _getSidebandInd(self, freq, tol=1):
+        """Find the index of an RF sideband frequency
+
+        Inputs:
+          freq: the frequency of the desired sideband
+          tol: tolerance of the difference between freq and the RF sideband
+            of the model [Hz] (Default: 1 Hz)
+        """
+        # FIXME: add support for multiple colors and polarizations
+        ind = np.nonzero(np.isclose(self.vRF, freq, atol=tol))[0]
+        if len(ind) == 0:
+            msg = 'There are no sidebands with frequency '
+            msg += '{:0.0f} {:s}Hz'.format(
+                *misc.siPrefix(freq)[::-1])
+            raise ValueError(msg)
+        elif len(ind) > 1:
+            msg = 'There are {:d} sidebands with '.format(len(ind))
+            msg += 'frequency {:0.0f} {:s}Hz'.format(
+                *misc.siPrefix(freq)[::-1])
+            raise ValueError(msg)
+        else:
+            return int(ind)
