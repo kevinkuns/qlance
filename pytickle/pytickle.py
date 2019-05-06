@@ -332,16 +332,7 @@ class PyTickle:
                 'Must run sweepLinear before calculating sweep power')
 
         # find the link and the drive
-        linkStart = str2mat(linkStart)
-        linkEnd = str2mat(linkEnd)
-        linkNum = self.eng.eval(
-            self.opt + ".getLinkNum(" + linkStart + ", " + linkEnd + ");")
-        try:
-            linkNum = int(linkNum) - 1
-        except TypeError:
-            msg = "Link from " + linkStart + " to " + linkEnd
-            msg += " does not appear to exist."
-            raise ValueError(msg)
+        linkNum = self._getLinkNum(linkStart, linkEnd)
         driveNum = self.drives.index(driveName)
 
         poses = self.poses[driveNum, :]
@@ -409,16 +400,7 @@ class PyTickle:
             nRFs = [nRFs]
 
         # find the link and the drive
-        linkStart = str2mat(linkStart)
-        linkEnd = str2mat(linkEnd)
-        linkNum = self.eng.eval(
-            self.opt + ".getLinkNum(" + linkStart + ", " + linkEnd + ");")
-        try:
-            linkNum = int(linkNum) - 1
-        except TypeError:
-            msg = "Link from " + linkStart + " to " + linkEnd
-            msg += " does not appear to exist."
-            raise ValueError(msg)
+        linkNum = self._getLinkNum(linkStart, linkEnd)
         driveNum = self.drives.index(driveName)
 
         poses = self.poses[driveNum, :]
@@ -459,8 +441,8 @@ class PyTickle:
         nLink = int(self.eng.eval(self.opt + ".Nlink;"))
         links = []
         for ii in range(nLink):
-            sourceName = self.getSourceName(ii + 1)
-            sinkName = self.getSinkName(ii + 1)
+            sourceName = self._getSourceName(ii + 1)
+            sinkName = self._getSinkName(ii + 1)
             links.append(sourceName + ' --> ' + sinkName)
         pad = max([len(link) for link in links])
         l1 = pad
@@ -950,7 +932,37 @@ class PyTickle:
         cmd += str2mat(name) + ", " + str(phase) + ");"
         self.eng.eval(cmd, nargout=0)
 
-    def getSourceName(self, linkNum):
+    def getLinkLength(self, linkStart, linkEnd):
+        """Get the length of a link
+
+        Inputs:
+          linkStart: name of the start of the link
+          linkEnd: name of the end of the link
+
+        Returns:
+          linkLen: the length of the link [m]
+        """
+        linkLens = self.eng.eval(self.opt + ".getLinkLengths", nargout=1)
+        linkLens = mat2py(linkLens)
+        linkNum = self._getLinkNum(linkStart, linkEnd)
+        return linkLens[linkNum]
+
+    def setLinkLength(self, linkStart, linkEnd, linkLen):
+        """Set a link length after the model is defined
+
+        Inputs:
+          linkStart: name of the start of the link
+          linkEnd: name of the end of the link
+          linkLen: new length of the link [m]
+        """
+        # add 1 to convert to Matlab's 1-based system
+        linkNum = self._getLinkNum(linkStart, linkEnd) + 1
+        self.eng.workspace['linkNum'] = py2mat(linkNum)
+        self.eng.workspace['linkLen'] = py2mat(linkLen)
+        self.eng.eval(
+            self.opt + ".setLinkLength(linkNum, linkLen);", nargout=0)
+
+    def _getSourceName(self, linkNum):
         """Find the name of the optic that is the source for a link
 
         Inputs:
@@ -959,14 +971,36 @@ class PyTickle:
         cmd = self.opt + ".getSourceName(" + str(linkNum) + ");"
         return self.eng.eval(cmd, nargout=1)
 
-    def getSinkName(self, linkNum):
-        """Find hte name of the optic that is the sink for a link
+    def _getSinkName(self, linkNum):
+        """Find the name of the optic that is the sink for a link
 
         Inputs:
           linkNum: the link number
         """
         cmd = self.opt + ".getSinkName(" + str(linkNum) + ");"
         return self.eng.eval(cmd, nargout=1)
+
+    def _getLinkNum(self, linkStart, linkEnd):
+        """Find the link number of a particular link in the Optickle model
+
+        Inputs:
+          linkStart: name of the start of the link
+          linkEnd: name of the end of the link
+
+        Returns:
+          linkNum: the link number converted to pytickle's 0-based system
+        """
+        linkStart = str2mat(linkStart)
+        linkEnd = str2mat(linkEnd)
+        linkNum = self.eng.eval(
+            self.opt + ".getLinkNum(" + linkStart + ", " + linkEnd + ");")
+        try:
+            linkNum = int(linkNum) - 1
+        except TypeError:
+            msg = "Link from " + linkStart + " to " + linkEnd
+            msg += " does not appear to exist."
+            raise ValueError(msg)
+        return linkNum
 
     def _updateNames(self):
         """Refresh the pytickle model's list of probe and drive names
