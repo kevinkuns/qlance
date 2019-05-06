@@ -132,20 +132,38 @@ class PyTickle:
         if noise:
             self.noiseAC = mat2py(self.eng.workspace['noiseAC'])
 
-    def sweeepLinear(self, driveNames, npts):
+    def sweeepLinear(self, startPos, endPos, npts):
         """Run Optickle's sweepLinear function
+
+        Inputs:
+          startPos: a dictionary with the starting positions of the drives
+            to sweep
+          endPos: a dictionary with the ending positions of the drives
+            to sweep
+          npts: number of points to sweep
         """
-        if isinstance(driveNames, str):
-            driveNames = {driveNames: 1}
-        pos = np.zeros(len(self.drives))
-        for driveName, drivePos in driveNames.items():
+        if isinstance(startPos, str):
+            startPos = {startPos: 1}
+        if isinstance(endPos, str):
+            endPos = {endPos: 1}
+
+        sPosMat = np.zeros(len(self.drives))
+        ePosMat = np.zeros(len(self.drives))
+        for driveName, drivePos in startPos.items():
             driveNum = self.drives.index(driveName)
-            pos[driveNum] = drivePos
-        self.eng.workspace['pos'] = py2mat(pos)
+            sPosMat[driveNum] = drivePos
+        for driveName, drivePos in endPos.items():
+            driveNum = self.drives.index(driveName)
+            ePosMat[driveNum] = drivePos
+
+        self.eng.workspace['startPos'] = py2mat(sPosMat)
+        self.eng.workspace['endPos'] = py2mat(ePosMat)
         self.eng.workspace['npts'] = matlab.double([npts])
-        output = "[poses, sigDC, fDC] = "
-        self.eng.eval(
-            output + self.opt + ".sweepLinear(-pos, pos, npts);", nargout=0)
+
+        cmd = "[poses, sigDC, fDC] = " + self.opt
+        cmd += ".sweepLinear(startPos, endPos, npts);"
+
+        self.eng.eval(cmd, nargout=0)
         self.poses = mat2py(self.eng.workspace['poses'])
         self.sigDC = mat2py(self.eng.workspace['sigDC'])
         self.fDCsweep = mat2py(self.eng.workspace['fDC'])
