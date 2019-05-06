@@ -304,10 +304,15 @@ class PyTickle:
           linkEnd: name of the end of the link
           fRF: frequency of the sideband power to return [Hz]
             (Default: 0, i.e. the carrier)
+
+        Returns:
+          poses: the drive positions
+          power: the power at those positions [W]
         """
         if self.fDCsweep is None:
             raise ValueError(
-                'Must run sweepLinear before plotting sweep power')
+                'Must run sweepLinear before calculating sweep power')
+
         # find the link and the drive
         linkStart = str2mat(linkStart)
         linkEnd = str2mat(linkEnd)
@@ -326,9 +331,31 @@ class PyTickle:
             power = np.abs(self.fDCsweep[linkNum, :])**2
         else:
             nRF = self._getSidebandInd(fRF)
-            power = np.abs(self.fDCsweep[linkNum, nRF, :])
+            power = np.abs(self.fDCsweep[linkNum, nRF, :])**2
 
         return poses, power
+
+    def getSweepSignal(self, probeName, driveName):
+        """Compute the signals as a drive is swept
+
+        Inputs:
+          probeName: name of the probe
+          driveName: name of the drive
+
+        Returns:
+          poses: the positions of the drive
+          sig: signal power at those positions [W]
+        """
+        probeNum = self.probes.index(probeName)
+        driveNum = self.drives.index(driveName)
+
+        poses = self.poses[driveNum, :]
+        try:
+            sig = self.sigDC[probeNum, :]
+        except IndexError:
+            sig = self.sigDC
+
+        return poses, sig
 
     def plotSweepPower(self, driveName, linkStart, linkEnd, nRFs='all',
                        wavelength=False, ax=None):
@@ -947,6 +974,9 @@ class PyTickle:
           freq: the frequency of the desired sideband
           tol: tolerance of the difference between freq and the RF sideband
             of the model [Hz] (Default: 1 Hz)
+
+        Returns:
+          nRF: the index of the RF sideband
         """
         # FIXME: add support for multiple colors and polarizations
         ind = np.nonzero(np.isclose(self.vRF, freq, atol=tol))[0]
