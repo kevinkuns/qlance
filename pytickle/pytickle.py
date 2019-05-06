@@ -366,73 +366,30 @@ class PyTickle:
 
         return poses, sig
 
-    def plotSweepPower(self, driveName, linkStart, linkEnd, nRFs='all',
-                       wavelength=False, ax=None):
-        """Plot the power along a link between two optics as a drive is swept
+    def getDCpower(self, linkStart, linkEnd, fRF=0):
+        """Get the DC power along a link
 
         Inputs:
-          driveName: name of the drive to sweep
           linkStart: name of the start of the link
           linkEnd: name of the end of the link
-          nRFs: which RF components to plot. (Default: 'all')
-            If nRFs = 'all', all RF components are plotted
-            If nRFs is a number or list of numbers, only those RF components
-            are plotted
-          wavelength: if True, the drive position is plotted in units of
-            wavelength instead of meters (Default: False)
-          ax: axis to plot the sweeps on. If None, a new figure is created.
-            (Default: None)
+          fRF: frequency of the sideband power to return [Hz]
+            (Default: 0, i.e. the carrier)
 
         Returns:
-          fig: If ax is None, returns new figure
-
-        Example:
-          To plot the power in the SRC as the SRM is swept:
-            opt.sweepLinear({'SRM.pos': 1064e-9}, 1000)
-            fig = opt.plotSweepPower('SRM.pos', 'SRM', 'SR2')
+          power: the DC power [W]
         """
-        if self.fDCsweep is None:
+        if self.fDC is None:
             raise ValueError(
-                'Must run sweepLinear before plotting sweep power')
-        if nRFs == 'all':
-            nRFs = range(self.vRF.size)
-        elif isinstance(nRFs, Number):
-            nRFs = [nRFs]
+                'Must run tickle before getting the DC power levels.')
 
-        # find the link and the drive
         linkNum = self._getLinkNum(linkStart, linkEnd)
-        driveNum = self.drives.index(driveName)
-
-        poses = self.poses[driveNum, :]
-        if wavelength:
-            poses = poses / self.lambda0
-
-        if ax is None:
-            fig = plt.figure()
-            ax = fig.gca()
-            newfig = False
-        else:
-            newfig = True
-
         if self.vRF.size == 1:
-            power = np.abs(self.fDCsweep[linkNum, :])**2
-            ax.semilogy(poses, power, label='0')
+            power = np.abs(self.fDC[linkNum])**2
         else:
-            for nRF in nRFs:
-                power = np.abs(self.fDCsweep[linkNum, nRF, :])**2
-                ax.semilogy(poses, power, label=str(nRF))
-        if wavelength:
-            ax.set_xlabel('Drive position [wavelengths]')
-        else:
-            ax.set_xlabel('Drive position [m]')
-        ax.set_ylabel('Power [W]')
-        ax.legend()
-        ax.set_xlim(poses[0], poses[-1])
-        ax.set_title('Sweeping {:s}; Power in link from {:s} to {:s}'.format(
-            driveName, linkStart, linkEnd))
+            nRF = self._getSidebandInd(fRF)
+            power = np.abs(self.fDC[linkNum, nRF])**2
 
-        if newfig:
-            return fig
+        return power
 
     def showfDC(self):
         """Print the DC power at each link in the model
