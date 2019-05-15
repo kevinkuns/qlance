@@ -63,12 +63,12 @@ class PyTickle:
 
     Inputs:
       eng: the python matlab engine
-      opt: the name for the optical model (Default: 'opt')
+      opt: the name for the optical model
       vRF: vector of RF frequencies [Hz] (Default: 0)
       lambda0: carrier wavelength [m] (Default: 1064e-9)
       pol: polarization (Default: 'S')
     """
-    def __init__(self, eng, opt='opt', vRF=0, lambda0=1064e-9, pol='S'):
+    def __init__(self, eng, opt, vRF=0, lambda0=1064e-9, pol='S'):
         # convert RF and polarization information
         if isinstance(vRF, Number):
             vRF = [vRF]
@@ -111,6 +111,23 @@ class PyTickle:
         self.fDCsweep = None
         self._rotatedBasis = False
 
+        # Track whether tickle or sweepLinear has been run on this model
+        # If it has, do not let a matlab model be associated with this
+        # PyTickle instance to avoid potentially confusing results
+        self._tickled = False
+
+    def loadMatModel(self):
+        """Loads a matlab model with the same name as this class
+        """
+        if self._tickled:
+            msg = 'This pytickle model has already been run\n'
+            msg += 'Initialize a new model and load the Matlab model again'
+            raise RuntimeError(msg)
+        self.lambda0 = mat2py(self.eng.eval(self.opt + ".lambda"))
+        self.vRF = mat2py(self.eng.eval(self.opt + ".vFrf"))
+        # FIXME: add polarization
+        self._updateNames()
+
     def tickle(self, f, noise=True):
         """Compute the Optickle model (Runs Optickle's tickle function)
 
@@ -119,6 +136,7 @@ class PyTickle:
           noise: If False, the quantum noise is not computed which can decrease
             runtime. Default: True
         """
+        self._tickled = True
         self.f = f
         self.eng.workspace['f'] = py2mat(f)
         if noise:
@@ -142,6 +160,7 @@ class PyTickle:
             to sweep
           npts: number of points to sweep
         """
+        self._tickled = True
         if isinstance(startPos, str):
             startPos = {startPos: 1}
         if isinstance(endPos, str):
@@ -819,10 +838,10 @@ class PyTickle:
         for probe in probes:
             nA = self.probes.index(probe + '_SUM')
             nB = self.probes.index(probe + '_DIFF')
-            mProbeOut[nA, nA] = 1/2
-            mProbeOut[nB, nA] = -1/2
-            mProbeOut[nA, nB] = 1/2
-            mProbeOut[nB, nB] = 1/2
+            mProbeOut[nA, nA] = 1
+            mProbeOut[nB, nA] = -1
+            mProbeOut[nA, nB] = 1
+            mProbeOut[nB, nB] = 1
         self.setProbeBasis(mProbeOut)
 
     def setProbeBasis(self, mProbeOut):
