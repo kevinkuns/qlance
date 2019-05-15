@@ -105,6 +105,7 @@ class PyTickle:
         self.fDC = None
         self.sigAC = None
         self.sigDCtickle = None
+        self.mMech = None
         self.noiseAC = None
         self.poses = None
         self.sigDC = None
@@ -140,13 +141,14 @@ class PyTickle:
         self.f = f
         self.eng.workspace['f'] = py2mat(f)
         if noise:
-            output = "[fDC, sigDCtickle, sigAC, ~, noiseAC] = "
+            output = "[fDC, sigDCtickle, sigAC, mMech, noiseAC] = "
         else:
-            output = "[fDC, sigDCtickle, sigAC] = "
+            output = "[fDC, sigDCtickle, sigAC, mMech] = "
         self.eng.eval(output + self.opt + ".tickle([], f);", nargout=0)
         self.fDC = mat2py(self.eng.workspace['fDC'])
         self.sigDCtickle = mat2py(self.eng.workspace['sigDCtickle'])
         self.sigAC = mat2py(self.eng.workspace['sigAC'])
+        self.mMech = mat2py(self.eng.workspace['mMech'])
         if noise:
             self.noiseAC = mat2py(self.eng.workspace['noiseAC'])
 
@@ -235,6 +237,15 @@ class PyTickle:
             tf = tf/self.f
 
         return tf
+
+    def getMechMod(self, driveOutName, driveInName):
+        if self.mMech is None:
+            raise ValueError(
+                'Must run tickle before calculating mechanical modifications')
+
+        driveInNum = self.drives.index(driveInName)
+        driveOutNum = self.drives.index(driveOutName)
+        return self.mMech[driveOutNum, driveInNum]
 
     def getQuantumNoise(self, probeName):
         """Compute the quantum noise at a probe
