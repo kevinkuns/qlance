@@ -6,12 +6,12 @@ from matplotlib.ticker import FormatStrFormatter
 from misc import mag2db
 
 
-def plotTF(f, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
+def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
            **kwargs):
     """Plots a transfer function.
 
     Inputs:
-        f: the frequency at which the transfer function is evaluated [Hz]
+        ff: the frequency at which the transfer function is evaluated [Hz]
         tf: the transfer function
         mag_ax: If not None, existing axis to plot the magnitude on
             (default: None)
@@ -64,14 +64,14 @@ def plotTF(f, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
         old_ylims = mag_ax.get_ylim()
 
     if phase2freq:
-        tf = tf/f
+        tf = tf/ff
 
     if dB:
-        mag_ax.semilogx(f, mag2db(np.abs(tf)), **kwargs)
+        mag_ax.semilogx(ff, mag2db(np.abs(tf)), **kwargs)
         mag_ax.set_ylabel('Magnitude [dB]')
         mag_ax.yaxis.set_major_formatter(FormatStrFormatter('%.0f'))
     else:
-        mag_ax.loglog(f, np.abs(tf), **kwargs)
+        mag_ax.loglog(ff, np.abs(tf), **kwargs)
         mag_ax.set_ylabel('Magnitude')
         magTF = np.abs(tf)
         # If the TF is close to being constant magnitude, increase ylims
@@ -87,12 +87,12 @@ def plotTF(f, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
         mag_ax.set_ylim(min(old_ylims[0], new_ylims[0]),
                         max(old_ylims[1], new_ylims[1]))
 
-    mag_ax.set_xlim(min(f), max(f))
+    mag_ax.set_xlim(min(ff), max(ff))
     phase_ax.set_ylim(-185, 185)
     # ticks = np.linspace(-180, 180, 7)
     ticks = np.arange(-180, 181, 45)
     phase_ax.yaxis.set_ticks(ticks)
-    phase_ax.semilogx(f, np.angle(tf, True), **kwargs)
+    phase_ax.semilogx(ff, np.angle(tf, True), **kwargs)
     phase_ax.set_ylabel('Phase [deg]')
     phase_ax.set_xlabel('Frequency [Hz]')
     plt.setp(mag_ax.get_xticklabels(), visible=False)
@@ -104,11 +104,11 @@ def plotTF(f, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
         return fig
 
 
-def plotAbsTF(f, tf, ax=None, dB=False, phase2freq=False, **kwargs):
+def plotAbsTF(ff, tf, ax=None, dB=False, phase2freq=False, **kwargs):
     """Plots the magnitude of a transfer function
 
     Inputs:
-    f: the frequency at which the transfer function is evaluated [Hz]
+    ff: the frequency at which the transfer function is evaluated [Hz]
     tf: the transfer function
     ax: If not None, existing axis to plot the transfer function on
         (default: None)
@@ -136,14 +136,14 @@ def plotAbsTF(f, tf, ax=None, dB=False, phase2freq=False, **kwargs):
         old_ylims = ax.get_ylim()
 
     if phase2freq:
-        tf = tf/f
+        tf = tf/ff
 
     if dB:
-        ax.semilogx(f, mag2db(np.abs(tf)), **kwargs)
+        ax.semilogx(ff, mag2db(np.abs(tf)), **kwargs)
         ax.set_ylabel('Magnitude [dB]')
         ax.yaxis.set_major_formatter(FormatStrFormatter('%.0f'))
     else:
-        ax.loglog(f, np.abs(tf), **kwargs)
+        ax.loglog(ff, np.abs(tf), **kwargs)
         ax.set_ylabel('Magnitude')
         magTF = np.abs(tf)
         # If the TF is close to being constant magnitude, increase ylims
@@ -159,7 +159,7 @@ def plotAbsTF(f, tf, ax=None, dB=False, phase2freq=False, **kwargs):
         ax.set_ylim(min(old_ylims[0], new_ylims[0]),
                     max(old_ylims[1], new_ylims[1]))
 
-    ax.set_xlim(min(f), max(f))
+    ax.set_xlim(min(ff), max(ff))
     ax.set_xlabel('Frequency [Hz]')
     ax.grid(True, which='both', alpha=0.5)
     ax.grid(alpha=0.25, which='minor')

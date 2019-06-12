@@ -63,12 +63,21 @@ class PyTickle:
 
     Inputs:
       eng: the python matlab engine
-      opt: the name for the optical model
+      optName: the name for the optical model
       vRF: vector of RF frequencies [Hz] (Default: 0)
       lambda0: carrier wavelength [m] (Default: 1064e-9)
       pol: polarization (Default: 'S')
+
+    Attributes:
+      eng: same as input
+      optName: same as input
+      vRF: same as input
+      lambda0: same as input
+      pol: same as input
+      probes: list of probe names associated with the model
+      drives: list of drive names associated with the model
     """
-    def __init__(self, eng, opt, vRF=0, lambda0=1064e-9, pol='S'):
+    def __init__(self, eng, optName, vRF=0, lambda0=1064e-9, pol='S'):
         # convert RF and polarization information
         if isinstance(vRF, Number):
             vRF = [vRF]
@@ -83,15 +92,16 @@ class PyTickle:
 
         # initialize the Optickle model in the matlab engine
         self.eng = eng
-        self.opt = opt
+        self.optName = optName
         self.eng.workspace['vRF'] = py2mat(vRF)
         self.eng.workspace['lambda0'] = py2mat(lambda0)
         self.eng.workspace['pol'] = py2mat(matPol)
-        self.eng.eval(self.opt + " = Optickle(vRF, lambda0, pol);", nargout=0)
+        self.eng.eval(
+            self.optName + " = Optickle(vRF, lambda0, pol);", nargout=0)
 
         # initialize pytickle class variables
         self.lambda0 = lambda0
-        self.vRF = mat2py(self.eng.eval(self.opt + ".vFrf"))
+        self.vRF = mat2py(self.eng.eval(self.optName + ".vFrf"))
         self.pol = np.array(pol)
         self.nRF = OrderedDict()
         for ri, fRF in enumerate(vRF):
@@ -101,15 +111,23 @@ class PyTickle:
             else:
                 key = str(int(round(num))) + ' ' + pref + 'Hz'
             self.nRF[key] = ri
-        self.f = None
-        self.fDC = None
-        self.sigAC = None
-        self.sigDCtickle = None
-        self.mMech = None
-        self.noiseAC = None
-        self.poses = None
-        self.sigDC = None
-        self.fDCsweep = None
+
+        self.probes = []
+        self.drives = []
+
+        self._ff = None
+        self._fDC = None
+        self._sigAC = None
+        self._sigAC_pitch = None
+        self._sigAC_yaw = None
+        self._sigDC_tickle = None
+        self._mMech = None
+        self._mMech_pitch = None
+        self._mMech_yaw = None
+        self._noiseAC = None
+        self._poses = None
+        self._sigDC_sweep = None
+        self._fDC_sweep = None
         self._rotatedBasis = False
 
         # Track whether tickle or sweepLinear has been run on this model
@@ -124,33 +142,85 @@ class PyTickle:
             msg = 'This pytickle model has already been run\n'
             msg += 'Initialize a new model and load the Matlab model again'
             raise RuntimeError(msg)
-        self.lambda0 = mat2py(self.eng.eval(self.opt + ".lambda"))
-        self.vRF = mat2py(self.eng.eval(self.opt + ".vFrf"))
+        self.lambda0 = mat2py(self.eng.eval(self.optName + ".lambda"))
+        self.vRF = mat2py(self.eng.eval(self.optName + ".vFrf"))
         # FIXME: add polarization
         self._updateNames()
 
-    def tickle(self, f, noise=True):
-        """Compute the Optickle model (Runs Optickle's tickle function)
+    def tickle(self, ff=None, noise=True, computeAC=True, dof='pos'):
+        """Compute the optomechanical response and quantum noise
+
+        Computes the optomechanical response and quantum noise of this model
+        by running Optickle's tickle function. Angular response is computed
+        with Optickle's tickle01 and tickle10 functions.
 
         Inputs:
-          f: frequency vector [Hz]
+          ff: frequency vector [Hz].
+            If ff is not given or is None, only the DC signals are computed
+            which reduces runtime if the AC signals are not needed.
           noise: If False, the quantum noise is not computed which can decrease
-            runtime. Default: True
+            runtime. (Default: True)
+          computeAC: If False, only the DC signals are computed which can
+            decrease runtime. (Default: True)
+          dof: which degree of freedom or mode to compute the response for:
+            pos: position or TEM00 mode
+            pitch: pitch or TEM01 mode
+            yaw: yaw or TEM10 mode
+            (Default: pos)
         """
         self._tickled = True
-        self.f = f
-        self.eng.workspace['f'] = py2mat(f)
-        if noise:
-            output = "[fDC, sigDCtickle, sigAC, mMech, noiseAC] = "
-        else:
-            output = "[fDC, sigDCtickle, sigAC, mMech] = "
-        self.eng.eval(output + self.opt + ".tickle([], f);", nargout=0)
-        self.fDC = mat2py(self.eng.workspace['fDC'])
-        self.sigDCtickle = mat2py(self.eng.workspace['sigDCtickle'])
-        self.sigAC = mat2py(self.eng.workspace['sigAC'])
-        self.mMech = mat2py(self.eng.workspace['mMech'])
-        if noise:
-            self.noiseAC = mat2py(self.eng.workspace['noiseAC'])
+
+        if dof not in ['pos', 'pitch', 'yaw']:
+            msg = 'Unrecognized degree of freedom {:s}'.format(dof)
+            msg += '. Choose \'pos\', \'pitch\', or \'yaw\'.'
+            raise ValueError(msg)
+
+        if ff is not None:
+            self._ff = ff
+            self.eng.workspace['f'] = py2mat(self._ff)
+
+        if dof == 'pos':
+            if ff is None:
+                output = "[fDC, sigDC_tickle]"
+                cmd = "{:s} = {:s}.tickle([], 0);".format(output, self.optName)
+                self.eng.eval(cmd, nargout=0)
+                self._fDC = mat2py(self.eng.workspace['fDC'])
+                self._sigDC_tickle = mat2py(self.eng.workspace['sigDC_tickle'])
+
+            else:
+                if noise:
+                    output = "[fDC, sigDC_tickle, sigAC, mMech, noiseAC]"
+                else:
+                    output = "[fDC, sigDC_tickle, sigAC, mMech]"
+                cmd = "{:s} = {:s}.tickle([], f);".format(output, self.optName)
+
+                self.eng.eval(cmd, nargout=0)
+                self._fDC = mat2py(self.eng.workspace['fDC'])
+                self._sigDC_tickle = mat2py(self.eng.workspace['sigDC_tickle'])
+                self._sigAC = mat2py(self.eng.workspace['sigAC'])
+                self._mMech = mat2py(self.eng.workspace['mMech'])
+                if noise:
+                    self._noiseAC = mat2py(self.eng.workspace['noiseAC'])
+
+        elif dof == 'pitch':
+            if self._sigDC_tickle is None:
+                # Compute the DC fields since they haven't been computed yet
+                self.tickle(ff=None)
+            cmd = "[sigAC_pitch, mMech_pitch] = {:}.tickle01([], f);".format(
+                self.optName)
+            self.eng.eval(cmd, nargout=0)
+            self._sigAC_pitch = mat2py(self.eng.workspace['sigAC_pitch'])
+            self._mMech_pitch = mat2py(self.eng.workspace['mMech_pitch'])
+
+        elif dof == 'yaw':
+            if self._sigDC_tickle is None:
+                # Compute the DC fields since they haven't been computed yet
+                self.tickle(ff=None)
+            cmd = "[sigAC_pitch, mMech_pitch] = {:}.tickle01([], f);".format(
+                self.optName)
+            self.eng.eval(cmd, nargout=0)
+            self._sigAC_pitch = mat2py(self.eng.workspace['sigAC_pitch'])
+            self._mMech_pitch = mat2py(self.eng.workspace['mMech_pitch'])
 
     def sweeepLinear(self, startPos, endPos, npts):
         """Run Optickle's sweepLinear function
@@ -181,13 +251,13 @@ class PyTickle:
         self.eng.workspace['endPos'] = py2mat(ePosMat)
         self.eng.workspace['npts'] = matlab.double([npts])
 
-        cmd = "[poses, sigDC, fDC] = " + self.opt
+        cmd = "[poses, sigDC, fDC] = " + self.optName
         cmd += ".sweepLinear(startPos, endPos, npts);"
 
         self.eng.eval(cmd, nargout=0)
-        self.poses = mat2py(self.eng.workspace['poses'])
-        self.sigDC = mat2py(self.eng.workspace['sigDC'])
-        self.fDCsweep = mat2py(self.eng.workspace['fDC'])
+        self._poses = mat2py(self.eng.workspace['poses'])
+        self._sigDC_sweep = mat2py(self.eng.workspace['sigDC'])
+        self._fDC_sweep = mat2py(self.eng.workspace['fDC'])
 
     def getTF(self, probeName, driveNames, phase2freq=False):
         """Compute a transfer function
@@ -214,27 +284,27 @@ class PyTickle:
               DARM = {'EX.pos': 1, 'EY.pos': -1}
               tf = opt.getTF('AS_DIFF', DARM)
         """
-        if self.sigAC is None:
+        if self._sigAC is None:
             raise ValueError(
                 'Must run tickle before calculating a transfer function.')
 
         probeNum = self.probes.index(probeName)
         if isinstance(driveNames, str):
             driveNames = {driveNames: 1}
-        if isinstance(self.f, Number):
+        if isinstance(self._ff, Number):
             tf = 0
         else:
-            tf = np.zeros(len(self.f), dtype='complex')
+            tf = np.zeros(len(self._ff), dtype='complex')
 
         for driveName, drivePos in driveNames.items():
             driveNum = self.drives.index(driveName)
             try:
-                tf += drivePos * self.sigAC[probeNum, driveNum]
+                tf += drivePos * self._sigAC[probeNum, driveNum]
             except IndexError:
-                tf += drivePos * self.sigAC[driveNum]
+                tf += drivePos * self._sigAC[driveNum]
 
         if phase2freq:
-            tf = tf/self.f
+            tf = tf/self.ff
 
         return tf
 
@@ -245,7 +315,7 @@ class PyTickle:
 
         driveInNum = self.drives.index(driveInName)
         driveOutNum = self.drives.index(driveOutName)
-        return self.mMech[driveOutNum, driveInNum]
+        return self._mMech[driveOutNum, driveInNum]
 
     def getQuantumNoise(self, probeName):
         """Compute the quantum noise at a probe
@@ -254,9 +324,9 @@ class PyTickle:
         """
         probeNum = self.probes.index(probeName)
         try:
-            qnoise = self.noiseAC[probeNum, :]
+            qnoise = self._noiseAC[probeNum, :]
         except IndexError:
-            qnoise = self.noiseAC[probeNum]
+            qnoise = self._noiseAC[probeNum]
         return qnoise
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
@@ -265,9 +335,9 @@ class PyTickle:
 
         See documentation for plotTF in plotting
         """
-        f = self.f
+        ff = self._ff
         tf = self.getTF(probeName, driveNames)
-        fig = plotting.plotTF(f, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
+        fig = plotting.plotTF(ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
                               phase2freq=phase2freq, **kwargs)
         return fig
 
@@ -287,7 +357,7 @@ class PyTickle:
           mass: If not None (default) plots the SQL with the given mass [kg]
           **kwargs: extra keyword arguments to pass to the plot
         """
-        f = self.f
+        ff = self._ff
         tf = self.getTF(probeName, driveNames)
         noiseASD = np.abs(self.getQuantumNoise(probeName)/tf)
 
@@ -299,14 +369,14 @@ class PyTickle:
         else:
             fig.gca().set_ylabel(
                 r'Strain $[1/\mathrm{Hz}^{1/2}]$')
-        fig.gca().loglog(f, noiseASD/Larm, **kwargs)
+        fig.gca().loglog(ff, noiseASD/Larm, **kwargs)
 
         if mass:
-            hSQL = np.sqrt(8*scc.hbar/(mass*(2*np.pi*f)**2))
-            fig.gca().loglog(f, hSQL/Larm, 'k--', label='SQL', alpha=0.7)
+            hSQL = np.sqrt(8*scc.hbar/(mass*(2*np.pi*ff)**2))
+            fig.gca().loglog(ff, hSQL/Larm, 'k--', label='SQL', alpha=0.7)
             fig.gca().legend()
 
-        fig.gca().set_xlim([min(f), max(f)])
+        fig.gca().set_xlim([min(ff), max(ff)])
         fig.gca().set_xlabel('Frequency [Hz]')
         fig.gca().xaxis.grid(True, which='both', alpha=0.5)
         fig.gca().xaxis.grid(alpha=0.25, which='minor')
@@ -316,7 +386,7 @@ class PyTickle:
         return fig
 
     def plotErrSig(self, probeName, driveName, quad=False, ax=None):
-        if self.sigDC is None:
+        if self._sigDC_sweep is None:
             raise ValueError(
                 'Must run sweepLinear before plotting an error signal')
         if quad:
@@ -331,7 +401,7 @@ class PyTickle:
         # fig = plt.figure()
         for probeName in probeNames:
             probeNum = self.probes.index(probeName)
-            sigDC = self.sigDC[probeNum, :]
+            sigDC = self._sigDC_[probeNum, :]
             ax.plot(poses, sigDC, label=probeName)
         # ax.plot(poses, np.zeros(len(poses)), 'C7--', alpha=0.5)
         ax.xaxis.grid(True, which='major', alpha=0.4)
@@ -367,10 +437,10 @@ class PyTickle:
 
         poses = self.poses[driveNum, :]
         if self.vRF.size == 1:
-            power = np.abs(self.fDCsweep[linkNum, :])**2
+            power = np.abs(self._fDC_sweep[linkNum, :])**2
         else:
             nRF = self._getSidebandInd(fRF)
-            power = np.abs(self.fDCsweep[linkNum, nRF, :])**2
+            power = np.abs(self._fDC_sweep[linkNum, nRF, :])**2
 
         return poses, power
 
@@ -388,11 +458,11 @@ class PyTickle:
         probeNum = self.probes.index(probeName)
         driveNum = self.drives.index(driveName)
 
-        poses = self.poses[driveNum, :]
+        poses = self._poses[driveNum, :]
         try:
-            sig = self.sigDC[probeNum, :]
+            sig = self._sigDC_sweep[probeNum, :]
         except IndexError:
-            sig = self.sigDC
+            sig = self._sigDC_sweep
 
         return poses, sig
 
@@ -408,16 +478,16 @@ class PyTickle:
         Returns:
           power: the DC power [W]
         """
-        if self.fDC is None:
+        if self._fDC is None:
             raise ValueError(
                 'Must run tickle before getting the DC power levels.')
 
         linkNum = self._getLinkNum(linkStart, linkEnd)
         if self.vRF.size == 1:
-            power = np.abs(self.fDC[linkNum])**2
+            power = np.abs(self._fDC[linkNum])**2
         else:
             nRF = self._getSidebandInd(fRF)
-            power = np.abs(self.fDC[linkNum, nRF])**2
+            power = np.abs(self._fDC[linkNum, nRF])**2
 
         return power
 
@@ -425,7 +495,7 @@ class PyTickle:
         """Print the DC power at each link in the model
         """
         pad2 = 7
-        nLink = int(self.eng.eval(self.opt + ".Nlink;"))
+        nLink = int(self.eng.eval(self.optName + ".Nlink;"))
         links = []
         for ii in range(nLink):
             sourceName = self._getSourceName(ii + 1)
@@ -443,9 +513,9 @@ class PyTickle:
         for li, link in enumerate(links):
             line = '{:{pad}s}|'.format(link, pad=pad)
             if nRF == 1:
-                line += misc.printLine([self.fDC[li]], pad2)
+                line += misc.printLine([self._fDC[li]], pad2)
             else:
-                line += misc.printLine(self.fDC[li, :], pad2)
+                line += misc.printLine(self._fDC[li, :], pad2)
             if li % 5 == 0:
                 print('{:_<{length}}'.format('', length=int(l1 + l2 + 1)))
             print(line)
@@ -465,9 +535,9 @@ class PyTickle:
             probes = self.probes
         for pi, probe in enumerate(probes):
             try:
-                pref, num = misc.siPrefix(self.sigDCtickle[pi])
+                pref, num = misc.siPrefix(self._sigDC_tickle[pi])
             except IndexError:
-                pref, num = misc.siPrefix(self.sigDCtickle)
+                pref, num = misc.siPrefix(self._sigDC_tickle)
             pad3 = pad2 - len(pref) - 2
             print('{:{pad1}s}| {:{pad3}.1f} {:s}W|'.format(
                 probe, num, pref, pad1=pad1, pad3=pad3))
@@ -489,7 +559,7 @@ class PyTickle:
         args = OrderedDict([
             ('aoi', aoi), ('Chr', Chr), ('Thr', Thr), ('Lhr', Lhr),
             ('Rar', Rar), ('Lmd', Lmd), ('Nmd', Nmd)])
-        cmd = self.opt + ".addMirror(" + str2mat(name)
+        cmd = self.optName + ".addMirror(" + str2mat(name)
         for key, val in args.items():
             self.eng.workspace[key] = py2mat(val)
             cmd += ", " + key
@@ -514,7 +584,7 @@ class PyTickle:
         args = OrderedDict([
             ('aoi', aoi), ('Chr', Chr), ('Thr', Thr), ('Lhr', Lhr),
             ('Rar', Rar), ('Lmd', Lmd), ('Nmd', Nmd)])
-        cmd = self.opt + ".addBeamSplitter(" + str2mat(name)
+        cmd = self.optName + ".addBeamSplitter(" + str2mat(name)
         for key, val in args.items():
             self.eng.workspace[key] = py2mat(val)
             cmd += ", " + key
@@ -552,7 +622,7 @@ class PyTickle:
           portIn: name of the ingoing port
           linkLen: length of the link [m]
         """
-        cmd = self.opt + ".addLink("
+        cmd = self.optName + ".addLink("
         cmd += str2mat(nameOut) + ", " + str2mat(portOut)
         cmd += ", " + str2mat(nameIn) + ", " + str2mat(portIn)
         cmd += ", " + str(linkLen) + ");"
@@ -569,7 +639,7 @@ class PyTickle:
             self.eng.workspace['ampRF'] = py2mat(ampRF)
         else:
             self.eng.workspace['ampRF'] = py2mat([ampRF])
-        cmd = self.opt + ".addSource("
+        cmd = self.optName + ".addSource("
         cmd += str2mat(name) + ", ampRF);"
         self.eng.eval(cmd, nargout=0)
         self._updateNames()
@@ -652,7 +722,7 @@ class PyTickle:
         self.eng.workspace['sqAng'] = py2mat(sqAng)
         self.eng.workspace['sqzOption'] = py2mat(sqzOption)
 
-        cmd = self.opt + ".addSqueezer(" + str2mat(name)
+        cmd = self.optName + ".addSqueezer(" + str2mat(name)
         cmd += ", lambda0, fRF, npol, sqAng, "
 
         if sqzOption == 0:
@@ -678,7 +748,7 @@ class PyTickle:
         """
         self.eng.workspace['lfw'] = py2mat(lfw)
         self.eng.workspace['theta'] = py2mat(theta)
-        cmd = self.opt + ".addWaveplate("
+        cmd = self.optName + ".addWaveplate("
         cmd += str2mat(name) + ", lfw, theta);"
         self.eng.eval(cmd, nargout=0)
         self._updateNames()
@@ -690,7 +760,7 @@ class PyTickle:
           name: name of the modulator
           cMod: modulation index (amplitude: 1; phase: 1j)
         """
-        cmd = self.opt + ".addModulator(" + str2mat(name)
+        cmd = self.optName + ".addModulator(" + str2mat(name)
         cmd += ", " + str(cMod) + ");"
         self.eng.eval(cmd, nargout=0)
         self._updateNames()
@@ -703,13 +773,13 @@ class PyTickle:
           fMod: frequency of the modulated RF component [Hz]
           aMod: modulation amplitude (real for amplitude; complex for phase)
         """
-        cmd = self.opt + ".addRFmodulator(" + str2mat(name)
+        cmd = self.optName + ".addRFmodulator(" + str2mat(name)
         cmd += ", " + str(fMod) + ", " + str(aMod) + ");"
         self.eng.eval(cmd, nargout=0)
         self._updateNames()
 
     def addSink(self, name, loss=1):
-        cmd = self.opt + ".addSink(" + str2mat(name)
+        cmd = self.optName + ".addSink(" + str2mat(name)
         cmd += ", " + str(loss) + ");"
         self.eng.eval(cmd, nargout=0)
         self._updateNames()
@@ -723,7 +793,7 @@ class PyTickle:
                    + ' addHomodyneReadout may have to be called with '
                    + 'rotateBasis=False.')
             raise RuntimeError(msg)
-        cmd = self.opt + ".addProbeIn("
+        cmd = self.optName + ".addProbeIn("
         cmd += str2mat(name) + ", " + str2mat(sinkName)
         cmd += ", " + str2mat(sinkPort) + ", "
         cmd += str(freq) + ", " + str(phase) + ");"
@@ -755,7 +825,7 @@ class PyTickle:
             self.addProbeIn(nameQ, sinkName, 'in', freq, phase + 90)
 
     def setPosOffset(self, name, dist):
-        cmd = self.opt + ".setPosOffset(" + str2mat(name)
+        cmd = self.optName + ".setPosOffset(" + str2mat(name)
         cmd += ", " + str(dist) + ");"
         self.eng.eval(cmd, nargout=0)
 
@@ -788,7 +858,7 @@ class PyTickle:
         self.eng.workspace['nDOF'] = py2mat(nDOF)
 
         self.eng.eval("tf = zpk(z, p, k);", nargout=0)
-        cmd = self.opt + ".setMechTF(" + str2mat(name) + ", tf, nDOF);"
+        cmd = self.optName + ".setMechTF(" + str2mat(name) + ", tf, nDOF);"
         self.eng.eval(cmd, nargout=0)
 
     def addHomodyneReadout(
@@ -805,14 +875,14 @@ class PyTickle:
         # Add LO if necessary.
         if LOpower > 0:
             if nu is None:
-                freqs = mat2py(self.eng.eval(self.opt + ".nu;"))
+                freqs = mat2py(self.eng.eval(self.optName + ".nu;"))
                 if len(freqs.shape) == 0:
                     nu = freqs
                 else:
                     nu = freqs[0]
             npol = self._pol2opt(pol)
             self.eng.workspace['nu'] = py2mat(nu)
-            cmd = "Optickle.matchFreqPol(" + self.opt + ", nu"
+            cmd = "Optickle.matchFreqPol(" + self.optName + ", nu"
             cmd += ", " + str(npol) + ");"
             ampRF = self.eng.eval(cmd)
             ampRF = np.sqrt(LOpower)*ampRF
@@ -838,7 +908,7 @@ class PyTickle:
             phase = np.pi*(90 - phase)/180
         else:
             phase = np.pi*phase/180
-        cmd = "LO = " + self.opt + ".getOptic(" + str2mat(LOname) + ");"
+        cmd = "LO = " + self.optName + ".getOptic(" + str2mat(LOname) + ");"
         self.eng.eval(cmd, nargout=0)
         self.eng.eval("RFamp = abs(LO.vArf);", nargout=0)
         self.eng.eval("LO.vArf = RFamp * exp(1i*" + str(phase) + ");",
@@ -861,7 +931,7 @@ class PyTickle:
         """Set the probe basis
         """
         self.eng.workspace['mProbeOut'] = py2mat(mProbeOut)
-        self.eng.eval(self.opt + ".mProbeOut = mProbeOut;", nargout=0)
+        self.eng.eval(self.optName + ".mProbeOut = mProbeOut;", nargout=0)
         self._rotatedBasis = True
 
     def setCavityBasis(self, name1, name2):
@@ -870,7 +940,7 @@ class PyTickle:
         Inputs:
           name1, name2: the names of the optics
         """
-        cmd = self.opt + ".setCavityBasis("
+        cmd = self.optName + ".setCavityBasis("
         cmd += str2mat(name1) + ", " + str2mat(name2) + ");"
         self.eng.eval(cmd, nargout=0)
 
@@ -882,7 +952,7 @@ class PyTickle:
           param: name of the parameter
           val: value of the paramter
         """
-        cmd = self.opt + ".setOpticParam("
+        cmd = self.optName + ".setOpticParam("
         cmd += str2mat(name) + ", " + str2mat(param)
         cmd += ", " + str(val) + ");"
         self.eng.eval(cmd, nargout=0)
@@ -894,7 +964,7 @@ class PyTickle:
           name: name of the optic
           param: name of the parameter
         """
-        cmd = self.opt + ".getOptic(" + str2mat(name) + ");"
+        cmd = self.optName + ".getOptic(" + str2mat(name) + ");"
         self.eng.eval(cmd, nargout=0)
         return self.eng.eval("ans." + param + ";")
 
@@ -907,7 +977,7 @@ class PyTickle:
         Returns:
           phase: phase of the probe [deg]
         """
-        cmd = self.opt + ".getProbePhase(" + str2mat(name) + ");"
+        cmd = self.optName + ".getProbePhase(" + str2mat(name) + ");"
         return self.eng.eval(cmd, nargout=1)
 
     def setProbePhase(self, name, phase):
@@ -917,7 +987,7 @@ class PyTickle:
           name: name of the probe
           phase: phase of the probe [deg]
         """
-        cmd = self.opt + ".setProbePhase("
+        cmd = self.optName + ".setProbePhase("
         cmd += str2mat(name) + ", " + str(phase) + ");"
         self.eng.eval(cmd, nargout=0)
 
@@ -931,7 +1001,7 @@ class PyTickle:
         Returns:
           linkLen: the length of the link [m]
         """
-        linkLens = self.eng.eval(self.opt + ".getLinkLengths", nargout=1)
+        linkLens = self.eng.eval(self.optName + ".getLinkLengths", nargout=1)
         linkLens = mat2py(linkLens)
         linkNum = self._getLinkNum(linkStart, linkEnd)
         return linkLens[linkNum]
@@ -949,7 +1019,7 @@ class PyTickle:
         self.eng.workspace['linkNum'] = py2mat(linkNum)
         self.eng.workspace['linkLen'] = py2mat(linkLen)
         self.eng.eval(
-            self.opt + ".setLinkLength(linkNum, linkLen);", nargout=0)
+            self.optName + ".setLinkLength(linkNum, linkLen);", nargout=0)
 
     def _getSourceName(self, linkNum):
         """Find the name of the optic that is the source for a link
@@ -957,7 +1027,7 @@ class PyTickle:
         Inputs:
           linkNum: the link number
         """
-        cmd = self.opt + ".getSourceName(" + str(linkNum) + ");"
+        cmd = self.optName + ".getSourceName(" + str(linkNum) + ");"
         return self.eng.eval(cmd, nargout=1)
 
     def _getSinkName(self, linkNum):
@@ -966,7 +1036,7 @@ class PyTickle:
         Inputs:
           linkNum: the link number
         """
-        cmd = self.opt + ".getSinkName(" + str(linkNum) + ");"
+        cmd = self.optName + ".getSinkName(" + str(linkNum) + ");"
         return self.eng.eval(cmd, nargout=1)
 
     def _getLinkNum(self, linkStart, linkEnd):
@@ -982,7 +1052,7 @@ class PyTickle:
         linkStart = str2mat(linkStart)
         linkEnd = str2mat(linkEnd)
         linkNum = self.eng.eval(
-            self.opt + ".getLinkNum(" + linkStart + ", " + linkEnd + ");")
+            self.optName + ".getLinkNum(" + linkStart + ", " + linkEnd + ");")
         try:
             linkNum = int(linkNum) - 1
         except TypeError:
@@ -994,8 +1064,8 @@ class PyTickle:
     def _updateNames(self):
         """Refresh the pytickle model's list of probe and drive names
         """
-        self.probes = self.eng.eval(self.opt + ".getProbeName")
-        self.drives = self.eng.eval(self.opt + ".getDriveNames")
+        self.probes = self.eng.eval(self.optName + ".getProbeName")
+        self.drives = self.eng.eval(self.optName + ".getDriveNames")
 
     def _pol2opt(self, pol):
         """Convert S and P polarizations to 1s and 0s for Optickle
