@@ -759,13 +759,11 @@ class PyTickle:
         cmd += ", " + str(dist) + ");"
         self.eng.eval(cmd, nargout=0)
 
-    def setMechTF(self, name, p, k, dof='pos'):
+    def setMechTF(self, name, z, p, k, dof='pos'):
         """Set the mechanical transfer function of an optic
 
         The transfer function is from radiation pressure to one of the degrees
         of freedom position, pitch, or yaw.
-
-        Need to make this a bit more general to handle zeros as well.
 
         Inputs:
           name: name of the optic
@@ -783,9 +781,13 @@ class PyTickle:
             msg = 'Unrecognized degree of freedom ' + str(dof)
             msg += '. Choose \'pos\', \'pitch\', or \'yaw\'.'
             raise ValueError(msg)
+
+        self.eng.workspace['z'] = py2mat(z, is_complex=True)
         self.eng.workspace['p'] = py2mat(p, is_complex=True)
+        self.eng.workspace['k'] = py2mat(k, is_complex=True)
         self.eng.workspace['nDOF'] = py2mat(nDOF)
-        self.eng.eval("tf = zpk([], p, " + str(k) + ");", nargout=0)
+
+        self.eng.eval("tf = zpk(z, p, k);", nargout=0)
         cmd = self.opt + ".setMechTF(" + str2mat(name) + ", tf, nDOF);"
         self.eng.eval(cmd, nargout=0)
 

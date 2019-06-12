@@ -123,17 +123,17 @@ def optSagnac(eng, opt, sqzAng=0, sqdB=0, antidB=0):
     iE = mE*iTM
 
     dampRes = np.array([0.01 + 1j, 0.01 - 1j])
-    opt.setMechTF('IX', -w*dampRes, 1/mI)
-    opt.setMechTF('EX', -w*dampRes, 1/mE)
-    opt.setMechTF('IY', -w_pit*dampRes, 1/iI, 'pitch')
-    opt.setMechTF('EY', -w_pit*dampRes, 1/iE, 'pitch')
+    opt.setMechTF('IX', [], -w*dampRes, 1/mI)
+    opt.setMechTF('EX', [], -w*dampRes, 1/mE)
+    opt.setMechTF('IY', [], -w_pit*dampRes, 1/iI, 'pitch')
+    opt.setMechTF('EY', [], -w_pit*dampRes, 1/iE, 'pitch')
 
     ######################################################################
     # Squeezer
     ######################################################################
 
     if sqdB > 0:
-        opt.addSqueezer('Sqz', pol='P', sqzAng=sqzAng, sqdB=sqdB,
+        opt.addSqueezer('Sqz', pol='P', sqAng=sqzAng, sqdB=sqdB,
                         antidB=antidB)
         opt.addLink('Sqz', 'out', 'BS', 'bkA', 0)
 
