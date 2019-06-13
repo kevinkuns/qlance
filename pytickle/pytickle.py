@@ -1021,6 +1021,29 @@ class PyTickle:
         self.eng.eval(
             self.optName + ".setLinkLength(linkNum, linkLen);", nargout=0)
 
+    def getBeamProperties(self, name, port):
+        """Compute the properties of a Gaussian beam at an optic
+
+        Inputs:
+          name: name of the optic
+          port: name of the port
+
+        Returns:
+          w: beam radius on the optic [m]
+          z: distance from the beam waist to the optic [m]
+            Negative values indicate that the optic is before the waist.
+          z0: Rayleigh range of the beam [m]
+          R: radius of curvature of the phase front on the optic [m]
+        """
+        cmd = "[w, z0, z, R] = {:s}.getBeamSize({:s}, {:s})".format(
+            self.optName, str2mat(name), str2mat(port))
+        self.eng.eval(cmd, nargout=0)
+        w = mat2py(self.eng.workspace['w'])
+        z0 = mat2py(self.eng.workspace['z0'])
+        z = mat2py(self.eng.workspace['z'])
+        R = mat2py(self.eng.workspace['R'])
+        return w, z0, z, R
+
     def _getSourceName(self, linkNum):
         """Find the name of the optic that is the source for a link
 
