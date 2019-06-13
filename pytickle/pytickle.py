@@ -216,11 +216,11 @@ class PyTickle:
             if self._sigDC_tickle is None:
                 # Compute the DC fields since they haven't been computed yet
                 self.tickle(ff=None)
-            cmd = "[sigAC_pitch, mMech_pitch] = {:}.tickle01([], f);".format(
+            cmd = "[sigAC_yaw, mMech_yaw] = {:}.tickle10([], f);".format(
                 self.optName)
             self.eng.eval(cmd, nargout=0)
-            self._sigAC_pitch = mat2py(self.eng.workspace['sigAC_pitch'])
-            self._mMech_pitch = mat2py(self.eng.workspace['mMech_pitch'])
+            self._sigAC_yaw = mat2py(self.eng.workspace['sigAC_yaw'])
+            self._mMech_yaw = mat2py(self.eng.workspace['mMech_yaw'])
 
     def sweeepLinear(self, startPos, endPos, npts):
         """Run Optickle's sweepLinear function
@@ -259,14 +259,12 @@ class PyTickle:
         self._sigDC_sweep = mat2py(self.eng.workspace['sigDC'])
         self._fDC_sweep = mat2py(self.eng.workspace['fDC'])
 
-    def getTF(self, probeName, driveNames, phase2freq=False):
+    def getTF(self, probeName, driveNames):
         """Compute a transfer function
 
         Inputs:
           probeName: name of the probe at which the TF is calculated
           driveNames: names of the drives from which the TF is calculated
-          phase2freq: If True, a phase transfer function is divided by the
-            frequency to return a frequency transfer function (Default: False)
 
         Returns:
           tf: the transfer function
@@ -276,8 +274,6 @@ class PyTickle:
             To compute the phase transfer function in reflection from a FP
             cavity
               tf = opt.getTF('REFL', 'PM.drive')
-            To get the frequency transfer function, call getTF with
-            phase2freq=True
 
           * If multiple drives are used, the drive names should be a dict
             To compute the DARM transfer function to the AS_DIFF PD
@@ -285,7 +281,7 @@ class PyTickle:
               tf = opt.getTF('AS_DIFF', DARM)
         """
         if self._sigAC is None:
-            raise ValueError(
+            raise RuntimeError(
                 'Must run tickle before calculating a transfer function.')
 
         probeNum = self.probes.index(probeName)
@@ -303,8 +299,47 @@ class PyTickle:
             except IndexError:
                 tf += drivePos * self._sigAC[driveNum]
 
-        if phase2freq:
-            tf = tf/self.ff
+        return tf
+
+    def getAngularTF(self, probeName, driveName, spotName, spotPort, dof):
+        """Compute an angular transfer function
+
+        Computes an angular transfer function from angle to beam-spot motion
+        Note that this function includes the conversion to beam-spot motion
+        which is not automatically included in Optickle
+
+        Inputs:
+          probeName: name of the probe at which the TF is calculated
+          driveName: name of the drive from which the TF is calculated
+          spotName: name of the optic which is probed
+          spotPort: name of the port
+
+        Returns:
+          tf: the transfer function [rad/m]
+        """
+        if dof == 'pitch':
+            sigAC = self._sigAC_pitch
+        elif dof == 'yaw':
+            sigAC = self._sigAC_yaw
+        else:
+            msg = 'Unrecognized degree of freedom {:s}'.format(dof)
+            msg += '. Choose \'pitch\', or \'yaw\'.'
+            raise ValueError(msg)
+
+        if sigAC is None:
+            msg = 'Must run tickle for dof {:s}'.format(dof)
+            msg += ' before calculating an angular transfer function'
+            raise RuntimeError(msg)
+
+        probeNum = self.probes.index(probeName)
+        driveNum = self.drives.index(driveName)
+        spotNum = self.drives.index(spotName + '.pos')
+        tf = sigAC[probeNum, driveNum]
+
+        # Convert to beam-spot motion
+        w, _, _, _ = self.getBeamProperties(spotName, spotPort)
+        Pdc = self._sigDC_tickle[spotNum]
+        tf *= w/(2*Pdc)
 
         return tf
 
