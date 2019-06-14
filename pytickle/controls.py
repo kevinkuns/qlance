@@ -218,6 +218,22 @@ class ControlSystem:
         """
         self._filters.append((dofTo, dofFrom, Filter(*args)))
 
+    def getFilter(self, dofTo, dofFrom):
+        dofsTo = np.array([filt[0] for filt in self._filters])
+        dofsFrom = np.array([filt[1] for filt in self._filters])
+        inds = np.logical_and(dofTo == dofsTo, dofFrom == dofsFrom)
+        nfilts = np.count_nonzero(inds)
+        if nfilts == 0:
+            raise ValueError('There is no filter from {:s} to {:s}'.format(
+                dofFrom, dofTo))
+        elif nfilts > 1:
+            raise ValueError('There are multiple filters')
+        else:
+            return self._filters[inds.nonzero()[0][0]][-1]
+
+    def plotFilter(self, dofTo, dofFrom):
+        pass
+
     def getOLTF(self, dofTo, dofFrom):
         pass
 
