@@ -2,6 +2,9 @@ from __future__ import division
 import numpy as np
 from collections import OrderedDict
 from utils import assertType
+from functools import partial
+from numbers import Number
+import plotting
 
 
 def append_str_if_unique(array, elements):
@@ -19,6 +22,30 @@ def append_str_if_unique(array, elements):
     for element in elements:
         if element not in array:
             array.append(element)
+
+
+def zpk(zs, ps, k, ff):
+    def assertArr(arr):
+        if isinstance(arr, Number):
+            return [arr]
+        elif isinstance(arr, list) or isinstance(arr, np.ndarray):
+            return arr
+        else:
+            raise ValueError('Unrecognized data dtype')
+
+    if not isinstance(k, Number):
+        raise ValueError('The gain should be a scalar')
+
+    filt = k * np.ones(len(ff), dtype=complex)
+    for z in assertArr(zs):
+        filt *= (ff - z)
+    for p in assertArr(ps):
+        filt /= (ff - p)
+    return filt
+
+
+def zpk2func(zs, ps, k):
+    return partial(zpk, zs, ps, k)
 
 
 class DegreeOfFreedom:
@@ -48,10 +75,47 @@ class DegreeOfFreedom:
         return driveArr
 
 
+class Filter:
+    """A class representing a generic filter
+
+    Inputs:
+      The filter can be specified in one of two ways:
+        1) Giving a callable function
+        2) Giving the zeros, poles, and gain
+
+    Attributes:
+      filt: the filter function
+    """
+    def __init__(self, *args):
+        if len(args) == 1:
+            self.filt = args[0]
+            if not callable(self.filt):
+                raise ValueError('One argument filters should be functions')
+        elif len(args) == 3:
+            zs = args[0]
+            ps = args[1]
+            k = args[2]
+            self.filt = partial(zpk, zs, ps, k)
+        else:
+            msg = 'Incorrect number of arguments. Input can be either\n'
+            msg += '1) A single argument which is the filter function\n'
+            msg += '2) Three arguments representing the zeros, poles, and gain'
+            raise ValueError(msg)
+
+    def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
+        ss = 2j*np.pi*ff
+        fig = plotting.plotTF(
+            ff, self.filt(ss), mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
+            **kwargs)
+        return fig
+
+
 class ControlSystem:
     def __init__(self):
         self.opt = None
+        self._ss = None
         self._dofs = OrderedDict()
+        self._filters = []
         self._dofNames = []
         self._driveNames = []
         self._probes = []
@@ -67,6 +131,7 @@ class ControlSystem:
             raise ValueError('A PyTickle model is already set as the plant')
         else:
             self.opt = opt
+            self._ss = 2j*np.pi*opt._ff
 
     def addDOF(self, name, probes, drives):
         """Add a degree of freedom to the model
@@ -98,12 +163,13 @@ class ControlSystem:
         nProbes = len(self._probes)
         nDrives = len(self._drives)
         nff = len(self.opt._ff)
-        plant = np.zeros((nProbes, nDrives, nff))
+        plant = np.zeros((nProbes, nDrives, nff), dtype=complex)
 
         for pi, probe in enumerate(self._probes):
-            for di, drive in enumerate(self.drives):
+            for di, drive in enumerate(self._drives):
                 tf = self.opt.getTF(probe, drive)
                 plant[pi, di, :] = tf
+        return plant
 
     def computeSensingMatrix(self):
         """Compute the sensing matrix from probes to DOFs
@@ -134,8 +200,15 @@ class ControlSystem:
     def computeController(self):
         pass
 
-    def addFilter(self, dofTo, dofFrom, z, p, k):
-        pass
+    def addFilter(self, dofTo, dofFrom, *args):
+        """Add a filter between two DOFs to the controller
+
+        Inputs:
+          dofTo: output DOF
+          dofFrom: input DOF
+          *args: arguments used to define a Filter instance
+        """
+        self._filters.append((dofTo, dofFrom, Filter(*args)))
 
     def getOLTF(self, dofTo, dofFrom):
         pass
