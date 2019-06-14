@@ -198,7 +198,15 @@ class ControlSystem:
         return actMat
 
     def computeController(self):
-        pass
+        if self._ss is None:
+            raise RuntimeError('There is no associated PyTickle model')
+        nDOF = len(self._dofs)
+        ctrlMat = np.zeros((nDOF, nDOF, len(self._ss)), dtype=complex)
+        for (dofTo, dofFrom, filt) in self._filters:
+            toInd = self._dofs.keys().index(dofTo)
+            fromInd = self._dofs.keys().index(dofFrom)
+            ctrlMat[toInd, fromInd, :] = filt.filt(self._ss)
+        return ctrlMat
 
     def addFilter(self, dofTo, dofFrom, *args):
         """Add a filter between two DOFs to the controller
