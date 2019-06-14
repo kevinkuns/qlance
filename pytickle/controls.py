@@ -103,6 +103,10 @@ class Filter:
             raise ValueError(msg)
 
     def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
+        """Plot the filter
+
+        See documentation for plotTF in plotting
+        """
         ss = 2j*np.pi*ff
         fig = plotting.plotTF(
             ff, self.filt(ss), mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
@@ -219,6 +223,15 @@ class ControlSystem:
         self._filters.append((dofTo, dofFrom, Filter(*args)))
 
     def getFilter(self, dofTo, dofFrom):
+        """Get the filter between two DOFs
+
+        Inputs:
+          dofTo: output DOF
+          dofFrom: input DOF
+
+        Returns:
+          filt: the filter
+        """
         dofsTo = np.array([filt[0] for filt in self._filters])
         dofsFrom = np.array([filt[1] for filt in self._filters])
         inds = np.logical_and(dofTo == dofsTo, dofFrom == dofsFrom)
@@ -231,8 +244,14 @@ class ControlSystem:
         else:
             return self._filters[inds.nonzero()[0][0]][-1]
 
-    def plotFilter(self, dofTo, dofFrom):
-        pass
+    def plotFilter(self, dofTo, dofFrom, mag_ax=None, phase_ax=None, dB=False,
+                   **kwargs):
+        """Plot a filter function
+
+        See documentation for plotFilter in Filter class
+        """
+        filt = self.getFilter(dofTo, dofFrom)
+        return filt.plotFilter(self.opt._ff, mag_ax, phase_ax, dB, **kwargs)
 
     def getOLTF(self, dofTo, dofFrom):
         pass
