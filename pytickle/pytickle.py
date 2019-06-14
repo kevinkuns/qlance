@@ -10,7 +10,7 @@ import scipy.constants as scc
 from numbers import Number
 from collections import OrderedDict
 import plotting
-import misc
+import utils
 
 
 def mat2py(mat_arr):
@@ -105,7 +105,7 @@ class PyTickle:
         self.pol = np.array(pol)
         self.nRF = OrderedDict()
         for ri, fRF in enumerate(vRF):
-            pref, num = misc.siPrefix(round(fRF))
+            pref, num = utils.siPrefix(round(fRF))
             if num == 0:
                 key = 'DC'
             else:
@@ -543,14 +543,14 @@ class PyTickle:
         except TypeError:
             nRF = 1
         l2 = (pad2 + 3)*nRF
-        print('{:<{l1}s}|'.format('Link', l1=l1) + misc.printHeader(
+        print('{:<{l1}s}|'.format('Link', l1=l1) + utils.printHeader(
             self.vRF, pad2 - 1))
         for li, link in enumerate(links):
             line = '{:{pad}s}|'.format(link, pad=pad)
             if nRF == 1:
-                line += misc.printLine([self._fDC[li]], pad2)
+                line += utils.printLine([self._fDC[li]], pad2)
             else:
-                line += misc.printLine(self._fDC[li, :], pad2)
+                line += utils.printLine(self._fDC[li, :], pad2)
             if li % 5 == 0:
                 print('{:_<{length}}'.format('', length=int(l1 + l2 + 1)))
             print(line)
@@ -570,9 +570,9 @@ class PyTickle:
             probes = self.probes
         for pi, probe in enumerate(probes):
             try:
-                pref, num = misc.siPrefix(self._sigDC_tickle[pi])
+                pref, num = utils.siPrefix(self._sigDC_tickle[pi])
             except IndexError:
-                pref, num = misc.siPrefix(self._sigDC_tickle)
+                pref, num = utils.siPrefix(self._sigDC_tickle)
             pad3 = pad2 - len(pref) - 2
             print('{:{pad1}s}| {:{pad3}.1f} {:s}W|'.format(
                 probe, num, pref, pad1=pad1, pad3=pad3))
@@ -1152,12 +1152,12 @@ class PyTickle:
         if len(ind) == 0:
             msg = 'There are no sidebands with frequency '
             msg += '{:0.0f} {:s}Hz'.format(
-                *misc.siPrefix(freq)[::-1])
+                *utils.siPrefix(freq)[::-1])
             raise ValueError(msg)
         elif len(ind) > 1:
             msg = 'There are {:d} sidebands with '.format(len(ind))
             msg += 'frequency {:0.0f} {:s}Hz'.format(
-                *misc.siPrefix(freq)[::-1])
+                *utils.siPrefix(freq)[::-1])
             raise ValueError(msg)
         else:
             return int(ind)

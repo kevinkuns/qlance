@@ -4,6 +4,7 @@ Some misc. functions.
 
 from __future__ import division
 import numpy as np
+from collections import OrderedDict
 
 
 def mag2db(arr, pow=False):
@@ -48,6 +49,29 @@ def siPrefix(num, tex=False):
         if pref == 'u':
             pref = r'$\mu$'
     return pref, num
+
+
+def assertType(data, dtype):
+    """Convert some data into a specified type
+
+    Converts a single data point to a list, dictionary or OrderedDict
+    of a single element
+
+    Inputs:
+      data: the data
+      dtype: the type of data: list, dict, or OrderedDict
+
+    Returns:
+      data: the converted data
+    """
+    if isinstance(data, str):
+        if dtype == list:
+            data = [data]
+        elif dtype == dict:
+            data = {data: 1}
+        elif dtype == OrderedDict:
+            data = OrderedDict({data: 1})
+    return data
 
 
 def printLine(arr, pad):

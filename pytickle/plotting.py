@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.ticker import FormatStrFormatter
-from misc import mag2db
+from utils import mag2db
 
 
 def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
