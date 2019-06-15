@@ -202,6 +202,11 @@ class ControlSystem:
         return actMat
 
     def computeController(self):
+        """Compute the control matrix from DOFs to DOFs
+
+        Returns:
+          ctrlMat: a (nDOF, nDOF, nff) array
+        """
         if self._ss is None:
             raise RuntimeError('There is no associated PyTickle model')
         nDOF = len(self._dofs)
@@ -211,6 +216,16 @@ class ControlSystem:
             fromInd = self._dofs.keys().index(dofFrom)
             ctrlMat[toInd, fromInd, :] = filt.filt(self._ss)
         return ctrlMat
+
+    def computeOLTF(self):
+        """Compute the OLTF from DOFs to DOFs
+        """
+        actMat = self.computeActuationMatrix()
+        sensMat = self.computeActuationMatrix()
+        ctrlMat = self.computeController()
+        plant = self.computePlant()
+        oltf = np.einsum('ijf,jk,klf,lm->imf', ctrlMat, sensMat, plant, actMat)
+        return oltf
 
     def addFilter(self, dofTo, dofFrom, *args):
         """Add a filter between two DOFs to the controller
