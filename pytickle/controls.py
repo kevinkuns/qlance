@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy as np
+from scipy.linalg import inv
 from collections import OrderedDict
 from utils import assertType
 from functools import partial
@@ -226,6 +227,16 @@ class ControlSystem:
         plant = self.computePlant()
         oltf = np.einsum('ijf,jk,klf,lm->imf', ctrlMat, sensMat, plant, actMat)
         return oltf
+
+    def computeCLTF(self):
+        """Compute the CLTF from DOFs to DOFs
+        """
+        oltf = self.computeOLTF()
+        cltf = np.zeros_like(oltf)
+        nDOF = cltf.shape[0]
+        for fi in range(cltf.shape[-1]):
+            cltf[:, :, fi] = inv(np.identity(nDOF) - oltf[:, :, fi])
+        return cltf
 
     def addFilter(self, dofTo, dofFrom, *args):
         """Add a filter between two DOFs to the controller
