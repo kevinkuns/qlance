@@ -106,7 +106,7 @@ class Filter:
     def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
         """Plot the filter
 
-        See documentation for plotTF in plotting
+        See documentation for plotting.plotTF
         """
         ss = 2j*np.pi*ff
         fig = plotting.plotTF(
@@ -121,8 +121,6 @@ class ControlSystem:
         self._ss = None
         self._dofs = OrderedDict()
         self._filters = []
-        self._dofNames = []
-        self._driveNames = []
         self._probes = []
         self._drives = []
 
@@ -158,7 +156,7 @@ class ControlSystem:
         append_str_if_unique(self._probes, probes)
         append_str_if_unique(self._drives, drives)
 
-    def computePlant(self):
+    def _computePlant(self):
         """Compute the PyTickle plant from drives to probes
 
         Returns:
@@ -176,7 +174,7 @@ class ControlSystem:
                 plant[pi, di, :] = tf
         return plant
 
-    def computeSensingMatrix(self):
+    def _computeSensingMatrix(self):
         """Compute the sensing matrix from probes to DOFs
 
         Returns:
@@ -189,7 +187,7 @@ class ControlSystem:
             sensMat[di, :] = dof.probes2dof(self._probes)
         return sensMat
 
-    def computeActuationMatrix(self):
+    def _computeActuationMatrix(self):
         """Compute the actuation matrix from DOFs to drives
 
         Returns:
@@ -202,7 +200,7 @@ class ControlSystem:
             actMat[:, di] = dof.dof2drives(self._drives)
         return actMat
 
-    def computeController(self):
+    def _computeController(self):
         """Compute the control matrix from DOFs to DOFs
 
         Returns:
@@ -218,20 +216,39 @@ class ControlSystem:
             ctrlMat[toInd, fromInd, :] = filt.filt(self._ss)
         return ctrlMat
 
-    def computeOLTF(self):
+    def _computeOLTF(self, sig='err'):
         """Compute the OLTF from DOFs to DOFs
+
+        Inputs:
+          sig: which signal to compute the TF for:
+            1) 'err': error signal (Default)
+            2) 'ctrl': control signal
         """
-        actMat = self.computeActuationMatrix()
-        sensMat = self.computeActuationMatrix()
-        ctrlMat = self.computeController()
-        plant = self.computePlant()
-        oltf = np.einsum('ijf,jk,klf,lm->imf', ctrlMat, sensMat, plant, actMat)
+        if sig not in ['err', 'ctrl']:
+            raise ValueError('The signal must be either err or ctrl')
+
+        actMat = self._computeActuationMatrix()
+        sensMat = self._computeActuationMatrix()
+        ctrlMat = self._computeController()
+        plant = self._computePlant()
+
+        if sig == 'err':
+            oltf = np.einsum('ij,jkf,kl,lmf->imf',
+                             sensMat, plant, actMat, ctrlMat)
+        elif sig == 'ctrl':
+            oltf = np.einsum('ijf,jk,klf,lm->imf',
+                             ctrlMat, sensMat, plant, actMat)
         return oltf
 
-    def computeCLTF(self):
+    def _computeCLTF(self, sig='err'):
         """Compute the CLTF from DOFs to DOFs
+
+        Inputs:
+          sig: which signal to compute the TF for:
+            1) 'err': error signal (Default)
+            2) 'ctrl': control signal
         """
-        oltf = self.computeOLTF()
+        oltf = self._computeOLTF(sig=sig)
         cltf = np.zeros_like(oltf)
         nDOF = cltf.shape[0]
         for fi in range(cltf.shape[-1]):
@@ -279,8 +296,56 @@ class ControlSystem:
         filt = self.getFilter(dofTo, dofFrom)
         return filt.plotFilter(self.opt._ff, mag_ax, phase_ax, dB, **kwargs)
 
-    def getOLTF(self, dofTo, dofFrom):
-        pass
+    def getOLTF(self, dofTo, dofFrom, sig='err'):
+        """Compute the OLTF from DOFs to DOFs
 
-    def getCLTF(self, dofTo, dofFrom):
-        pass
+        Inputs:
+          dofTo: output DOF
+          dofFrom: input DOF
+          sig: which signal to compute the TF for:
+            1) 'err': error signal (Default)
+            2) 'ctrl': control signal
+        """
+        oltf = self._computeOLTF(sig=sig)
+        dofToInd = self._dofs.keys().index(dofTo)
+        dofFromInd = self._dofs.keys().index(dofFrom)
+        return oltf[dofToInd, dofFromInd, :]
+
+    def getCLTF(self, dofTo, dofFrom, sig='err'):
+        """Compute the CLTF from DOFs to DOFs
+
+        Inputs:
+          dofTo: output DOF
+          dofFrom: input DOF
+          sig: which signal to compute the TF for:
+            1) 'err': error signal (Default)
+            2) 'ctrl': control signal
+        """
+        cltf = self._computeCLTF(sig=sig)
+        dofToInd = self._dofs.keys().index(dofTo)
+        dofFromInd = self._dofs.keys().index(dofFrom)
+        return cltf[dofToInd, dofFromInd, :]
+
+    def plotOLTF(self, dofTo, dofFrom, sig='err', mag_ax=None, phase_ax=None,
+                 dB=False, **kwargs):
+        """Plot an OLTF
+
+        See documentation for getOLTF and plotting.plotTF
+        """
+        oltf = self.getOLTF(dofTo, dofFrom, sig=sig)
+        fig = plotting.plotTF(
+            self.opt._ff, oltf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
+            **kwargs)
+        return fig
+
+    def plotCLTF(self, dofTo, dofFrom, sig='err', mag_ax=None, phase_ax=None,
+                 dB=False, **kwargs):
+        """Plot a CLTF
+
+        See documentation for getCLTF and plotting.plotTF
+        """
+        cltf = self.getCLTF(dofTo, dofFrom, sig=sig)
+        fig = plotting.plotTF(
+            self.opt._ff, cltf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
+            **kwargs)
+        return fig
