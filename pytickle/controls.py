@@ -338,6 +338,60 @@ class ControlSystem:
             **kwargs)
         return fig
 
+    def getSensingNoise(self, dof, probe, sig='err'):
+        """Compute the sensing noise from a probe to a DOF
+
+        Inputs:
+          dof: DOF name
+          probe: probe name
+          sig: which signal to compute the TF for:
+            1) 'err': error signal (Default)
+            2) 'ctrl': control signal
+
+        Returns:
+          sensNoise: the sensing noise
+            [W/rtHz] if sig='err'
+            [m/rtHz] if sig='ctrl'
+        """
+        if sig not in ['err', 'ctrl']:
+            raise ValueError('The signal must be either err or ctrl')
+
+        cltf = self._computeCLTF(sig=sig)
+        sensMat = self._computeSensingMatrix()
+        if sig == 'err':
+            noiseTF = np.einsum('ijf,jk->ikf', cltf, sensMat)
+        elif sig == 'ctrl':
+            ctrlMat = self._computeController()
+            noiseTF = np.einsum('ijf,jkf,kl->ilf', cltf, ctrlMat, sensMat)
+
+        dofInd = self._dofs.keys().index(dof)
+        probeInd = self._probes.index(probe)
+        qnoise = self.opt.getQuantumNoise(probe)
+        sensNoise = np.abs(noiseTF[dofInd, probeInd, :]) * qnoise
+        return sensNoise
+
+    def getSensingFunction(self, dofTo, dofFrom):
+        """Computes the sensing function from DOFs to DOFs
+
+        Computes the sensing function between two degrees of freedom.
+        This includes the optomechanical plant as well as the actuation
+        and sensing matrices.
+
+        Inputs:
+          dofTo: output DOF
+          dofFrom: input DOF
+
+        Returns:
+          sensFunc: the sensing function [W/m]
+        """
+        actMat = self._computeActuationMatrix()
+        sensMat = self._computeSensingMatrix()
+        optPlant = self._computePlant()
+        sensFunc = np.einsum('ij,jkf,kl->ilf', sensMat, optPlant, actMat)
+        dofTo = self._dofs.keys().index(dofTo)
+        dofFrom = self._dofs.keys().index(dofFrom)
+        return sensFunc[dofTo, dofFrom, :]
+
     def plotCLTF(self, dofTo, dofFrom, sig='err', mag_ax=None, phase_ax=None,
                  dB=False, **kwargs):
         """Plot a CLTF
