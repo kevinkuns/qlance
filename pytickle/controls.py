@@ -123,6 +123,12 @@ class ControlSystem:
         self._filters = []
         self._probes = []
         self._drives = []
+        self._opticalPlant = None
+        self._ctrlMat = None
+        self._oltf = None
+        self._cltf = None
+        self._inMat = None
+        self._outMat = None
 
     def setPyTicklePlant(self, opt):
         """Set a PyTickle model to be the plant
@@ -135,6 +141,15 @@ class ControlSystem:
         else:
             self.opt = opt
             self._ss = 2j*np.pi*opt._ff
+
+    def tickle(self):
+        self._inMat = self._computeInputMatrix()
+        self._outMat = self._computeOutputMatrix()
+        self._plant = self._computePlant()
+        self._ctrlMat = self._computeController()
+        self._oltf = {sig: self._computeOLTF(sig) for sig in ['err', 'ctrl']}
+        self._cltf = {sig: self._computeCLTF(oltf)
+                      for sig, oltf in self._oltf.items()}
 
     def addDOF(self, name, probes, drives):
         """Add a degree of freedom to the model
@@ -174,7 +189,7 @@ class ControlSystem:
                 plant[pi, di, :] = tf
         return plant
 
-    def _computeSensingMatrix(self):
+    def _computeInputMatrix(self):
         """Compute the sensing matrix from probes to DOFs
 
         Returns:
@@ -187,7 +202,7 @@ class ControlSystem:
             sensMat[di, :] = dof.probes2dof(self._probes)
         return sensMat
 
-    def _computeActuationMatrix(self):
+    def _computeOutputMatrix(self):
         """Compute the actuation matrix from DOFs to drives
 
         Returns:
@@ -227,20 +242,19 @@ class ControlSystem:
         if sig not in ['err', 'ctrl']:
             raise ValueError('The signal must be either err or ctrl')
 
-        actMat = self._computeActuationMatrix()
-        sensMat = self._computeActuationMatrix()
-        ctrlMat = self._computeController()
-        plant = self._computePlant()
-
         if sig == 'err':
-            oltf = np.einsum('ij,jkf,kl,lmf->imf',
-                             sensMat, plant, actMat, ctrlMat)
+            oltf = np.einsum(
+                'ij,jkf,kl,lmf->imf', self._inMat, self._plant, self._outMat,
+                self._ctrlMat)
+
         elif sig == 'ctrl':
-            oltf = np.einsum('ijf,jk,klf,lm->imf',
-                             ctrlMat, sensMat, plant, actMat)
+            oltf = np.einsum(
+                'ijf,jk,klf,lm->imf', self._ctrlMat, self._inMat, self._plant,
+                self._outMat)
+
         return oltf
 
-    def _computeCLTF(self, sig='err'):
+    def _computeCLTF(self, oltf):
         """Compute the CLTF from DOFs to DOFs
 
         Inputs:
@@ -248,7 +262,6 @@ class ControlSystem:
             1) 'err': error signal (Default)
             2) 'ctrl': control signal
         """
-        oltf = self._computeOLTF(sig=sig)
         cltf = np.zeros_like(oltf)
         nDOF = cltf.shape[0]
         for fi in range(cltf.shape[-1]):
@@ -306,7 +319,10 @@ class ControlSystem:
             1) 'err': error signal (Default)
             2) 'ctrl': control signal
         """
-        oltf = self._computeOLTF(sig=sig)
+        if sig not in ['err', 'ctrl']:
+            raise ValueError('The signal must be either err or ctrl')
+
+        oltf = self._oltf[sig]
         dofToInd = self._dofs.keys().index(dofTo)
         dofFromInd = self._dofs.keys().index(dofFrom)
         return oltf[dofToInd, dofFromInd, :]
@@ -321,10 +337,46 @@ class ControlSystem:
             1) 'err': error signal (Default)
             2) 'ctrl': control signal
         """
-        cltf = self._computeCLTF(sig=sig)
+        if sig not in ['err', 'ctrl']:
+            raise ValueError('The signal must be either err or ctrl')
+
+        cltf = self._cltf[sig]
         dofToInd = self._dofs.keys().index(dofTo)
         dofFromInd = self._dofs.keys().index(dofFrom)
         return cltf[dofToInd, dofFromInd, :]
+
+    def getCalibration(self, dofTo, dofFrom, sig='err'):
+        """Compute the CLTF between two DOFs to use for calibration
+
+        Computes the TF necessary to signal-refer noise to. For example, noise
+        is usually plotted DARM referred in which case the raw noise should be
+        divided by the CLTF from the DARM drives to the DARM probes.
+
+        Inputs:
+          dofTo: output DOF
+          dofFrom: input DOF
+          sig: which signal to compute the TF for:
+            1) 'err': error signal (Default)
+            2) 'ctrl': control signal
+
+        Returns:
+          tf: the transfer function
+        """
+        cltf = self._cltf[sig]
+
+        if sig == 'err':
+            tf = np.einsum(
+                'ijf,jk,klf,lm->imf', cltf, self._inMat, self._plant,
+                self._outMat)
+
+        elif sig == 'ctrl':
+            tf = np.einsum(
+                'ijf,jkf,kl,lmf,mn->inf', cltf, self._ctrlMat, self._inMat,
+                self._plant, self._outMat)
+
+        dofToInd = self._dofs.keys().index(dofTo)
+        dofFromInd = self._dofs.keys().index(dofFrom)
+        return tf[dofToInd, dofFromInd, :]
 
     def plotOLTF(self, dofTo, dofFrom, sig='err', mag_ax=None, phase_ax=None,
                  dB=False, **kwargs):
@@ -338,12 +390,14 @@ class ControlSystem:
             **kwargs)
         return fig
 
-    def getSensingNoise(self, dof, probe, sig='err'):
+    def getSensingNoise(self, dof, probe, asd=None, sig='err'):
         """Compute the sensing noise from a probe to a DOF
 
         Inputs:
           dof: DOF name
           probe: probe name
+          asd: Noise ASD to use. If None (Default) noise is calculated
+            from the Optickle model
           sig: which signal to compute the TF for:
             1) 'err': error signal (Default)
             2) 'ctrl': control signal
@@ -356,19 +410,28 @@ class ControlSystem:
         if sig not in ['err', 'ctrl']:
             raise ValueError('The signal must be either err or ctrl')
 
-        cltf = self._computeCLTF(sig=sig)
-        sensMat = self._computeSensingMatrix()
+        cltf = self._cltf[sig]
         if sig == 'err':
-            noiseTF = np.einsum('ijf,jk->ikf', cltf, sensMat)
+            noiseTF = np.einsum('ijf,jk->ikf', cltf, self._inMat)
         elif sig == 'ctrl':
-            ctrlMat = self._computeController()
-            noiseTF = np.einsum('ijf,jkf,kl->ilf', cltf, ctrlMat, sensMat)
+            noiseTF = np.einsum('ijf,jkf,kl->ilf', cltf, self._ctrlMat,
+                                self._inMat)
+
+        if asd is None:
+            qnoise = self.opt.getQuantumNoise(probe)
+        else:
+            qnoise = asd
 
         dofInd = self._dofs.keys().index(dof)
         probeInd = self._probes.index(probe)
-        qnoise = self.opt.getQuantumNoise(probe)
         sensNoise = np.abs(noiseTF[dofInd, probeInd, :]) * qnoise
         return sensNoise
+
+    def getDisplacementNoise(self, dof, drive, asd, sig='err'):
+        pass
+
+    def getForceNoise(self, dof, drive, asd, sig='err'):
+        pass
 
     def getSensingFunction(self, dofTo, dofFrom):
         """Computes the sensing function from DOFs to DOFs
@@ -384,10 +447,8 @@ class ControlSystem:
         Returns:
           sensFunc: the sensing function [W/m]
         """
-        actMat = self._computeActuationMatrix()
-        sensMat = self._computeSensingMatrix()
-        optPlant = self._computePlant()
-        sensFunc = np.einsum('ij,jkf,kl->ilf', sensMat, optPlant, actMat)
+        sensFunc = np.einsum(
+            'ij,jkf,kl->ilf', self._inMat, self._plant, self._outMat)
         dofTo = self._dofs.keys().index(dofTo)
         dofFrom = self._dofs.keys().index(dofFrom)
         return sensFunc[dofTo, dofFrom, :]
