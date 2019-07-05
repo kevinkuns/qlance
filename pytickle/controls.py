@@ -26,7 +26,20 @@ def append_str_if_unique(array, elements):
 
 
 def zpk(zs, ps, k, ff):
+    """Return the function specified by zeros, poles, and a gain
+
+    Inputs:
+      zs: the zeros
+      ps: the poles
+      k: the gain
+      ff: the frequencies at which to evaluate the function [Hz]
+
+    Returns:
+      filt: the function
+    """
     def assertArr(arr):
+        """Ensure that the input is an array
+        """
         if isinstance(arr, Number):
             return [arr]
         elif isinstance(arr, list) or isinstance(arr, np.ndarray):
@@ -37,16 +50,18 @@ def zpk(zs, ps, k, ff):
     if not isinstance(k, Number):
         raise ValueError('The gain should be a scalar')
 
-    filt = k * np.ones(len(ff), dtype=complex)
+    if isinstance(ff, Number):
+        filt = k
+    else:
+        filt = k * np.ones(len(ff), dtype=complex)
+
     for z in assertArr(zs):
         filt *= (ff - z)
+
     for p in assertArr(ps):
         filt /= (ff - p)
+
     return filt
-
-
-def zpk2func(zs, ps, k):
-    return partial(zpk, zs, ps, k)
 
 
 class DegreeOfFreedom:
