@@ -25,6 +25,19 @@ def append_str_if_unique(array, elements):
             array.append(element)
 
 
+def assertArr(arr):
+    """Ensure that the input is an array
+    """
+    if isinstance(arr, Number):
+        return [arr]
+    elif isinstance(arr, list) or isinstance(arr, np.ndarray):
+        return arr
+    elif isinstance(arr, tuple):
+        return list(arr)
+    else:
+        raise ValueError('Unrecognized data dtype')
+
+
 def zpk(zs, ps, k, ss):
     """Return the function specified by zeros, poles, and a gain
 
@@ -37,16 +50,6 @@ def zpk(zs, ps, k, ss):
     Returns:
       filt: the function
     """
-    def assertArr(arr):
-        """Ensure that the input is an array
-        """
-        if isinstance(arr, Number):
-            return [arr]
-        elif isinstance(arr, list) or isinstance(arr, np.ndarray):
-            return arr
-        else:
-            raise ValueError('Unrecognized data dtype')
-
     if not isinstance(k, Number):
         raise ValueError('The gain should be a scalar')
 
@@ -84,6 +87,45 @@ def resRoots(f0, Q, Hz=True):
     return r1, r2
 
 
+def catzp(*args):
+    """Concatenate a list of zeros or poles
+
+    Useful in conjunction with resRoots. For example, a pole at 1 Hz and a
+    complex pair of poles with frequency 50 Hz and Q 10 can be defined with
+        catzp(1, resRoots(50, 10))
+
+    Inputs:
+      The zeros or poles
+
+    Returns:
+      zp: a list of the zeros or poles
+    """
+    zp = []
+    for arg in args:
+        zp.extend(assertArr(arg))
+    return zp
+
+
+def catfilt(*args):
+    """Concatenate a list of Filters
+
+    Returns a new Filter instance which is the product of the input filters
+
+    Inputs:
+      args: a list of Filter instances to multiply
+
+    Returns:
+      newFilt: a Filter instance which is the product of the inputs
+    """
+    def newFilt(ss):
+        out = 1
+        for filt in args:
+            out *= filt.filt(ss)
+        return out
+
+    return Filter(newFilt)
+
+
 class DegreeOfFreedom:
     def __init__(self, name, probes, drives):
         self.name = name
@@ -119,8 +161,9 @@ class Filter:
         1) Giving a callable function
         2) Giving the zeros, poles, and gain
         3) Giving the zeros, poles, and gain at a specific frequency
-      Hz: If True the zeros and poles are in Hz
-        If False, the zeros and poles are in the s-domain
+      Hz: If True, the zeros and poles are in the frequency domain and in Hz
+        If False, the zeros and poles are in the s-domain and in rad/s
+        (Default: True)
 
     Attributes:
       filt: the filter function
@@ -343,9 +386,15 @@ class ControlSystem:
         Inputs:
           dofTo: output DOF
           dofFrom: input DOF
-          *args: arguments used to define a Filter instance
+          *args: Filter instance or arguments used to define a Filter instance
         """
-        self._filters.append((dofTo, dofFrom, Filter(*args)))
+        if len(args) == 1 and isinstance(args[0], Filter):
+            # args is already a Filter instance
+            self._filters.append((dofTo, dofFrom, args[0]))
+
+        else:
+            # args defines a new Filter
+            self._filters.append((dofTo, dofFrom, Filter(*args)))
 
     def getFilter(self, dofTo, dofFrom):
         """Get the filter between two DOFs
