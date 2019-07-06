@@ -98,35 +98,69 @@ class Filter:
       The filter can be specified in one of two ways:
         1) Giving a callable function
         2) Giving the zeros, poles, and gain
+        3) Giving the zeros, poles, and gain at a specific frequency
+      Hz: If True the zeros and poles are in Hz
+        If False, the zeros and poles are in the s-domain
 
     Attributes:
       filt: the filter function
     """
-    def __init__(self, *args):
+    def __init__(self, *args, **kwargs):
+        if 'Hz' in kwargs:
+            if kwargs['Hz']:
+                a = -2*np.pi
+            else:
+                a = 1
+        else:
+            a = -2*np.pi
+
         if len(args) == 1:
             self.filt = args[0]
             if not callable(self.filt):
                 raise ValueError('One argument filters should be functions')
+
         elif len(args) == 3:
-            zs = args[0]
-            ps = args[1]
+            zs = a*np.array(args[0])
+            ps = a*np.array(args[1])
             k = args[2]
+            if not isinstance(k, Number):
+                raise ValueError('The gain should be a scalar')
+
             self.filt = partial(zpk, zs, ps, k)
+
+        elif len(args) == 4:
+            zs = a*np.array(args[0])
+            ps = a*np.array(args[1])
+            g = args[2]
+            s0 = np.abs(a)*1j*args[3]
+            if not (isinstance(g, Number) and isinstance(s0, Number)):
+                raise ValueError(
+                    'The gain and reference frequency should be scalars')
+
+            k = g / np.abs(zpk(zs, ps, 1, s0))
+            self.filt = partial(zpk, zs, ps, k)
+
         else:
-            msg = 'Incorrect number of arguments. Input can be either\n'
-            msg += '1) A single argument which is the filter function\n'
-            msg += '2) Three arguments representing the zeros, poles, and gain'
+            msg = 'Incorrect number of arguments. Input can be either\n' \
+                  + '1) A single argument which is the filter function\n' \
+                  + '2) Three arguments representing the zeros, poles,' \
+                  + ' and gain\n' \
+                  + '3) Four arguments representing the zeros, poles,' \
+                  + ' and gain at a specific frequency'
             raise ValueError(msg)
+
+    def computeFilter(self, ff):
+        ss = 2j*np.pi*ff
+        return self.filt(ss)
 
     def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
         """Plot the filter
 
         See documentation for plotting.plotTF
         """
-        ss = 2j*np.pi*ff
         fig = plotting.plotTF(
-            ff, self.filt(ss), mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
-            **kwargs)
+            ff, self.computeFilter(ff), mag_ax=mag_ax, phase_ax=phase_ax,
+            dB=dB, **kwargs)
         return fig
 
 
