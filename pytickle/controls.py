@@ -25,14 +25,14 @@ def append_str_if_unique(array, elements):
             array.append(element)
 
 
-def zpk(zs, ps, k, ff):
+def zpk(zs, ps, k, ss):
     """Return the function specified by zeros, poles, and a gain
 
     Inputs:
       zs: the zeros
       ps: the poles
       k: the gain
-      ff: the frequencies at which to evaluate the function [Hz]
+      ss: the frequencies at which to evaluate the function [rad/s]
 
     Returns:
       filt: the function
@@ -50,18 +50,38 @@ def zpk(zs, ps, k, ff):
     if not isinstance(k, Number):
         raise ValueError('The gain should be a scalar')
 
-    if isinstance(ff, Number):
+    if isinstance(ss, Number):
         filt = k
     else:
-        filt = k * np.ones(len(ff), dtype=complex)
+        filt = k * np.ones(len(ss), dtype=complex)
 
     for z in assertArr(zs):
-        filt *= (ff - z)
+        filt *= (ss - z)
 
     for p in assertArr(ps):
-        filt /= (ff - p)
+        filt /= (ss - p)
 
     return filt
+
+
+def resRoots(f0, Q, Hz=True):
+    """Compute the complex roots of a TF from the resonance frequency and Q
+
+    Inputs:
+      f0: the resonance frequency [Hz or rad/s]
+      Q: the quality factor
+      Hz: If True the roots are in the frequency domain and f0 is in Hz
+        If False, the roots are in the s-domain and f0 is in rad/s
+        (Default: True)
+
+    Returns:
+      r1, r2: the two complex roots
+    """
+    a = (-1)**(not Hz)
+    rr = np.sqrt(1 - 4*Q**2 + 0j)
+    r1 = a * f0/(2*Q) * (1 + rr)
+    r2 = a * f0/(2*Q) * (1 - rr)
+    return r1, r2
 
 
 class DegreeOfFreedom:
