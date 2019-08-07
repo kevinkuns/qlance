@@ -301,7 +301,8 @@ class PyTickle:
 
         return tf
 
-    def getAngularTF(self, probeName, driveName, spotName, spotPort, dof):
+    def getAngularTF(self, probeName, driveName, dof, spotName=None,
+                     spotPort=None):
         """Compute an angular transfer function
 
         Computes an angular transfer function from angle to beam-spot motion
@@ -322,9 +323,19 @@ class PyTickle:
         elif dof == 'yaw':
             sigAC = self._sigAC_yaw
         else:
-            msg = 'Unrecognized degree of freedom {:s}'.format(dof)
+            msg = 'Unrecognized angular degree of freedom {:s}'.format(dof)
             msg += '. Choose \'pitch\', or \'yaw\'.'
             raise ValueError(msg)
+
+        # Should we convert to beam-spot motion?
+        if not(spotName and spotPort):
+            if (spotName is not None) or (spotPort is not None):
+                msg = 'To convert to beam-spot motion, both the spot name' \
+                      + ' and the spot port must be given'
+                raise ValueError(msg)
+            bsm = False
+        else:
+            bsm = True
 
         if sigAC is None:
             msg = 'Must run tickle for dof {:s}'.format(dof)
@@ -333,13 +344,14 @@ class PyTickle:
 
         probeNum = self.probes.index(probeName)
         driveNum = self.drives.index(driveName)
-        spotNum = self.drives.index(spotName + '.pos')
         tf = sigAC[probeNum, driveNum]
 
-        # Convert to beam-spot motion
-        w, _, _, _ = self.getBeamProperties(spotName, spotPort)
-        Pdc = self._sigDC_tickle[spotNum]
-        tf *= w/(2*Pdc)
+        # Convert to beam-spot motion if necessary
+        if bsm:
+            spotNum = self.drives.index(spotName + '.pos')
+            w, _, _, _ = self.getBeamProperties(spotName, spotPort)
+            Pdc = self._sigDC_tickle[spotNum]
+            tf *= w/(2*Pdc)
 
         return tf
 

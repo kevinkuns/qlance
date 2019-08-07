@@ -127,12 +127,16 @@ def catfilt(*args):
 
 
 class DegreeOfFreedom:
-    def __init__(self, name, probes, drives):
+    def __init__(self, name, probes, drives, dofType='pos'):
         self.name = name
-        self.probes = assertType(probes, dict)
-        self.drives = assertType(drives, dict)
-        self.inDOFs = []
-        self.outDOFs = []
+        self.probes = assertType(probes, dict).copy()
+        self.drives = assertType(drives, dict).copy()
+        self.dofType = dofType
+
+        # append the type of dof to the names of the drives
+        for key in self.drives.keys():
+            newkey = key + '.' + dofType
+            self.drives[newkey] = self.drives.pop(key)
 
     def probes2dof(self, probeList):
         """Make a vector of probes
@@ -235,12 +239,18 @@ class ControlSystem:
         self._filters = []
         self._probes = []
         self._drives = []
+        self._respFilts = []
+        self._compFilts = []
         self._opticalPlant = None
         self._ctrlMat = None
         self._oltf = None
         self._cltf = None
         self._inMat = None
         self._outMat = None
+        self._compMat = None
+        self._respMat = None
+        self._sigs = ['err', 'ctrl', 'comp', 'drive', 'sens']
+        # self._sigs = ['err', 'ctrl']
 
     def setPyTicklePlant(self, opt):
         """Set a PyTickle model to be the plant
@@ -259,11 +269,13 @@ class ControlSystem:
         self._outMat = self._computeOutputMatrix()
         self._plant = self._computePlant()
         self._ctrlMat = self._computeController()
-        self._oltf = {sig: self._computeOLTF(sig) for sig in ['err', 'ctrl']}
+        self._compMat = self._computeCompensator()
+        self._respMat = self._computeResponse()
+        self._oltf = {sig: self._computeOLTF(sig) for sig in self._sigs}
         self._cltf = {sig: self._computeCLTF(oltf)
                       for sig, oltf in self._oltf.items()}
 
-    def addDOF(self, name, probes, drives):
+    def addDOF(self, name, probes, drives, dofType='pos'):
         """Add a degree of freedom to the model
 
         Inputs:
@@ -279,9 +291,10 @@ class ControlSystem:
             raise ValueError(
                 'Degree of freedom {:s} already exists'.format(name))
 
-        self._dofs[name] = DegreeOfFreedom(name, probes, drives)
-        append_str_if_unique(self._probes, probes)
-        append_str_if_unique(self._drives, drives)
+        dof = DegreeOfFreedom(name, probes, drives, dofType=dofType)
+        self._dofs[name] = dof
+        append_str_if_unique(self._probes, dof.probes)
+        append_str_if_unique(self._drives, dof.drives)
 
     def _computePlant(self):
         """Compute the PyTickle plant from drives to probes
@@ -297,7 +310,13 @@ class ControlSystem:
 
         for pi, probe in enumerate(self._probes):
             for di, drive in enumerate(self._drives):
-                tf = self.opt.getTF(probe, drive)
+                driveData = drive.split('.')
+                driveName = '.'.join(driveData[:2])
+                dofType = driveData[-1]
+                if dofType == 'pos':
+                    tf = self.opt.getTF(probe, driveName)
+                elif dofType in ['pitch', 'yaw']:
+                    tf = self.opt.getAngularTF(probe, driveName, dofType)
                 plant[pi, di, :] = tf
         return plant
 
@@ -343,6 +362,34 @@ class ControlSystem:
             ctrlMat[toInd, fromInd, :] = filt.filt(self._ss)
         return ctrlMat
 
+    def _computeCompensator(self):
+        nff = len(self._ss)
+        ndrives = len(self._drives)
+        ones = np.ones(nff)
+        compMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
+        compdrives = [cf[0] for cf in self._compFilts]
+        for di, drive in enumerate(self._drives):
+            try:
+                ind = compdrives.index(drive)
+                compMat[di, di, :] = self._compFilts[ind][-1].filt(self._ss)
+            except ValueError:
+                compMat[di, di, :] = ones
+        return compMat
+
+    def _computeResponse(self):
+        nff = len(self._ss)
+        ndrives = len(self._drives)
+        ones = np.ones(nff)
+        respMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
+        respdrives = [rf[0] for rf in self._respFilts]
+        for di, drive in enumerate(self._drives):
+            try:
+                ind = respdrives.index(drive)
+                respMat[di, di, :] = self._respFilts[ind][-1].filt(self._ss)
+            except ValueError:
+                respMat[di, di, :] = ones
+        return respMat
+
     def _computeOLTF(self, sig='err'):
         """Compute the OLTF from DOFs to DOFs
 
@@ -351,18 +398,33 @@ class ControlSystem:
             1) 'err': error signal (Default)
             2) 'ctrl': control signal
         """
-        if sig not in ['err', 'ctrl']:
-            raise ValueError('The signal must be either err or ctrl')
+        if sig not in self._sigs:
+            raise ValueError('Unrecognized signal')
 
         if sig == 'err':
             oltf = np.einsum(
-                'ij,jkf,kl,lmf->imf', self._inMat, self._plant, self._outMat,
-                self._ctrlMat)
+                'ij,jkf,klf,lmf,mn,npf->ipf', self._inMat, self._plant,
+                self._respMat, self._compMat, self._outMat, self._ctrlMat)
 
         elif sig == 'ctrl':
             oltf = np.einsum(
-                'ijf,jk,klf,lm->imf', self._ctrlMat, self._inMat, self._plant,
-                self._outMat)
+                'ijf,jk,klf,lmf,mnf,np->ipf', self._ctrlMat, self._inMat,
+                self._plant, self._respMat, self._compMat, self._outMat)
+
+        elif sig == 'comp':
+            oltf = np.einsum(
+                'ijf,jk,klf,lm,mnf,npf->ipf', self._compMat, self._outMat,
+                self._ctrlMat, self._inMat, self._plant, self._respMat)
+
+        elif sig == 'drive':
+            oltf = np.einsum(
+                'ijf,jkf,kl,lmf,mn,npf->ipf', self._respMat, self._compMat,
+                self._outMat, self._ctrlMat, self._inMat, self._plant)
+
+        elif sig == 'sens':
+            oltf = np.einsum(
+                'ijf,jkf,klf,lm,mnf,np->ipf', self._plant, self._respMat,
+                self._compMat, self._outMat, self._ctrlMat, self._inMat)
 
         return oltf
 
@@ -395,6 +457,30 @@ class ControlSystem:
         else:
             # args defines a new Filter
             self._filters.append((dofTo, dofFrom, Filter(*args)))
+
+    def addCompensator(self, drive, driveType, *args):
+        drive += '.' + driveType
+        if drive in [cf[0] for cf in self._compFilts]:
+            raise ValueError(
+                'A compensator is already set for drive {:s}'.format(drive))
+
+        if len(args) == 1 and isinstance(args[0], Filter):
+            self._compFilts.append((drive, args[0]))
+
+        else:
+            self._compFilts.append((drive, Filter(*args)))
+
+    def setResponse(self, drive, driveType, *args):
+        drive += '.' + driveType
+        if drive in [rf[0] for rf in self._respFilts]:
+            raise ValueError(
+                'A response is already set for drive {:s}'.format(drive))
+
+        if len(args) == 1 and isinstance(args[0], Filter):
+            self._respFilts.append((drive, args[0]))
+
+        else:
+            self._respFilts.append((drive, Filter(*args)))
 
     def getFilter(self, dofTo, dofFrom):
         """Get the filter between two DOFs
