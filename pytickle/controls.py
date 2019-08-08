@@ -549,6 +549,95 @@ class ControlSystem:
         dofFromInd = self._dofs.keys().index(dofFrom)
         return cltf[dofToInd, dofFromInd, :]
 
+    def getTF(self, dofTo, sigTo, dofFrom, sigFrom):
+        cltf = self._cltf[sigTo]
+        if sigTo == 'err':
+            if sigFrom == 'sens':
+                tf = np.einsum(
+                    'ijf,jk->ikf', cltf, self._inMat)
+            elif sigFrom == 'drive':
+                tf = np.einsum(
+                    'ijf,jk,klf->ilf', cltf, self._inMat, self._plant)
+            elif sigFrom == 'comp':
+                tf = np.einsum(
+                    'ijf,jk,klf,lmf->imf', cltf, self._inMat, self._plant,
+                    self._respMat)
+            elif sigFrom == 'ctrl':
+                tf = np.einsum(
+                    'ijf,jk,klf,lmf,mnf,np->ipf', cltf, self._inMat,
+                    self._plant, self._respMat, self._compMat, self._outMat)
+
+        elif sigTo == 'ctrl':
+            if sigFrom == 'err':
+                tf = np.einsum(
+                    'ijf,jkf->ikf', cltf, self._ctrlMat)
+            elif sigFrom == 'sens':
+                tf = np.einsum(
+                    'ijf,jkf,kl->ilf', cltf, self._ctrlMat, self._inMat)
+            elif sigFrom == 'drive':
+                tf = np.einsum(
+                    'ijf,jkf,kl,lmf->imf', cltf, self._ctrlMat, self._inMat,
+                    self._plant)
+            elif sigFrom == 'comp':
+                tf = np.einsum(
+                    'ijf,jkf,kl,lmf,mn->inf', cltf, self._ctrlMat, self._inMat,
+                    self._plant, self._respMat)
+
+        elif sigTo == 'comp':
+            if sigFrom == 'ctrl':
+                tf = np.einsum(
+                    'ijf,jk->ikf', cltf, self._compMat, self._outMat)
+            elif sigFrom == 'err':
+                tf = np.einsum(
+                    'ijf,jk,klf->ilf', cltf, self._compMat, self._outMat,
+                    self._ctrlMat)
+            elif sigFrom == 'sens':
+                tf = np.einsum(
+                    'ijf,jk,klf,lm->imf', cltf, self._compMat, self._outMat,
+                    self._ctrlMat, self._inMat)
+            elif sigFrom == 'drive':
+                tf = np.einsum(
+                    'ijf,jk,klf,lm,mnf->inf', cltf, self._compMat,
+                    self._outMat, self._ctrlMat, self._inMat, self._plant)
+
+        elif sigTo == 'drive':
+            if sigFrom == 'comp':
+                tf = np.einsum(
+                    'ijf,jkf->ikf', cltf, self._respMat)
+            elif sigFrom == 'ctrl':
+                tf = np.einsum(
+                    'ijf,jkf,klf,lm->imf', cltf, self._respMat, self._compMat,
+                    self._outMat)
+            elif sigFrom == 'err':
+                tf = np.einsum(
+                    'ijf,jkf,klf,lm,mnf->inf', cltf, self._respMat,
+                    self._compMat, self._outMat, self._ctrlMat)
+            elif sigFrom == 'sens':
+                tf = np.einsum(
+                    'ijf,jkf,klf,lm,mnf,np->ipf', cltf, self._respMat,
+                    self._compMat, self._outMat, self._ctrlMat, self._inMat)
+
+        elif sigTo == 'sens':
+            if sigFrom == 'drive':
+                tf = np.einsum(
+                    'ijf,jkf->ikf', cltf, self._plant)
+            elif sigFrom == 'comp':
+                tf = np.einsum(
+                    'ijf,jkf,klf->ilf', cltf, self._plant, self._respMat)
+            elif sigFrom == 'ctrl':
+                tf = np.einsum(
+                    'ijf,jkf,klf,lmf,mn->inf', cltf, self._plant,
+                    self._respMat, self._compMat, self._outMat)
+            elif sigFrom == 'err':
+                tf = np.einsum(
+                    'ijf,jkf,klf,lmf,mn,npf->ipf', cltf, self._plant,
+                    self._respMat, self._compMat, self._outMat, self._ctrlMat)
+
+        toInd = self._getIndex(dofTo, sigTo)
+        fromInd = self._getIndex(dofFrom, sigFrom)
+
+        return tf[toInd, fromInd]
+
     def getCalibration(self, dofTo, dofFrom, sig='err'):
         """Compute the CLTF between two DOFs to use for calibration
 
@@ -668,3 +757,12 @@ class ControlSystem:
             self.opt._ff, cltf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
             **kwargs)
         return fig
+
+    def _getIndex(self, name, sig):
+        if sig in ['err', 'ctrl']:
+            ind = self._dofs.keys().index(name)
+        elif sig in ['comp', 'drive']:
+            ind = self._drives.index(name)
+        elif sig == 'sens':
+            ind = self._probes.index(name)
+        return ind
