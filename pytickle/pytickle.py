@@ -355,14 +355,37 @@ class PyTickle:
 
         return tf
 
-    def getMechMod(self, driveOutName, driveInName):
-        if self.mMech is None:
-            raise ValueError(
-                'Must run tickle before calculating mechanical modifications')
+    def getMechMod(self, driveOutName, driveInName, dof='pos'):
+        if dof not in ['pos', 'pitch', 'yaw']:
+            msg = 'Unrecognized degree of freedom {:s}'.format(dof)
+            msg += '. Choose \'pos\', \'pitch\', or \'yaw\'.'
+            raise ValueError(msg)
 
         driveInNum = self.drives.index(driveInName)
         driveOutNum = self.drives.index(driveOutName)
-        return self._mMech[driveOutNum, driveInNum]
+
+        if dof == 'pos':
+            msg = 'Must run tickle for dof pos before calculating ' \
+                  + 'mechanical modifications'
+            if self._mMech is None:
+                raise ValueError(msg)
+            mMech = self._mMech[driveOutNum, driveInNum]
+
+        elif dof == 'pitch':
+            msg = 'Must run tickle for dof pitch before calculating ' \
+                  + 'mechanical modifications'
+            if self._mMech_pitch is None:
+                raise ValueError(msg)
+            mMech = self._mMech_pitch[driveOutNum, driveInNum]
+
+        elif dof == 'yaw':
+            msg = 'Must run tickle for dof yaw before calculating ' \
+                  + 'mechanical modifications'
+            if self._mMech_yaw is None:
+                raise ValueError(msg)
+            mMech = self._mMech_yaw[driveOutNum, driveInNum]
+
+        return mMech
 
     def getQuantumNoise(self, probeName):
         """Compute the quantum noise at a probe
