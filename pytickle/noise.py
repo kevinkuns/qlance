@@ -14,12 +14,12 @@ def resamplePSD(ffOld, ffNew, Sold):
     which is taken to be S(f_0) * (f_0 - 0)
 
     Inputs:
-      ffOld: old frequency vector
-      ffNew: new frequency vector
-      Sold: old PSD evaluated at ffOld
+      ffOld: old frequency vector [Hz]
+      ffNew: new frequency vector [Hz]
+      Sold: old PSD evaluated at ffOld [A**2 / Hz, for some units A]
 
     Returns:
-      Snew: the resampled PSD evaluated at ffNew
+      Snew: the resampled PSD evaluated at ffNew [A**2 / Hz]
 
     Based off of pickle's rebinSpec.m
     """
@@ -38,7 +38,7 @@ def resamplePSD(ffOld, ffNew, Sold):
     Pnew = np.zeros_like(ffNew)
 
     # Ensure that the old frequency vector is as long as the new one
-    if ffNew[-1] > ffOld[-1]:
+    if ffNew[-1] >= ffOld[-1]:
         ffOld = np.concatenate((ffOld, [ffNew[-1]]))
         Pold = np.concatenate((Pold, [0]))
 
@@ -62,7 +62,7 @@ def resamplePSD(ffOld, ffNew, Sold):
             Pnew[ni] += Sold[oi] * (ffOld[oi] - ffLast)
 
             # loop through old bins covered by this new bin
-            while ffOld[oi + 1] <= ffNewBin:
+            while ffOld[oi + 1] < ffNewBin:
                 oi += 1
                 Pnew[ni] += Pold[oi]
 
@@ -86,3 +86,42 @@ def resamplePSD(ffOld, ffNew, Sold):
     Snew = np.concatenate(([S0], Snew))
 
     return Snew
+
+
+def convolvePSDs(ff, df, PSD1, PSD2):
+    """Compute the convolution of two PSDs
+
+    The two PSDs are resampled with a linear frequency vector, convolved,
+    and the convolution resampled to the original (possibly logarithmic)
+    frequency vector
+
+    Inputs:
+      ff: the frequencies at which the PSDs are evaluated [Hz]
+      df: linear spacing for the intermediate frequency vector [Hz]
+      PSD1: the first PSD [A**2 / Hz, for some units A]
+      PSD2: the second PSD [A**2 / Hz]
+
+    Returns:
+      convPSD: the convolution [A**2 / Hz]
+
+    Based off of pickle's convNoise
+    """
+    # resample PSDs to linear spacing
+    ffLin = np.linspace(0, ff[-1], int(ff[-1]/df))
+    nff = len(ffLin)
+    linPSD1 = resamplePSD(ff, ffLin, PSD1)
+    linPSD2 = resamplePSD(ff, ffLin, PSD2)
+
+    # Convert to double-sided PSDs
+    linPSD1 = 1/2 * np.concatenate((linPSD1[::-1], [], linPSD1))
+    linPSD2 = 1/2 * np.concatenate((linPSD2[::-1], [], linPSD2))
+
+    # Do the convolution
+    linConv = np.convolve(linPSD1, linPSD2) * df
+
+    # Take the central part of the convolution
+    inds = np.arange(nff) + 2*(nff - 1)
+    linConv = 2 * linConv[inds]
+
+    # Return convolution resampled to original frequency vector
+    return resamplePSD(ffLin, ff, linConv)
