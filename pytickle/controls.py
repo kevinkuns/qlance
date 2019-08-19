@@ -147,7 +147,7 @@ class DegreeOfFreedom:
             dofArr[probeInd] = coeff
         return dofArr
 
-    def dof2drives(self, driveList):
+    def dofs2drives(self, driveList):
         """Make a vector of drives
         """
         driveArr = np.zeros(len(driveList))
@@ -250,7 +250,6 @@ class ControlSystem:
         self._compMat = None
         self._respMat = None
         self._sigs = ['err', 'ctrl', 'comp', 'drive', 'sens']
-        # self._sigs = ['err', 'ctrl']
 
     def setPyTicklePlant(self, opt):
         """Set a PyTickle model to be the plant
@@ -343,7 +342,7 @@ class ControlSystem:
         nDrives = len(self._drives)
         actMat = np.zeros((nDrives, nDOF))
         for di, dof in enumerate(self._dofs.values()):
-            actMat[:, di] = dof.dof2drives(self._drives)
+            actMat[:, di] = dof.dofs2drives(self._drives)
         return actMat
 
     def _computeController(self):
@@ -523,8 +522,8 @@ class ControlSystem:
             1) 'err': error signal (Default)
             2) 'ctrl': control signal
         """
-        if sig not in ['err', 'ctrl']:
-            raise ValueError('The signal must be either err or ctrl')
+        # if sig not in ['err', 'ctrl']:
+        #     raise ValueError('The signal must be either err or ctrl')
 
         oltf = self._oltf[sig]
         dofToInd = self._dofs.keys().index(dofTo)
@@ -541,8 +540,8 @@ class ControlSystem:
             1) 'err': error signal (Default)
             2) 'ctrl': control signal
         """
-        if sig not in ['err', 'ctrl']:
-            raise ValueError('The signal must be either err or ctrl')
+        # if sig not in ['err', 'ctrl']:
+        #     raise ValueError('The signal must be either err or ctrl')
 
         cltf = self._cltf[sig]
         dofToInd = self._dofs.keys().index(dofTo)
@@ -550,8 +549,8 @@ class ControlSystem:
         return cltf[dofToInd, dofFromInd, :]
 
     def getTF(self, dofTo, sigTo, dofFrom, sigFrom):
-        cltf = self._cltf[sigTo]
         if sigTo == 'err':
+            cltf = self._cltf[sigTo]
             if sigFrom == 'sens':
                 tf = np.einsum(
                     'ijf,jk->ikf', cltf, self._inMat)
@@ -568,6 +567,7 @@ class ControlSystem:
                     self._plant, self._respMat, self._compMat, self._outMat)
 
         elif sigTo == 'ctrl':
+            cltf = self._cltf[sigTo]
             if sigFrom == 'err':
                 tf = np.einsum(
                     'ijf,jkf->ikf', cltf, self._ctrlMat)
@@ -584,6 +584,7 @@ class ControlSystem:
                     self._plant, self._respMat)
 
         elif sigTo == 'comp':
+            cltf = self._cltf[sigTo]
             if sigFrom == 'ctrl':
                 tf = np.einsum(
                     'ijf,jk->ikf', cltf, self._compMat, self._outMat)
@@ -601,6 +602,7 @@ class ControlSystem:
                     self._outMat, self._ctrlMat, self._inMat, self._plant)
 
         elif sigTo == 'drive':
+            cltf = self._cltf[sigTo]
             if sigFrom == 'comp':
                 tf = np.einsum(
                     'ijf,jkf->ikf', cltf, self._respMat)
@@ -618,6 +620,7 @@ class ControlSystem:
                     self._compMat, self._outMat, self._ctrlMat, self._inMat)
 
         elif sigTo == 'sens':
+            cltf = self._cltf[sigTo]
             if sigFrom == 'drive':
                 tf = np.einsum(
                     'ijf,jkf->ikf', cltf, self._plant)
@@ -633,10 +636,73 @@ class ControlSystem:
                     'ijf,jkf,klf,lmf,mn,npf->ipf', cltf, self._plant,
                     self._respMat, self._compMat, self._outMat, self._ctrlMat)
 
-        toInd = self._getIndex(dofTo, sigTo)
-        fromInd = self._getIndex(dofFrom, sigFrom)
+        elif sigTo == 'pos':
+            # Get the mechanical modifications of the drives
+            nDrives = len(self._drives)
+            nff = len(self.opt._ff)
+            mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
+            for dit, driveTo in enumerate(self._drives):
+                driveData = driveTo.split('.')
+                driveToName = '.'.join(driveData[:2])
+                dofToType = driveData[-1]
+                for djf, driveFrom in enumerate(self._drives):
+                    driveData = driveFrom.split('.')
+                    driveFromName = '.'.join(driveData[:2])
+                    dofFromType = driveData[-1]
+                    if dofFromType != dofToType:
+                        msg = 'Input and output drives should be the same ' \
+                              + 'degree of freedom (pos, pitch, or yaw)'
+                        raise ValueError(msg)
+                    mMech[dit, djf, :] = self.opt.getMechMod(
+                        driveToName, driveFromName, dofToType)
 
-        return tf[toInd, fromInd]
+            # Get the loop transfer function to drives
+            if sigFrom == 'drive':
+                loopTF = self._cltf['drive']
+            else:
+                loopTF = self.getTF('', 'drive', '', sigFrom)
+            tf = np.einsum('ijf,jkf->ikf', mMech, loopTF)
+
+        elif sigTo == 'spot':
+            # Get the conversion from drives to beam spot motion
+            nDrives = len(self._drives)
+            nff = len(self.opt._ff)
+            drive2bsm = np.zeros((nDrives, nDrives, nff), dtype=complex)
+            for si, spot_drive in enumerate(self._drives):
+                spot_probe = spot_drive.split('.')[0]
+                for di, drive in enumerate(self._drives):
+                    driveData = drive.split('.')
+                    driveName = '.'.join(driveData[:2])
+                    dofType = driveData[-1]
+                    tf = self.opt.getAngularTF(spot_probe, driveName, dofType,
+                                               'fr')
+                    drive2bsm[si, di] = tf
+
+            # Get the loop transfer function to drives
+            if sigFrom == 'drive':
+                loopTF = self._cltf['drive']
+            else:
+                loopTF = self.getTF('', 'drive', '', sigFrom)
+            tf = np.einsum('ijf,jkf->ikf', drive2bsm, loopTF)
+
+        if dofFrom:
+            fromInd = self._getIndex(dofFrom, sigFrom)
+            tf = tf[:, fromInd]
+
+        if dofTo:
+            toInd = self._getIndex(dofTo, sigTo)
+            tf = tf[toInd]
+
+        return tf
+
+    def getNoise(self, dofTo, sigTo, sigFrom, noiseASDs):
+        ampTF = self.getTF(dofTo, sigTo, '', sigFrom)
+        powTF = np.abs(ampTF)**2
+        totalPSD = np.zeros(powTF.shape[-1])
+        for dofFrom, noiseASD in noiseASDs.items():
+            fromInd = self._getIndex(dofFrom, sigFrom)
+            totalPSD += powTF[fromInd] * noiseASD**2
+        return np.sqrt(totalPSD)
 
     def getCalibration(self, dofTo, dofFrom, sig='err'):
         """Compute the CLTF between two DOFs to use for calibration
@@ -761,7 +827,7 @@ class ControlSystem:
     def _getIndex(self, name, sig):
         if sig in ['err', 'ctrl']:
             ind = self._dofs.keys().index(name)
-        elif sig in ['comp', 'drive']:
+        elif sig in ['comp', 'drive', 'pos', 'spot']:
             ind = self._drives.index(name)
         elif sig == 'sens':
             ind = self._probes.index(name)
