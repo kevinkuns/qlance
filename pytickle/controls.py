@@ -237,8 +237,8 @@ class ControlSystem:
         self._ss = None
         self._dofs = OrderedDict()
         self._filters = []
-        self._probes = []
-        self._drives = []
+        self.probes = []
+        self.drives = []
         self._respFilts = []
         self._compFilts = []
         self._opticalPlant = None
@@ -292,8 +292,8 @@ class ControlSystem:
 
         dof = DegreeOfFreedom(name, probes, drives, dofType=dofType)
         self._dofs[name] = dof
-        append_str_if_unique(self._probes, dof.probes)
-        append_str_if_unique(self._drives, dof.drives)
+        append_str_if_unique(self.probes, dof.probes)
+        append_str_if_unique(self.drives, dof.drives)
 
     def _computePlant(self):
         """Compute the PyTickle plant from drives to probes
@@ -302,13 +302,13 @@ class ControlSystem:
           plant: The plant a (nProbes, nDrives, nFreq) array
             with the transfer functions from drives to probes
         """
-        nProbes = len(self._probes)
-        nDrives = len(self._drives)
+        nProbes = len(self.probes)
+        nDrives = len(self.drives)
         nff = len(self.opt._ff)
         plant = np.zeros((nProbes, nDrives, nff), dtype=complex)
 
-        for pi, probe in enumerate(self._probes):
-            for di, drive in enumerate(self._drives):
+        for pi, probe in enumerate(self.probes):
+            for di, drive in enumerate(self.drives):
                 driveData = drive.split('.')
                 driveName = '.'.join(driveData[:2])
                 dofType = driveData[-1]
@@ -325,11 +325,11 @@ class ControlSystem:
         Returns:
           sensMat: a (nDOF, nProbes) array
         """
-        nProbes = len(self._probes)
+        nProbes = len(self.probes)
         nDOF = len(self._dofs)
         sensMat = np.zeros((nDOF, nProbes))
         for di, dof in enumerate(self._dofs.values()):
-            sensMat[di, :] = dof.probes2dof(self._probes)
+            sensMat[di, :] = dof.probes2dof(self.probes)
         return sensMat
 
     def _computeOutputMatrix(self):
@@ -339,10 +339,10 @@ class ControlSystem:
           actMat: a (nDrives, nDOF) array
         """
         nDOF = len(self._dofs)
-        nDrives = len(self._drives)
+        nDrives = len(self.drives)
         actMat = np.zeros((nDrives, nDOF))
         for di, dof in enumerate(self._dofs.values()):
-            actMat[:, di] = dof.dofs2drives(self._drives)
+            actMat[:, di] = dof.dofs2drives(self.drives)
         return actMat
 
     def _computeController(self):
@@ -363,11 +363,11 @@ class ControlSystem:
 
     def _computeCompensator(self):
         nff = len(self._ss)
-        ndrives = len(self._drives)
+        ndrives = len(self.drives)
         ones = np.ones(nff)
         compMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
         compdrives = [cf[0] for cf in self._compFilts]
-        for di, drive in enumerate(self._drives):
+        for di, drive in enumerate(self.drives):
             try:
                 ind = compdrives.index(drive)
                 compMat[di, di, :] = self._compFilts[ind][-1].filt(self._ss)
@@ -377,11 +377,11 @@ class ControlSystem:
 
     def _computeResponse(self):
         nff = len(self._ss)
-        ndrives = len(self._drives)
+        ndrives = len(self.drives)
         ones = np.ones(nff)
         respMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
         respdrives = [rf[0] for rf in self._respFilts]
-        for di, drive in enumerate(self._drives):
+        for di, drive in enumerate(self.drives):
             try:
                 ind = respdrives.index(drive)
                 respMat[di, di, :] = self._respFilts[ind][-1].filt(self._ss)
@@ -557,6 +557,10 @@ class ControlSystem:
             elif sigFrom == 'drive':
                 tf = np.einsum(
                     'ijf,jk,klf->ilf', cltf, self._inMat, self._plant)
+            elif sigFrom == 'cal':
+                tf = np.einsum(
+                    'ijf,jk,klf,lm->imf', cltf, self._inMat, self._plant,
+                    self._outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
                     'ijf,jk,klf,lmf->imf', cltf, self._inMat, self._plant,
@@ -578,6 +582,10 @@ class ControlSystem:
                 tf = np.einsum(
                     'ijf,jkf,kl,lmf->imf', cltf, self._ctrlMat, self._inMat,
                     self._plant)
+            elif sigFrom == 'cal':
+                tf = np.einsum(
+                    'ijf,jkf,kl,lmf,mn->inf', cltf, self._ctrlMat, self._inMat,
+                    self._plant, self._outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
                     'ijf,jkf,kl,lmf,mn->inf', cltf, self._ctrlMat, self._inMat,
@@ -600,10 +608,18 @@ class ControlSystem:
                 tf = np.einsum(
                     'ijf,jk,klf,lm,mnf->inf', cltf, self._compMat,
                     self._outMat, self._ctrlMat, self._inMat, self._plant)
+            elif sigFrom == 'cal':
+                tf = np.einsum(
+                    'ijf,jk,klf,lm,mnf,np->ipf', cltf, self._compMat,
+                    self._outMat, self._ctrlMat, self._inMat, self._plant,
+                    self._outMat)
 
         elif sigTo == 'drive':
             cltf = self._cltf[sigTo]
-            if sigFrom == 'comp':
+            if sigFrom == 'cal':
+                tf = np.einsum('ijf,jkf,kl->ilf',
+                               cltf, self._oltf['drive'], self._outMat)
+            elif sigFrom == 'comp':
                 tf = np.einsum(
                     'ijf,jkf->ikf', cltf, self._respMat)
             elif sigFrom == 'ctrl':
@@ -624,6 +640,9 @@ class ControlSystem:
             if sigFrom == 'drive':
                 tf = np.einsum(
                     'ijf,jkf->ikf', cltf, self._plant)
+            if sigFrom == 'cal':
+                tf = np.einsum(
+                    'ijf,jkf,kl->ilf', cltf, self._plant, self._outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
                     'ijf,jkf,klf->ilf', cltf, self._plant, self._respMat)
@@ -638,14 +657,14 @@ class ControlSystem:
 
         elif sigTo == 'pos':
             # Get the mechanical modifications of the drives
-            nDrives = len(self._drives)
+            nDrives = len(self.drives)
             nff = len(self.opt._ff)
             mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
-            for dit, driveTo in enumerate(self._drives):
+            for dit, driveTo in enumerate(self.drives):
                 driveData = driveTo.split('.')
                 driveToName = '.'.join(driveData[:2])
                 dofToType = driveData[-1]
-                for djf, driveFrom in enumerate(self._drives):
+                for djf, driveFrom in enumerate(self.drives):
                     driveData = driveFrom.split('.')
                     driveFromName = '.'.join(driveData[:2])
                     dofFromType = driveData[-1]
@@ -665,12 +684,12 @@ class ControlSystem:
 
         elif sigTo == 'spot':
             # Get the conversion from drives to beam spot motion
-            nDrives = len(self._drives)
+            nDrives = len(self.drives)
             nff = len(self.opt._ff)
             drive2bsm = np.zeros((nDrives, nDrives, nff), dtype=complex)
-            for si, spot_drive in enumerate(self._drives):
+            for si, spot_drive in enumerate(self.drives):
                 spot_probe = spot_drive.split('.')[0]
-                for di, drive in enumerate(self._drives):
+                for di, drive in enumerate(self.drives):
                     driveData = drive.split('.')
                     driveName = '.'.join(driveData[:2])
                     dofType = driveData[-1]
@@ -695,13 +714,22 @@ class ControlSystem:
 
         return tf
 
-    def getNoise(self, dofTo, sigTo, sigFrom, noiseASDs):
+    def getTotalNoiseTo(self, dofTo, sigTo, sigFrom, noiseASDs):
         ampTF = self.getTF(dofTo, sigTo, '', sigFrom)
         powTF = np.abs(ampTF)**2
         totalPSD = np.zeros(powTF.shape[-1])
         for dofFrom, noiseASD in noiseASDs.items():
             fromInd = self._getIndex(dofFrom, sigFrom)
             totalPSD += powTF[fromInd] * noiseASD**2
+        return np.sqrt(totalPSD)
+
+    def getTotalNoiseFrom(self, sigTo, dofFrom, sigFrom, noiseASDs):
+        ampTF = self.getTF('', sigTo, dofFrom, sigFrom)
+        powTF = np.abs(ampTF)**2
+        totalPSD = np.zeros(powTF.shape[-1])
+        for dofTo, noiseASD in noiseASDs.items():
+            toInd = self._getIndex(dofTo, sigTo)
+            totalPSD += powTF[toInd] * noiseASD**2
         return np.sqrt(totalPSD)
 
     def getCalibration(self, dofTo, dofFrom, sig='err'):
@@ -737,18 +765,6 @@ class ControlSystem:
         dofFromInd = self._dofs.keys().index(dofFrom)
         return tf[dofToInd, dofFromInd, :]
 
-    def plotOLTF(self, dofTo, dofFrom, sig='err', mag_ax=None, phase_ax=None,
-                 dB=False, **kwargs):
-        """Plot an OLTF
-
-        See documentation for getOLTF and plotting.plotTF
-        """
-        oltf = self.getOLTF(dofTo, dofFrom, sig=sig)
-        fig = plotting.plotTF(
-            self.opt._ff, oltf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
-            **kwargs)
-        return fig
-
     def getSensingNoise(self, dof, probe, asd=None, sig='err'):
         """Compute the sensing noise from a probe to a DOF
 
@@ -782,15 +798,9 @@ class ControlSystem:
             qnoise = asd
 
         dofInd = self._dofs.keys().index(dof)
-        probeInd = self._probes.index(probe)
+        probeInd = self.probes.index(probe)
         sensNoise = np.abs(noiseTF[dofInd, probeInd, :]) * qnoise
         return sensNoise
-
-    def getDisplacementNoise(self, dof, drive, asd, sig='err'):
-        pass
-
-    def getForceNoise(self, dof, drive, asd, sig='err'):
-        pass
 
     def getSensingFunction(self, dofTo, dofFrom):
         """Computes the sensing function from DOFs to DOFs
@@ -825,10 +835,10 @@ class ControlSystem:
         return fig
 
     def _getIndex(self, name, sig):
-        if sig in ['err', 'ctrl']:
+        if sig in ['err', 'ctrl', 'cal']:
             ind = self._dofs.keys().index(name)
         elif sig in ['comp', 'drive', 'pos', 'spot']:
-            ind = self._drives.index(name)
+            ind = self.drives.index(name)
         elif sig == 'sens':
-            ind = self._probes.index(name)
+            ind = self.probes.index(name)
         return ind
