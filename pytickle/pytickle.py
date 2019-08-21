@@ -898,6 +898,18 @@ class PyTickle:
             self.addProbeIn(nameI, sinkName, 'in', freq, phase)
             self.addProbeIn(nameQ, sinkName, 'in', freq, phase + 90)
 
+    def addGouyPhase(self, name, phase):
+        """Add a Gouy phase optic
+
+        Inputs:
+          name: name of the Gouy phase optic
+          phase: Gouy phase to add [deg]
+        """
+        phase *= np.pi/180
+        cmd = self.optName + ".addGouyPhase(" + str2mat(name) + ", " \
+            + str(phase) + ");"
+        self.eng.eval(cmd, nargout=0)
+
     def setPosOffset(self, name, dist):
         cmd = self.optName + ".setPosOffset(" + str2mat(name)
         cmd += ", " + str(dist) + ");"
@@ -1065,6 +1077,33 @@ class PyTickle:
         cmd += str2mat(name) + ", " + str(phase) + ");"
         self.eng.eval(cmd, nargout=0)
 
+    def getGouyPhase(self, name):
+        """Get the Gouy phase of an existing Gouy phase optic
+
+        Inputs:
+          name: name of the Gouy phase optic
+
+        Returns:
+          phase: the phase [deg]
+        """
+        cmd = self.optName + ".getOptic(" + str2mat(name) + ");"
+        self.eng.eval(cmd, nargout=0)
+        phase = mat2py(self.eng.eval("ans.getPhase;"))
+        return phase * 180/np.pi
+
+    def setGouyPhase(self, name, phase):
+        """Set the Gouy phase of an existing Gouy phase optic
+
+        Inputs:
+          name: name of the Gouy phase optic
+          phase: phase [deg]
+        """
+        phase *= np.pi / 180
+        cmd = "gouy = " + self.optName + ".getOptic(" + str2mat(name) + ");"
+        self.eng.eval(cmd, nargout=0)
+        cmd = "gouy.setPhase(" + str(phase) + ");"
+        self.eng.eval(cmd, nargout=0)
+
     def getLinkLength(self, linkStart, linkEnd):
         """Get the length of a link
 
@@ -1109,7 +1148,7 @@ class PyTickle:
           z0: Rayleigh range of the beam [m]
           R: radius of curvature of the phase front on the optic [m]
         """
-        cmd = "[w, z0, z, R] = {:s}.getBeamSize({:s}, {:s})".format(
+        cmd = "[w, z0, z, R] = {:s}.getBeamSize({:s}, {:s});".format(
             self.optName, str2mat(name), str2mat(port))
         self.eng.eval(cmd, nargout=0)
         w = mat2py(self.eng.workspace['w'])
