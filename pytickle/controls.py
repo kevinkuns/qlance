@@ -310,12 +310,14 @@ class ControlSystem:
         for pi, probe in enumerate(self.probes):
             for di, drive in enumerate(self.drives):
                 driveData = drive.split('.')
-                driveName = '.'.join(driveData[:2])
+                # driveName = '.'.join(driveData[:2])
+                driveName = driveData[0]
                 dofType = driveData[-1]
-                if dofType == 'pos':
-                    tf = self.opt.getTF(probe, driveName)
-                elif dofType in ['pitch', 'yaw']:
-                    tf = self.opt.getAngularTF(probe, driveName, dofType)
+                # if dofType == 'pos':
+                #     tf = self.opt.getTF(probe, driveName)
+                # elif dofType in ['pitch', 'yaw']:
+                #     tf = self.opt.getAngularTF(probe, driveName, dofType)
+                tf = self.opt.getTF(probe, driveName, dof=dofType)
                 plant[pi, di, :] = tf
         return plant
 
@@ -595,15 +597,15 @@ class ControlSystem:
             cltf = self._cltf[sigTo]
             if sigFrom == 'ctrl':
                 tf = np.einsum(
-                    'ijf,jk->ikf', cltf, self._compMat, self._outMat)
+                    'ijf,jkf,kl->ilf', cltf, self._compMat, self._outMat)
             elif sigFrom == 'err':
                 tf = np.einsum(
-                    'ijf,jk,klf->ilf', cltf, self._compMat, self._outMat,
+                    'ijf,jkf,kl,lmf->imf', cltf, self._compMat, self._outMat,
                     self._ctrlMat)
             elif sigFrom == 'sens':
                 tf = np.einsum(
-                    'ijf,jk,klf,lm->imf', cltf, self._compMat, self._outMat,
-                    self._ctrlMat, self._inMat)
+                    'ijf,jkf,kl,lmf,mn->inf', cltf, self._compMat,
+                    self._outMat, self._ctrlMat, self._inMat)
             elif sigFrom == 'drive':
                 tf = np.einsum(
                     'ijf,jk,klf,lm,mnf->inf', cltf, self._compMat,
@@ -662,11 +664,13 @@ class ControlSystem:
             mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
             for dit, driveTo in enumerate(self.drives):
                 driveData = driveTo.split('.')
-                driveToName = '.'.join(driveData[:2])
+                # driveToName = '.'.join(driveData[:2])
+                driveToName = driveData[0]
                 dofToType = driveData[-1]
                 for djf, driveFrom in enumerate(self.drives):
                     driveData = driveFrom.split('.')
-                    driveFromName = '.'.join(driveData[:2])
+                    # driveFromName = '.'.join(driveData[:2])
+                    driveFromName = driveData[0]
                     dofFromType = driveData[-1]
                     if dofFromType != dofToType:
                         msg = 'Input and output drives should be the same ' \
@@ -688,14 +692,18 @@ class ControlSystem:
             nff = len(self.opt._ff)
             drive2bsm = np.zeros((nDrives, nDrives, nff), dtype=complex)
             for si, spot_drive in enumerate(self.drives):
-                spot_probe = spot_drive.split('.')[0]
+                opticName = spot_drive.split('.')[0]
                 for di, drive in enumerate(self.drives):
                     driveData = drive.split('.')
-                    driveName = '.'.join(driveData[:2])
+                    # driveName = '.'.join(driveData[:2])
+                    driveName = driveData[0]
                     dofType = driveData[-1]
-                    tf = self.opt.getAngularTF(spot_probe, driveName, dofType,
-                                               'fr')
-                    drive2bsm[si, di] = tf
+                    # tf = self.opt.getAngularTF(spot_probe, driveName, dofType,
+                    #                            'fr')
+                    # drive2bsm[si, di] = tf
+                    # print(opticName, driveName, dofType)
+                    drive2bsm[si, di] = self.opt.computeBeamSpotMotion(
+                        opticName, 'fr', driveName, dofType)
 
             # Get the loop transfer function to drives
             if sigFrom == 'drive':
