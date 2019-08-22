@@ -125,3 +125,18 @@ def convolvePSDs(ff, df, PSD1, PSD2):
 
     # Return convolution resampled to original frequency vector
     return resamplePSD(ffLin, ff, linConv)
+
+
+def computeRMS(ff, asd):
+    """Compute the cumulative RMS
+
+    Inputs:
+        ff: the frequency vector [Hz]
+        asd: the ASD of a quantity [A/rtHz, for some units A]
+
+    Returns:
+        rms: the cumulative RMS [A]
+    """
+    dS = np.flip(asd**2 * ff)
+    rms = np.flip(np.sqrt(np.cumsum(dS)))
+    return rms
