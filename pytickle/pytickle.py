@@ -910,6 +910,26 @@ class PyTickle:
             + str(phase) + ");"
         self.eng.eval(cmd, nargout=0)
 
+    def addGouyReadout(self, name, phaseA, dphaseB=90):
+        """Add Gouy phases and sinks for WFS readout
+
+        Inputs:
+          name: base name of the probes
+          phaseA: Gouy phase of the A probe [deg]
+          dphaseB: additional Gouy phase of the B probe relative to the
+            A probe [deg] (Default: 90 deg)
+        """
+        self.addMirror(name + '_WFS_BS', Thr=0.5, aoi=45)
+        self.addSink(name + '_A')
+        self.addSink(name + '_B')
+        self.addGouyPhase(name + '_GouyA', phaseA)
+        self.addGouyPhase(name + '_GouyB', phaseA + dphaseB)
+
+        self.addLink(name + '_WFS_BS', 'fr', name + '_GouyA', 'in', 0)
+        self.addLink(name + '_WFS_BS', 'bk', name + '_GouyB', 'in', 0)
+        self.addLink(name + '_GouyA', 'out', name + '_A', 'in', 0)
+        self.addLink(name + '_GouyB', 'out', name + '_B', 'in', 0)
+
     def setPosOffset(self, name, dist):
         cmd = self.optName + ".setPosOffset(" + str2mat(name)
         cmd += ", " + str(dist) + ");"
