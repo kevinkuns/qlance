@@ -63,6 +63,8 @@ def opt40m(eng, opt, par, phi=0, zeta=0, Pin=1):
     optics = mirrors + splitters
     for optic in optics:
         opt.setMechTF(optic, [], poles, 1/par[optic]['mass'])
+        opt.setMechTF(optic, [], poles, 1/par[optic]['mass'], 'pitch')
+        opt.setMechTF(optic, [], poles, 1/par[optic]['mass'], 'yaw')
 
     ##########################################################################
     # Input.

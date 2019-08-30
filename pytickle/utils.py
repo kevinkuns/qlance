@@ -5,6 +5,7 @@ Some misc. functions.
 from __future__ import division
 import numpy as np
 from collections import OrderedDict
+from copy import deepcopy
 
 
 def mag2db(arr, pow=False):
@@ -64,6 +65,7 @@ def assertType(data, dtype):
     Returns:
       data: the converted data
     """
+    data = deepcopy(data)
     if isinstance(data, str):
         if dtype == list:
             data = [data]

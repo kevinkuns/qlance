@@ -1,11 +1,10 @@
-from __future__ import division
 import numpy as np
 from scipy.linalg import inv
 from collections import OrderedDict
-from utils import assertType
+from .utils import assertType
 from functools import partial
 from numbers import Number
-import plotting
+from . import plotting
 
 
 def append_str_if_unique(array, elements):
@@ -358,8 +357,8 @@ class ControlSystem:
         nDOF = len(self._dofs)
         ctrlMat = np.zeros((nDOF, nDOF, len(self._ss)), dtype=complex)
         for (dofTo, dofFrom, filt) in self._filters:
-            toInd = self._dofs.keys().index(dofTo)
-            fromInd = self._dofs.keys().index(dofFrom)
+            toInd = list(self._dofs.keys()).index(dofTo)
+            fromInd = list(self._dofs.keys()).index(dofFrom)
             ctrlMat[toInd, fromInd, :] = filt.filt(self._ss)
         return ctrlMat
 
@@ -528,8 +527,8 @@ class ControlSystem:
         #     raise ValueError('The signal must be either err or ctrl')
 
         oltf = self._oltf[sig]
-        dofToInd = self._dofs.keys().index(dofTo)
-        dofFromInd = self._dofs.keys().index(dofFrom)
+        dofToInd = list(self._dofs.keys()).index(dofTo)
+        dofFromInd = list(self._dofs.keys()).index(dofFrom)
         return oltf[dofToInd, dofFromInd, :]
 
     def getCLTF(self, dofTo, dofFrom, sig='err'):
@@ -546,13 +545,30 @@ class ControlSystem:
         #     raise ValueError('The signal must be either err or ctrl')
 
         cltf = self._cltf[sig]
-        dofToInd = self._dofs.keys().index(dofTo)
-        dofFromInd = self._dofs.keys().index(dofFrom)
+        dofToInd = list(self._dofs.keys()).index(dofTo)
+        dofFromInd = list(self._dofs.keys()).index(dofFrom)
         return cltf[dofToInd, dofFromInd, :]
 
-    def getTF(self, dofTo, sigTo, dofFrom, sigFrom):
+    def getTF(self, dofTo, sigTo, dofFrom, sigFrom, closed=True):
+        """Get a transfer function between two test points in a loop
+
+        If dofTo is the empty string '', the vector to all dofs is returned
+        If dofFrom is the empty string '', the vector of all dofs is returned
+        """
+        def cltf_or_unity(sigTo):
+            """Returns the CLTF if a closed loop TF is necessary and the identity
+            matrix if an open loop TF is necessary
+            """
+            if closed:
+                return self._cltf[sigTo]
+            else:
+                unity = np.zeros_like(self._cltf[sigTo])
+                inds = np.arange(self._cltf[sigTo].shape[0])
+                unity[inds, inds, :] = 1
+                return unity
+
         if sigTo == 'err':
-            cltf = self._cltf[sigTo]
+            cltf = cltf_or_unity(sigTo)
             if sigFrom == 'sens':
                 tf = np.einsum(
                     'ijf,jk->ikf', cltf, self._inMat)
@@ -573,7 +589,7 @@ class ControlSystem:
                     self._plant, self._respMat, self._compMat, self._outMat)
 
         elif sigTo == 'ctrl':
-            cltf = self._cltf[sigTo]
+            cltf = cltf_or_unity(sigTo)
             if sigFrom == 'err':
                 tf = np.einsum(
                     'ijf,jkf->ikf', cltf, self._ctrlMat)
@@ -594,7 +610,7 @@ class ControlSystem:
                     self._plant, self._respMat)
 
         elif sigTo == 'comp':
-            cltf = self._cltf[sigTo]
+            cltf = cltf_or_unity(sigTo)
             if sigFrom == 'ctrl':
                 tf = np.einsum(
                     'ijf,jkf,kl->ilf', cltf, self._compMat, self._outMat)
@@ -617,7 +633,7 @@ class ControlSystem:
                     self._outMat)
 
         elif sigTo == 'drive':
-            cltf = self._cltf[sigTo]
+            cltf = cltf_or_unity(sigTo)
             if sigFrom == 'cal':
                 tf = np.einsum('ijf,jkf,kl->ilf',
                                cltf, self._oltf['drive'], self._outMat)
@@ -638,7 +654,7 @@ class ControlSystem:
                     self._compMat, self._outMat, self._ctrlMat, self._inMat)
 
         elif sigTo == 'sens':
-            cltf = self._cltf[sigTo]
+            cltf = cltf_or_unity(sigTo)
             if sigFrom == 'drive':
                 tf = np.einsum(
                     'ijf,jkf->ikf', cltf, self._plant)
@@ -664,12 +680,10 @@ class ControlSystem:
             mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
             for dit, driveTo in enumerate(self.drives):
                 driveData = driveTo.split('.')
-                # driveToName = '.'.join(driveData[:2])
                 driveToName = driveData[0]
                 dofToType = driveData[-1]
                 for djf, driveFrom in enumerate(self.drives):
                     driveData = driveFrom.split('.')
-                    # driveFromName = '.'.join(driveData[:2])
                     driveFromName = driveData[0]
                     dofFromType = driveData[-1]
                     if dofFromType != dofToType:
@@ -681,7 +695,7 @@ class ControlSystem:
 
             # Get the loop transfer function to drives
             if sigFrom == 'drive':
-                loopTF = self._cltf['drive']
+                loopTF = cltf_or_unity('drive')
             else:
                 loopTF = self.getTF('', 'drive', '', sigFrom)
             tf = np.einsum('ijf,jkf->ikf', mMech, loopTF)
@@ -695,19 +709,14 @@ class ControlSystem:
                 opticName = spot_drive.split('.')[0]
                 for di, drive in enumerate(self.drives):
                     driveData = drive.split('.')
-                    # driveName = '.'.join(driveData[:2])
                     driveName = driveData[0]
                     dofType = driveData[-1]
-                    # tf = self.opt.getAngularTF(spot_probe, driveName, dofType,
-                    #                            'fr')
-                    # drive2bsm[si, di] = tf
-                    # print(opticName, driveName, dofType)
                     drive2bsm[si, di] = self.opt.computeBeamSpotMotion(
                         opticName, 'fr', driveName, dofType)
 
             # Get the loop transfer function to drives
             if sigFrom == 'drive':
-                loopTF = self._cltf['drive']
+                loopTF = cltf_or_unity('drive')
             else:
                 loopTF = self.getTF('', 'drive', '', sigFrom)
             tf = np.einsum('ijf,jkf->ikf', drive2bsm, loopTF)
@@ -739,39 +748,6 @@ class ControlSystem:
             toInd = self._getIndex(dofTo, sigTo)
             totalPSD += powTF[toInd] * noiseASD**2
         return np.sqrt(totalPSD)
-
-    def getCalibration(self, dofTo, dofFrom, sig='err'):
-        """Compute the CLTF between two DOFs to use for calibration
-
-        Computes the TF necessary to signal-refer noise to. For example, noise
-        is usually plotted DARM referred in which case the raw noise should be
-        divided by the CLTF from the DARM drives to the DARM probes.
-
-        Inputs:
-          dofTo: output DOF
-          dofFrom: input DOF
-          sig: which signal to compute the TF for:
-            1) 'err': error signal (Default)
-            2) 'ctrl': control signal
-
-        Returns:
-          tf: the transfer function
-        """
-        cltf = self._cltf[sig]
-
-        if sig == 'err':
-            tf = np.einsum(
-                'ijf,jk,klf,lm->imf', cltf, self._inMat, self._plant,
-                self._outMat)
-
-        elif sig == 'ctrl':
-            tf = np.einsum(
-                'ijf,jkf,kl,lmf,mn->inf', cltf, self._ctrlMat, self._inMat,
-                self._plant, self._outMat)
-
-        dofToInd = self._dofs.keys().index(dofTo)
-        dofFromInd = self._dofs.keys().index(dofFrom)
-        return tf[dofToInd, dofFromInd, :]
 
     def getSensingNoise(self, dof, probe, asd=None, sig='err'):
         """Compute the sensing noise from a probe to a DOF
@@ -805,46 +781,14 @@ class ControlSystem:
         else:
             qnoise = asd
 
-        dofInd = self._dofs.keys().index(dof)
+        dofInd = list(self._dofs.keys()).index(dof)
         probeInd = self.probes.index(probe)
         sensNoise = np.abs(noiseTF[dofInd, probeInd, :]) * qnoise
         return sensNoise
 
-    def getSensingFunction(self, dofTo, dofFrom):
-        """Computes the sensing function from DOFs to DOFs
-
-        Computes the sensing function between two degrees of freedom.
-        This includes the optomechanical plant as well as the actuation
-        and sensing matrices.
-
-        Inputs:
-          dofTo: output DOF
-          dofFrom: input DOF
-
-        Returns:
-          sensFunc: the sensing function [W/m]
-        """
-        sensFunc = np.einsum(
-            'ij,jkf,kl->ilf', self._inMat, self._plant, self._outMat)
-        dofTo = self._dofs.keys().index(dofTo)
-        dofFrom = self._dofs.keys().index(dofFrom)
-        return sensFunc[dofTo, dofFrom, :]
-
-    def plotCLTF(self, dofTo, dofFrom, sig='err', mag_ax=None, phase_ax=None,
-                 dB=False, **kwargs):
-        """Plot a CLTF
-
-        See documentation for getCLTF and plotting.plotTF
-        """
-        cltf = self.getCLTF(dofTo, dofFrom, sig=sig)
-        fig = plotting.plotTF(
-            self.opt._ff, cltf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
-            **kwargs)
-        return fig
-
     def _getIndex(self, name, sig):
         if sig in ['err', 'ctrl', 'cal']:
-            ind = self._dofs.keys().index(name)
+            ind = list(self._dofs.keys()).index(name)
         elif sig in ['comp', 'drive', 'pos', 'spot']:
             ind = self.drives.index(name)
         elif sig == 'sens':

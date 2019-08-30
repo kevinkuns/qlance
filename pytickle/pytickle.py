@@ -2,15 +2,14 @@
 Provides code for calling Optickle from within python
 '''
 
-from __future__ import division
 import numpy as np
 import matlab
 import matplotlib.pyplot as plt
 import scipy.constants as scc
 from numbers import Number
 from collections import OrderedDict
-import plotting
-import utils
+from . import plotting
+from . import utils
 
 
 def mat2py(mat_arr):
