@@ -129,13 +129,13 @@ class DegreeOfFreedom:
     def __init__(self, name, probes, drives, dofType='pos'):
         self.name = name
         self.probes = assertType(probes, dict).copy()
-        self.drives = assertType(drives, dict).copy()
+        self.drives = OrderedDict()
         self.dofType = dofType
 
         # append the type of dof to the names of the drives
-        for key in self.drives.keys():
-            newkey = key + '.' + dofType
-            self.drives[newkey] = self.drives.pop(key)
+        in_drives = assertType(drives, dict).copy()
+        self.drives = OrderedDict(
+            {k + '.' + dofType: v for k, v in in_drives.items()})
 
     def probes2dof(self, probeList):
         """Make a vector of probes
