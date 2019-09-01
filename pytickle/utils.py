@@ -2,10 +2,18 @@
 Some misc. functions.
 '''
 
-from __future__ import division
 import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
+
+
+def normalizeDOF(dof):
+    """Normalize a degree of freedom for use in transfer functions, et
+    """
+    vals = np.array(list(dof.values()))
+    norm = np.sum(np.abs(vals))
+    dof_normalized = OrderedDict({k: v / norm for k, v in dof.items()})
+    return dof_normalized
 
 
 def mag2db(arr, pow=False):
