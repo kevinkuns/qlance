@@ -99,7 +99,7 @@ class PyTickle:
             self.optName + " = Optickle(vRF, lambda0, pol);", nargout=0)
 
         # initialize pytickle class variables
-        self.lambda0 = lambda0
+        self.lambda0 = mat2py(self.eng.eval(self.optName + ".lambda"))
         self.vRF = mat2py(self.eng.eval(self.optName + ".vFrf"))
         self.pol = np.array(pol)
         self.nRF = OrderedDict()
@@ -209,21 +209,35 @@ class PyTickle:
             if self._sigDC_tickle is None:
                 # Compute the DC fields since they haven't been computed yet
                 self.tickle(ff=None)
-            cmd = "[sigAC_pitch, mMech_pitch] = {:}.tickle01([], f);".format(
-                self.optName)
+            if noise:
+                output = "[sigAC_pitch, mMech_pitch, noiseAC_pitch]"
+            else:
+                output = "[sigAC_pitch, mMech_pitch, noiseAC_pitch]"
+            cmd = "{:s} = {:}.tickle01([], f);".format(output, self.optName)
+
             self.eng.eval(cmd, nargout=0)
             self._sigAC['pitch'] = mat2py(self.eng.workspace['sigAC_pitch'])
             self._mMech['pitch'] = mat2py(self.eng.workspace['mMech_pitch'])
+            if noise:
+                self._noiseAC['pitch'] = mat2py(
+                    self.eng.workspace['noiseAC_pitch'])
 
         elif dof == 'yaw':
             if self._sigDC_tickle is None:
                 # Compute the DC fields since they haven't been computed yet
                 self.tickle(ff=None)
-            cmd = "[sigAC_yaw, mMech_yaw] = {:}.tickle10([], f);".format(
-                self.optName)
+            if noise:
+                output = "[sigAC_yaw, mMech_yaw, noiseAC_yaw]"
+            else:
+                output = "[sigAC_yaw, mMech_yaw, noiseAC_yaw]"
+            cmd = "{:s} = {:}.tickle01([], f);".format(output, self.optName)
+
             self.eng.eval(cmd, nargout=0)
             self._sigAC['yaw'] = mat2py(self.eng.workspace['sigAC_yaw'])
             self._mMech['yaw'] = mat2py(self.eng.workspace['mMech_yaw'])
+            if noise:
+                self._noiseAC['pitch'] = mat2py(
+                    self.eng.workspace['noiseAC_pitch'])
 
     def sweeepLinear(self, startPos, endPos, npts):
         """Run Optickle's sweepLinear function
