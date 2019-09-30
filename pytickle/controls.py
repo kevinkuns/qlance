@@ -268,7 +268,9 @@ class ControlSystem:
         self._plant = self._computePlant()
         self._ctrlMat = self._computeController()
         self._compMat = self._computeCompensator()
-        self._respMat = self._computeResponse()
+        response = self._computeResponse()
+        mMech = self._computeMechMod()
+        self._respMat = np.einsum('ijf,jkf->ikf', mMech, response)
         self._oltf = {sig: self._computeOLTF(sig) for sig in self._sigs}
         self._cltf = {sig: self._computeCLTF(oltf)
                       for sig, oltf in self._oltf.items()}
@@ -389,6 +391,27 @@ class ControlSystem:
             except ValueError:
                 respMat[di, di, :] = ones
         return respMat
+
+    def _computeMechMod(self):
+        nDrives = len(self.drives)
+        nff = len(self.opt._ff)
+        mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
+        for dit, driveTo in enumerate(self.drives):
+            driveData = driveTo.split('.')
+            driveToName = driveData[0]
+            dofToType = driveData[-1]
+            for djf, driveFrom in enumerate(self.drives):
+                driveData = driveFrom.split('.')
+                driveFromName = driveData[0]
+                dofFromType = driveData[-1]
+                if dofFromType != dofToType:
+                    msg = 'Input and output drives should be the same ' \
+                          + 'degree of freedom (pos, pitch, or yaw)'
+                    raise ValueError(msg)
+                mMech[dit, djf, :] = self.opt.getMechMod(
+                    driveToName, driveFromName, dofToType)
+        return mMech
+
 
     def _computeOLTF(self, sig='err'):
         """Compute the OLTF from DOFs to DOFs
@@ -567,7 +590,10 @@ class ControlSystem:
                 unity[inds, inds, :] = 1
                 return unity
 
-        if sigTo == 'err':
+        if sigTo == sigFrom:
+            tf = cltf_or_unity(sigTo)
+
+        elif sigTo == 'err':
             cltf = cltf_or_unity(sigTo)
             if sigFrom == 'sens':
                 tf = np.einsum(
@@ -673,33 +699,6 @@ class ControlSystem:
                     'ijf,jkf,klf,lmf,mn,npf->ipf', cltf, self._plant,
                     self._respMat, self._compMat, self._outMat, self._ctrlMat)
 
-        elif sigTo == 'pos':
-            # Get the mechanical modifications of the drives
-            nDrives = len(self.drives)
-            nff = len(self.opt._ff)
-            mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
-            for dit, driveTo in enumerate(self.drives):
-                driveData = driveTo.split('.')
-                driveToName = driveData[0]
-                dofToType = driveData[-1]
-                for djf, driveFrom in enumerate(self.drives):
-                    driveData = driveFrom.split('.')
-                    driveFromName = driveData[0]
-                    dofFromType = driveData[-1]
-                    if dofFromType != dofToType:
-                        msg = 'Input and output drives should be the same ' \
-                              + 'degree of freedom (pos, pitch, or yaw)'
-                        raise ValueError(msg)
-                    mMech[dit, djf, :] = self.opt.getMechMod(
-                        driveToName, driveFromName, dofToType)
-
-            # Get the loop transfer function to drives
-            if sigFrom == 'drive':
-                loopTF = cltf_or_unity('drive')
-            else:
-                loopTF = self.getTF('', 'drive', '', sigFrom)
-            tf = np.einsum('ijf,jkf->ikf', mMech, loopTF)
-
         elif sigTo == 'spot':
             # Get the conversion from drives to beam spot motion
             nDrives = len(self.drives)
@@ -789,7 +788,7 @@ class ControlSystem:
     def _getIndex(self, name, sig):
         if sig in ['err', 'ctrl', 'cal']:
             ind = list(self._dofs.keys()).index(name)
-        elif sig in ['comp', 'drive', 'pos', 'spot']:
+        elif sig in ['comp', 'drive', 'spot']:
             ind = self.drives.index(name)
         elif sig == 'sens':
             ind = self.probes.index(name)

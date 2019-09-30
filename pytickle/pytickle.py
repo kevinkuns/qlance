@@ -239,7 +239,7 @@ class PyTickle:
                 self._noiseAC['pitch'] = mat2py(
                     self.eng.workspace['noiseAC_pitch'])
 
-    def sweeepLinear(self, startPos, endPos, npts):
+    def sweepLinear(self, startPos, endPos, npts):
         """Run Optickle's sweepLinear function
 
         Inputs:
@@ -588,7 +588,7 @@ class PyTickle:
           poses: the drive positions
           power: the power at those positions [W]
         """
-        if self.fDCsweep is None:
+        if self._fDC_sweep is None:
             raise ValueError(
                 'Must run sweepLinear before calculating sweep power')
 
@@ -596,7 +596,7 @@ class PyTickle:
         linkNum = self._getLinkNum(linkStart, linkEnd)
         driveNum = self.drives.index(driveName)
 
-        poses = self.poses[driveNum, :]
+        poses = self._poses[driveNum, :]
         if self.vRF.size == 1:
             power = np.abs(self._fDC_sweep[linkNum, :])**2
         else:
@@ -1041,6 +1041,9 @@ class PyTickle:
 
     def monitorBeamSpotMotion(self, opticName, spotPort):
         """Add a DC probe to an optic to monitor beam spot motion
+
+        NOTE: The probe basis cannot be rotated before monitoring beam spot
+        motion.
 
         Inputs:
           opticName: name of the optic to monitor BSM on
