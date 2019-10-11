@@ -234,21 +234,21 @@ class ControlSystem:
     def __init__(self):
         self.opt = None
         self.ss = None
-        self._dofs = OrderedDict()
-        self._filters = []
+        self.dofs = OrderedDict()
+        self.filters = []
         self.probes = []
         self.drives = []
-        self._respFilts = []
-        self._compFilts = []
-        self._opticalPlant = None
-        self._ctrlMat = None
-        self._oltf = None
-        self._cltf = None
-        self._inMat = None
-        self._outMat = None
-        self._compMat = None
-        self._respMat = None
-        self._sigs = ['err', 'ctrl', 'comp', 'drive', 'sens']
+        self.respFilts = []
+        self.compFilts = []
+        self.plant = None
+        self.ctrlMat = None
+        self.oltf = None
+        self.cltf = None
+        self.inMat = None
+        self.outMat = None
+        self.compMat = None
+        self.respMat = None
+        self.sigs = ['err', 'ctrl', 'comp', 'drive', 'sens']
 
     def setPyTicklePlant(self, opt):
         """Set a PyTickle model to be the plant
@@ -263,17 +263,17 @@ class ControlSystem:
             self.ss = 2j*np.pi*opt.ff
 
     def tickle(self):
-        self._inMat = self._computeInputMatrix()
-        self._outMat = self._computeOutputMatrix()
-        self._plant = self._computePlant()
-        self._ctrlMat = self._computeController()
-        self._compMat = self._computeCompensator()
-        response = self._computeResponse()
-        mMech = self._computeMechMod()
-        self._respMat = np.einsum('ijf,jkf->ikf', mMech, response)
-        self._oltf = {sig: self._computeOLTF(sig) for sig in self._sigs}
-        self._cltf = {sig: self._computeCLTF(oltf)
-                      for sig, oltf in self._oltf.items()}
+        self.inMat = self.computeInputMatrix()
+        self.outMat = self.computeOutputMatrix()
+        self.plant = self.computePlant()
+        self.ctrlMat = self.computeController()
+        self.compMat = self.computeCompensator()
+        response = self.computeResponse()
+        mMech = self.computeMechMod()
+        self.respMat = np.einsum('ijf,jkf->ikf', mMech, response)
+        self.oltf = {sig: self.computeOLTF(sig) for sig in self.sigs}
+        self.cltf = {sig: self.computeCLTF(oltf)
+                      for sig, oltf in self.oltf.items()}
 
     def addDOF(self, name, probes, drives, dofType='pos'):
         """Add a degree of freedom to the model
@@ -287,16 +287,16 @@ class ControlSystem:
           For DARM where L = Lx - Ly and it is sensed by AS_DIFF
           cs.addDOF('DARM', 'AS_DIFF', {'EX.pos': 1, 'EY.pos': -1})
         """
-        if name in self._dofs.keys():
+        if name in self.dofs.keys():
             raise ValueError(
                 'Degree of freedom {:s} already exists'.format(name))
 
         dof = DegreeOfFreedom(name, probes, drives, dofType=dofType)
-        self._dofs[name] = dof
+        self.dofs[name] = dof
         append_str_if_unique(self.probes, dof.probes)
         append_str_if_unique(self.drives, dof.drives)
 
-    def _computePlant(self):
+    def computePlant(self):
         """Compute the PyTickle plant from drives to probes
 
         Returns:
@@ -311,44 +311,39 @@ class ControlSystem:
         for pi, probe in enumerate(self.probes):
             for di, drive in enumerate(self.drives):
                 driveData = drive.split('.')
-                # driveName = '.'.join(driveData[:2])
                 driveName = driveData[0]
                 dofType = driveData[-1]
-                # if dofType == 'pos':
-                #     tf = self.opt.getTF(probe, driveName)
-                # elif dofType in ['pitch', 'yaw']:
-                #     tf = self.opt.getAngularTF(probe, driveName, dofType)
-                tf = self.opt.getTF(probe, driveName, dof=dofType)
+                tf = self.opt.getTF(probe, driveName, dof=dofType, optOnly=True)
                 plant[pi, di, :] = tf
         return plant
 
-    def _computeInputMatrix(self):
+    def computeInputMatrix(self):
         """Compute the sensing matrix from probes to DOFs
 
         Returns:
           sensMat: a (nDOF, nProbes) array
         """
         nProbes = len(self.probes)
-        nDOF = len(self._dofs)
+        nDOF = len(self.dofs)
         sensMat = np.zeros((nDOF, nProbes))
-        for di, dof in enumerate(self._dofs.values()):
+        for di, dof in enumerate(self.dofs.values()):
             sensMat[di, :] = dof.probes2dof(self.probes)
         return sensMat
 
-    def _computeOutputMatrix(self):
+    def computeOutputMatrix(self):
         """Compute the actuation matrix from DOFs to drives
 
         Returns:
           actMat: a (nDrives, nDOF) array
         """
-        nDOF = len(self._dofs)
+        nDOF = len(self.dofs)
         nDrives = len(self.drives)
         actMat = np.zeros((nDrives, nDOF))
-        for di, dof in enumerate(self._dofs.values()):
+        for di, dof in enumerate(self.dofs.values()):
             actMat[:, di] = dof.dofs2drives(self.drives)
         return actMat
 
-    def _computeController(self):
+    def computeController(self):
         """Compute the control matrix from DOFs to DOFs
 
         Returns:
@@ -356,43 +351,43 @@ class ControlSystem:
         """
         if self.ss is None:
             raise RuntimeError('There is no associated PyTickle model')
-        nDOF = len(self._dofs)
+        nDOF = len(self.dofs)
         ctrlMat = np.zeros((nDOF, nDOF, len(self.ss)), dtype=complex)
-        for (dofTo, dofFrom, filt) in self._filters:
-            toInd = list(self._dofs.keys()).index(dofTo)
-            fromInd = list(self._dofs.keys()).index(dofFrom)
+        for (dofTo, dofFrom, filt) in self.filters:
+            toInd = list(self.dofs.keys()).index(dofTo)
+            fromInd = list(self.dofs.keys()).index(dofFrom)
             ctrlMat[toInd, fromInd, :] = filt.filt(self.ss)
         return ctrlMat
 
-    def _computeCompensator(self):
+    def computeCompensator(self):
         nff = len(self.ss)
         ndrives = len(self.drives)
         ones = np.ones(nff)
         compMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
-        compdrives = [cf[0] for cf in self._compFilts]
+        compdrives = [cf[0] for cf in self.compFilts]
         for di, drive in enumerate(self.drives):
             try:
                 ind = compdrives.index(drive)
-                compMat[di, di, :] = self._compFilts[ind][-1].filt(self.ss)
+                compMat[di, di, :] = self.compFilts[ind][-1].filt(self.ss)
             except ValueError:
                 compMat[di, di, :] = ones
         return compMat
 
-    def _computeResponse(self):
+    def computeResponse(self):
         nff = len(self.ss)
         ndrives = len(self.drives)
         ones = np.ones(nff)
         respMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
-        respdrives = [rf[0] for rf in self._respFilts]
+        respdrives = [rf[0] for rf in self.respFilts]
         for di, drive in enumerate(self.drives):
             try:
                 ind = respdrives.index(drive)
-                respMat[di, di, :] = self._respFilts[ind][-1].filt(self.ss)
+                respMat[di, di, :] = self.respFilts[ind][-1].filt(self.ss)
             except ValueError:
                 respMat[di, di, :] = ones
         return respMat
 
-    def _computeMechMod(self):
+    def computeMechMod(self):
         nDrives = len(self.drives)
         nff = len(self.opt.ff)
         mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
@@ -413,7 +408,7 @@ class ControlSystem:
         return mMech
 
 
-    def _computeOLTF(self, sig='err'):
+    def computeOLTF(self, sig='err'):
         """Compute the OLTF from DOFs to DOFs
 
         Inputs:
@@ -421,37 +416,37 @@ class ControlSystem:
             1) 'err': error signal (Default)
             2) 'ctrl': control signal
         """
-        if sig not in self._sigs:
+        if sig not in self.sigs:
             raise ValueError('Unrecognized signal')
 
         if sig == 'err':
             oltf = np.einsum(
-                'ij,jkf,klf,lmf,mn,npf->ipf', self._inMat, self._plant,
-                self._respMat, self._compMat, self._outMat, self._ctrlMat)
+                'ij,jkf,klf,lmf,mn,npf->ipf', self.inMat, self.plant,
+                self.respMat, self.compMat, self.outMat, self.ctrlMat)
 
         elif sig == 'ctrl':
             oltf = np.einsum(
-                'ijf,jk,klf,lmf,mnf,np->ipf', self._ctrlMat, self._inMat,
-                self._plant, self._respMat, self._compMat, self._outMat)
+                'ijf,jk,klf,lmf,mnf,np->ipf', self.ctrlMat, self.inMat,
+                self.plant, self.respMat, self.compMat, self.outMat)
 
         elif sig == 'comp':
             oltf = np.einsum(
-                'ijf,jk,klf,lm,mnf,npf->ipf', self._compMat, self._outMat,
-                self._ctrlMat, self._inMat, self._plant, self._respMat)
+                'ijf,jk,klf,lm,mnf,npf->ipf', self.compMat, self.outMat,
+                self.ctrlMat, self.inMat, self.plant, self.respMat)
 
         elif sig == 'drive':
             oltf = np.einsum(
-                'ijf,jkf,kl,lmf,mn,npf->ipf', self._respMat, self._compMat,
-                self._outMat, self._ctrlMat, self._inMat, self._plant)
+                'ijf,jkf,kl,lmf,mn,npf->ipf', self.respMat, self.compMat,
+                self.outMat, self.ctrlMat, self.inMat, self.plant)
 
         elif sig == 'sens':
             oltf = np.einsum(
-                'ijf,jkf,klf,lm,mnf,np->ipf', self._plant, self._respMat,
-                self._compMat, self._outMat, self._ctrlMat, self._inMat)
+                'ijf,jkf,klf,lm,mnf,np->ipf', self.plant, self.respMat,
+                self.compMat, self.outMat, self.ctrlMat, self.inMat)
 
         return oltf
 
-    def _computeCLTF(self, oltf):
+    def computeCLTF(self, oltf):
         """Compute the CLTF from DOFs to DOFs
 
         Inputs:
@@ -475,35 +470,35 @@ class ControlSystem:
         """
         if len(args) == 1 and isinstance(args[0], Filter):
             # args is already a Filter instance
-            self._filters.append((dofTo, dofFrom, args[0]))
+            self.filters.append((dofTo, dofFrom, args[0]))
 
         else:
             # args defines a new Filter
-            self._filters.append((dofTo, dofFrom, Filter(*args)))
+            self.filters.append((dofTo, dofFrom, Filter(*args)))
 
     def addCompensator(self, drive, driveType, *args):
         drive += '.' + driveType
-        if drive in [cf[0] for cf in self._compFilts]:
+        if drive in [cf[0] for cf in self.compFilts]:
             raise ValueError(
                 'A compensator is already set for drive {:s}'.format(drive))
 
         if len(args) == 1 and isinstance(args[0], Filter):
-            self._compFilts.append((drive, args[0]))
+            self.compFilts.append((drive, args[0]))
 
         else:
-            self._compFilts.append((drive, Filter(*args)))
+            self.compFilts.append((drive, Filter(*args)))
 
     def setResponse(self, drive, driveType, *args):
         drive += '.' + driveType
-        if drive in [rf[0] for rf in self._respFilts]:
+        if drive in [rf[0] for rf in self.respFilts]:
             raise ValueError(
                 'A response is already set for drive {:s}'.format(drive))
 
         if len(args) == 1 and isinstance(args[0], Filter):
-            self._respFilts.append((drive, args[0]))
+            self.respFilts.append((drive, args[0]))
 
         else:
-            self._respFilts.append((drive, Filter(*args)))
+            self.respFilts.append((drive, Filter(*args)))
 
     def getFilter(self, dofTo, dofFrom):
         """Get the filter between two DOFs
@@ -515,8 +510,8 @@ class ControlSystem:
         Returns:
           filt: the filter
         """
-        dofsTo = np.array([filt[0] for filt in self._filters])
-        dofsFrom = np.array([filt[1] for filt in self._filters])
+        dofsTo = np.array([filt[0] for filt in self.filters])
+        dofsFrom = np.array([filt[1] for filt in self.filters])
         inds = np.logical_and(dofTo == dofsTo, dofFrom == dofsFrom)
         nfilts = np.count_nonzero(inds)
         if nfilts == 0:
@@ -525,7 +520,7 @@ class ControlSystem:
         elif nfilts > 1:
             raise ValueError('There are multiple filters')
         else:
-            return self._filters[inds.nonzero()[0][0]][-1]
+            return self.filters[inds.nonzero()[0][0]][-1]
 
     def plotFilter(self, dofTo, dofFrom, mag_ax=None, phase_ax=None, dB=False,
                    **kwargs):
@@ -549,9 +544,9 @@ class ControlSystem:
         # if sig not in ['err', 'ctrl']:
         #     raise ValueError('The signal must be either err or ctrl')
 
-        oltf = self._oltf[sig]
-        dofToInd = list(self._dofs.keys()).index(dofTo)
-        dofFromInd = list(self._dofs.keys()).index(dofFrom)
+        oltf = self.oltf[sig]
+        dofToInd = list(self.dofs.keys()).index(dofTo)
+        dofFromInd = list(self.dofs.keys()).index(dofFrom)
         return oltf[dofToInd, dofFromInd, :]
 
     def getCLTF(self, dofTo, dofFrom, sig='err'):
@@ -567,9 +562,9 @@ class ControlSystem:
         # if sig not in ['err', 'ctrl']:
         #     raise ValueError('The signal must be either err or ctrl')
 
-        cltf = self._cltf[sig]
-        dofToInd = list(self._dofs.keys()).index(dofTo)
-        dofFromInd = list(self._dofs.keys()).index(dofFrom)
+        cltf = self.cltf[sig]
+        dofToInd = list(self.dofs.keys()).index(dofTo)
+        dofFromInd = list(self.dofs.keys()).index(dofFrom)
         return cltf[dofToInd, dofFromInd, :]
 
     def getTF(self, dofTo, sigTo, dofFrom, sigFrom, closed=True):
@@ -583,10 +578,10 @@ class ControlSystem:
             matrix if an open loop TF is necessary
             """
             if closed:
-                return self._cltf[sigTo]
+                return self.cltf[sigTo]
             else:
-                unity = np.zeros_like(self._cltf[sigTo])
-                inds = np.arange(self._cltf[sigTo].shape[0])
+                unity = np.zeros_like(self.cltf[sigTo])
+                inds = np.arange(self.cltf[sigTo].shape[0])
                 unity[inds, inds, :] = 1
                 return unity
 
@@ -597,107 +592,107 @@ class ControlSystem:
             cltf = cltf_or_unity(sigTo)
             if sigFrom == 'sens':
                 tf = np.einsum(
-                    'ijf,jk->ikf', cltf, self._inMat)
+                    'ijf,jk->ikf', cltf, self.inMat)
             elif sigFrom == 'drive':
                 tf = np.einsum(
-                    'ijf,jk,klf->ilf', cltf, self._inMat, self._plant)
+                    'ijf,jk,klf->ilf', cltf, self.inMat, self.plant)
             elif sigFrom == 'cal':
                 tf = np.einsum(
-                    'ijf,jk,klf,lm->imf', cltf, self._inMat, self._plant,
-                    self._outMat)
+                    'ijf,jk,klf,lm->imf', cltf, self.inMat, self.plant,
+                    self.outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
-                    'ijf,jk,klf,lmf->imf', cltf, self._inMat, self._plant,
-                    self._respMat)
+                    'ijf,jk,klf,lmf->imf', cltf, self.inMat, self.plant,
+                    self.respMat)
             elif sigFrom == 'ctrl':
                 tf = np.einsum(
-                    'ijf,jk,klf,lmf,mnf,np->ipf', cltf, self._inMat,
-                    self._plant, self._respMat, self._compMat, self._outMat)
+                    'ijf,jk,klf,lmf,mnf,np->ipf', cltf, self.inMat,
+                    self.plant, self.respMat, self.compMat, self.outMat)
 
         elif sigTo == 'ctrl':
             cltf = cltf_or_unity(sigTo)
             if sigFrom == 'err':
                 tf = np.einsum(
-                    'ijf,jkf->ikf', cltf, self._ctrlMat)
+                    'ijf,jkf->ikf', cltf, self.ctrlMat)
             elif sigFrom == 'sens':
                 tf = np.einsum(
-                    'ijf,jkf,kl->ilf', cltf, self._ctrlMat, self._inMat)
+                    'ijf,jkf,kl->ilf', cltf, self.ctrlMat, self.inMat)
             elif sigFrom == 'drive':
                 tf = np.einsum(
-                    'ijf,jkf,kl,lmf->imf', cltf, self._ctrlMat, self._inMat,
-                    self._plant)
+                    'ijf,jkf,kl,lmf->imf', cltf, self.ctrlMat, self.inMat,
+                    self.plant)
             elif sigFrom == 'cal':
                 tf = np.einsum(
-                    'ijf,jkf,kl,lmf,mn->inf', cltf, self._ctrlMat, self._inMat,
-                    self._plant, self._outMat)
+                    'ijf,jkf,kl,lmf,mn->inf', cltf, self.ctrlMat, self.inMat,
+                    self.plant, self.outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
-                    'ijf,jkf,kl,lmf,mn->inf', cltf, self._ctrlMat, self._inMat,
-                    self._plant, self._respMat)
+                    'ijf,jkf,kl,lmf,mn->inf', cltf, self.ctrlMat, self.inMat,
+                    self.plant, self.respMat)
 
         elif sigTo == 'comp':
             cltf = cltf_or_unity(sigTo)
             if sigFrom == 'ctrl':
                 tf = np.einsum(
-                    'ijf,jkf,kl->ilf', cltf, self._compMat, self._outMat)
+                    'ijf,jkf,kl->ilf', cltf, self.compMat, self.outMat)
             elif sigFrom == 'err':
                 tf = np.einsum(
-                    'ijf,jkf,kl,lmf->imf', cltf, self._compMat, self._outMat,
-                    self._ctrlMat)
+                    'ijf,jkf,kl,lmf->imf', cltf, self.compMat, self.outMat,
+                    self.ctrlMat)
             elif sigFrom == 'sens':
                 tf = np.einsum(
-                    'ijf,jkf,kl,lmf,mn->inf', cltf, self._compMat,
-                    self._outMat, self._ctrlMat, self._inMat)
+                    'ijf,jkf,kl,lmf,mn->inf', cltf, self.compMat,
+                    self.outMat, self.ctrlMat, self.inMat)
             elif sigFrom == 'drive':
                 tf = np.einsum(
-                    'ijf,jk,klf,lm,mnf->inf', cltf, self._compMat,
-                    self._outMat, self._ctrlMat, self._inMat, self._plant)
+                    'ijf,jk,klf,lm,mnf->inf', cltf, self.compMat,
+                    self.outMat, self.ctrlMat, self.inMat, self.plant)
             elif sigFrom == 'cal':
                 tf = np.einsum(
-                    'ijf,jk,klf,lm,mnf,np->ipf', cltf, self._compMat,
-                    self._outMat, self._ctrlMat, self._inMat, self._plant,
-                    self._outMat)
+                    'ijf,jk,klf,lm,mnf,np->ipf', cltf, self.compMat,
+                    self.outMat, self.ctrlMat, self.inMat, self.plant,
+                    self.outMat)
 
         elif sigTo == 'drive':
             cltf = cltf_or_unity(sigTo)
             if sigFrom == 'cal':
                 tf = np.einsum('ijf,jkf,kl->ilf',
-                               cltf, self._oltf['drive'], self._outMat)
+                               cltf, self.oltf['drive'], self.outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
-                    'ijf,jkf->ikf', cltf, self._respMat)
+                    'ijf,jkf->ikf', cltf, self.respMat)
             elif sigFrom == 'ctrl':
                 tf = np.einsum(
-                    'ijf,jkf,klf,lm->imf', cltf, self._respMat, self._compMat,
-                    self._outMat)
+                    'ijf,jkf,klf,lm->imf', cltf, self.respMat, self.compMat,
+                    self.outMat)
             elif sigFrom == 'err':
                 tf = np.einsum(
-                    'ijf,jkf,klf,lm,mnf->inf', cltf, self._respMat,
-                    self._compMat, self._outMat, self._ctrlMat)
+                    'ijf,jkf,klf,lm,mnf->inf', cltf, self.respMat,
+                    self.compMat, self.outMat, self.ctrlMat)
             elif sigFrom == 'sens':
                 tf = np.einsum(
-                    'ijf,jkf,klf,lm,mnf,np->ipf', cltf, self._respMat,
-                    self._compMat, self._outMat, self._ctrlMat, self._inMat)
+                    'ijf,jkf,klf,lm,mnf,np->ipf', cltf, self.respMat,
+                    self.compMat, self.outMat, self.ctrlMat, self.inMat)
 
         elif sigTo == 'sens':
             cltf = cltf_or_unity(sigTo)
             if sigFrom == 'drive':
                 tf = np.einsum(
-                    'ijf,jkf->ikf', cltf, self._plant)
+                    'ijf,jkf->ikf', cltf, self.plant)
             if sigFrom == 'cal':
                 tf = np.einsum(
-                    'ijf,jkf,kl->ilf', cltf, self._plant, self._outMat)
+                    'ijf,jkf,kl->ilf', cltf, self.plant, self.outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
-                    'ijf,jkf,klf->ilf', cltf, self._plant, self._respMat)
+                    'ijf,jkf,klf->ilf', cltf, self.plant, self.respMat)
             elif sigFrom == 'ctrl':
                 tf = np.einsum(
-                    'ijf,jkf,klf,lmf,mn->inf', cltf, self._plant,
-                    self._respMat, self._compMat, self._outMat)
+                    'ijf,jkf,klf,lmf,mn->inf', cltf, self.plant,
+                    self.respMat, self.compMat, self.outMat)
             elif sigFrom == 'err':
                 tf = np.einsum(
-                    'ijf,jkf,klf,lmf,mn,npf->ipf', cltf, self._plant,
-                    self._respMat, self._compMat, self._outMat, self._ctrlMat)
+                    'ijf,jkf,klf,lmf,mn,npf->ipf', cltf, self.plant,
+                    self.respMat, self.compMat, self.outMat, self.ctrlMat)
 
         elif sigTo == 'spot':
             # Get the conversion from drives to beam spot motion
@@ -768,26 +763,26 @@ class ControlSystem:
         if sig not in ['err', 'ctrl']:
             raise ValueError('The signal must be either err or ctrl')
 
-        cltf = self._cltf[sig]
+        cltf = self.cltf[sig]
         if sig == 'err':
-            noiseTF = np.einsum('ijf,jk->ikf', cltf, self._inMat)
+            noiseTF = np.einsum('ijf,jk->ikf', cltf, self.inMat)
         elif sig == 'ctrl':
-            noiseTF = np.einsum('ijf,jkf,kl->ilf', cltf, self._ctrlMat,
-                                self._inMat)
+            noiseTF = np.einsum('ijf,jkf,kl->ilf', cltf, self.ctrlMat,
+                                self.inMat)
 
         if asd is None:
             qnoise = self.opt.getQuantumNoise(probe)
         else:
             qnoise = asd
 
-        dofInd = list(self._dofs.keys()).index(dof)
+        dofInd = list(self.dofs.keys()).index(dof)
         probeInd = self.probes.index(probe)
         sensNoise = np.abs(noiseTF[dofInd, probeInd, :]) * qnoise
         return sensNoise
 
     def _getIndex(self, name, sig):
         if sig in ['err', 'ctrl', 'cal']:
-            ind = list(self._dofs.keys()).index(name)
+            ind = list(self.dofs.keys()).index(name)
         elif sig in ['comp', 'drive', 'spot']:
             ind = self.drives.index(name)
         elif sig == 'sens':
