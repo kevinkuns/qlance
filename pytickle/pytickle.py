@@ -258,10 +258,10 @@ class PyTickle:
         sPosMat = np.zeros(len(self.drives))
         ePosMat = np.zeros(len(self.drives))
         for driveName, drivePos in startPos.items():
-            driveNum = self.drives.index(driveName)
+            driveNum = self._getDriveIndex(driveName, 'pos')
             sPosMat[driveNum] = drivePos
         for driveName, drivePos in endPos.items():
-            driveNum = self.drives.index(driveName)
+            driveNum = self._getDriveIndex(driveName, 'pos')
             ePosMat[driveNum] = drivePos
 
         self.eng.workspace['startPos'] = py2mat(sPosMat)
@@ -575,7 +575,8 @@ class PyTickle:
         ax.set_xlim([min(poses), max(poses)])
         # return fig
 
-    def getSweepPower(self, driveName, linkStart, linkEnd, fRF=0):
+    def getSweepPower(self, driveName, linkStart, linkEnd, fRF=0,
+                      lambda0=1064e-9):
         """Get the power along a link between two optics as a drive is swept
 
         Inputs:
@@ -583,6 +584,8 @@ class PyTickle:
           linkEnd: name of the end of the link
           fRF: frequency of the sideband power to return [Hz]
             (Default: 0, i.e. the carrier)
+          lambda0: wavelength of the sideband power to return [m]
+            (Default: 1064e-9)
 
         Returns:
           poses: the drive positions
@@ -594,13 +597,13 @@ class PyTickle:
 
         # find the link and the drive
         linkNum = self._getLinkNum(linkStart, linkEnd)
-        driveNum = self.drives.index(driveName)
+        driveNum = self._getDriveIndex(driveName, 'pos')
 
         poses = self._poses[driveNum, :]
         if self.vRF.size == 1:
             power = np.abs(self._fDC_sweep[linkNum, :])**2
         else:
-            nRF = self._getSidebandInd(fRF)
+            nRF = self._getSidebandInd(fRF, lambda0)
             power = np.abs(self._fDC_sweep[linkNum, nRF, :])**2
 
         return poses, power
@@ -1372,28 +1375,36 @@ class PyTickle:
             raise ValueError('Unrecognized polarization ' + str(pol)
                              + '. Use \'S\' or \'P\'')
 
-    def _getSidebandInd(self, freq, tol=1):
+    def _getSidebandInd(self, freq, lambda0=1064e-9, ftol=1, wltol=1e-10):
         """Find the index of an RF sideband frequency
 
         Inputs:
           freq: the frequency of the desired sideband
-          tol: tolerance of the difference between freq and the RF sideband
+          lambda0: wavelength of desired sideband [m] (Default: 1064 nm)
+          ftol: tolerance of the difference between freq and the RF sideband
             of the model [Hz] (Default: 1 Hz)
+          wltol: tolerance of the difference between lambda0 and the RF
+            sideband wavelength of the model [m] (Default: 100 pm)
 
         Returns:
           nRF: the index of the RF sideband
         """
-        # FIXME: add support for multiple colors and polarizations
-        ind = np.nonzero(np.isclose(self.vRF, freq, atol=tol))[0]
+        # FIXME: add support for multiple polarizations
+        ind = np.nonzero(np.logical_and(
+            np.isclose(self.vRF, freq, atol=ftol),
+            np.isclose(self.lambda0, lambda0, atol=wltol)))[0]
+
         if len(ind) == 0:
             msg = 'There are no sidebands with frequency '
             msg += '{:0.0f} {:s}Hz'.format(
                 *utils.siPrefix(freq)[::-1])
             raise ValueError(msg)
+
         elif len(ind) > 1:
             msg = 'There are {:d} sidebands with '.format(len(ind))
             msg += 'frequency {:0.0f} {:s}Hz'.format(
                 *utils.siPrefix(freq)[::-1])
             raise ValueError(msg)
+
         else:
             return int(ind)
