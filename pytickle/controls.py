@@ -233,7 +233,7 @@ class Filter:
 class ControlSystem:
     def __init__(self):
         self.opt = None
-        self._ss = None
+        self.ss = None
         self._dofs = OrderedDict()
         self._filters = []
         self.probes = []
@@ -260,7 +260,7 @@ class ControlSystem:
             raise ValueError('A PyTickle model is already set as the plant')
         else:
             self.opt = opt
-            self._ss = 2j*np.pi*opt._ff
+            self.ss = 2j*np.pi*opt.ff
 
     def tickle(self):
         self._inMat = self._computeInputMatrix()
@@ -305,7 +305,7 @@ class ControlSystem:
         """
         nProbes = len(self.probes)
         nDrives = len(self.drives)
-        nff = len(self.opt._ff)
+        nff = len(self.opt.ff)
         plant = np.zeros((nProbes, nDrives, nff), dtype=complex)
 
         for pi, probe in enumerate(self.probes):
@@ -354,18 +354,18 @@ class ControlSystem:
         Returns:
           ctrlMat: a (nDOF, nDOF, nff) array
         """
-        if self._ss is None:
+        if self.ss is None:
             raise RuntimeError('There is no associated PyTickle model')
         nDOF = len(self._dofs)
-        ctrlMat = np.zeros((nDOF, nDOF, len(self._ss)), dtype=complex)
+        ctrlMat = np.zeros((nDOF, nDOF, len(self.ss)), dtype=complex)
         for (dofTo, dofFrom, filt) in self._filters:
             toInd = list(self._dofs.keys()).index(dofTo)
             fromInd = list(self._dofs.keys()).index(dofFrom)
-            ctrlMat[toInd, fromInd, :] = filt.filt(self._ss)
+            ctrlMat[toInd, fromInd, :] = filt.filt(self.ss)
         return ctrlMat
 
     def _computeCompensator(self):
-        nff = len(self._ss)
+        nff = len(self.ss)
         ndrives = len(self.drives)
         ones = np.ones(nff)
         compMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
@@ -373,13 +373,13 @@ class ControlSystem:
         for di, drive in enumerate(self.drives):
             try:
                 ind = compdrives.index(drive)
-                compMat[di, di, :] = self._compFilts[ind][-1].filt(self._ss)
+                compMat[di, di, :] = self._compFilts[ind][-1].filt(self.ss)
             except ValueError:
                 compMat[di, di, :] = ones
         return compMat
 
     def _computeResponse(self):
-        nff = len(self._ss)
+        nff = len(self.ss)
         ndrives = len(self.drives)
         ones = np.ones(nff)
         respMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
@@ -387,14 +387,14 @@ class ControlSystem:
         for di, drive in enumerate(self.drives):
             try:
                 ind = respdrives.index(drive)
-                respMat[di, di, :] = self._respFilts[ind][-1].filt(self._ss)
+                respMat[di, di, :] = self._respFilts[ind][-1].filt(self.ss)
             except ValueError:
                 respMat[di, di, :] = ones
         return respMat
 
     def _computeMechMod(self):
         nDrives = len(self.drives)
-        nff = len(self.opt._ff)
+        nff = len(self.opt.ff)
         mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
         for dit, driveTo in enumerate(self.drives):
             driveData = driveTo.split('.')
@@ -534,7 +534,7 @@ class ControlSystem:
         See documentation for plotFilter in Filter class
         """
         filt = self.getFilter(dofTo, dofFrom)
-        return filt.plotFilter(self.opt._ff, mag_ax, phase_ax, dB, **kwargs)
+        return filt.plotFilter(self.opt.ff, mag_ax, phase_ax, dB, **kwargs)
 
     def getOLTF(self, dofTo, dofFrom, sig='err'):
         """Compute the OLTF from DOFs to DOFs
@@ -702,7 +702,7 @@ class ControlSystem:
         elif sigTo == 'spot':
             # Get the conversion from drives to beam spot motion
             nDrives = len(self.drives)
-            nff = len(self.opt._ff)
+            nff = len(self.opt.ff)
             drive2bsm = np.zeros((nDrives, nDrives, nff), dtype=complex)
             for si, spot_drive in enumerate(self.drives):
                 opticName = spot_drive.split('.')[0]
