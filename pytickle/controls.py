@@ -248,6 +248,7 @@ class ControlSystem:
         self.outMat = None
         self.compMat = None
         self.respMat = None
+        self.mMech = None
         self.sigs = ['err', 'ctrl', 'comp', 'drive', 'sens']
 
     def setPyTicklePlant(self, opt):
@@ -269,8 +270,8 @@ class ControlSystem:
         self.ctrlMat = self.computeController()
         self.compMat = self.computeCompensator()
         response = self.computeResponse()
-        mMech = self.computeMechMod()
-        self.respMat = np.einsum('ijf,jkf->ikf', mMech, response)
+        self.mMech = self.computeMechMod()
+        self.respMat = np.einsum('ijf,jkf->ikf', self.mMech, response)
         self.oltf = {sig: self.computeOLTF(sig) for sig in self.sigs}
         self.cltf = {sig: self.computeCLTF(oltf)
                       for sig, oltf in self.oltf.items()}
@@ -596,10 +597,14 @@ class ControlSystem:
             elif sigFrom == 'drive':
                 tf = np.einsum(
                     'ijf,jk,klf->ilf', cltf, self.inMat, self.plant)
-            elif sigFrom == 'cal':
+            elif sigFrom == 'optcal':
                 tf = np.einsum(
                     'ijf,jk,klf,lm->imf', cltf, self.inMat, self.plant,
                     self.outMat)
+            elif sigFrom == 'cal':
+                tf = np.einsum(
+                    'ijf,jk,klf,lmf,mn->inf', cltf, self.inMat, self.plant,
+                    self.mMech, self.outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
                     'ijf,jk,klf,lmf->imf', cltf, self.inMat, self.plant,
@@ -621,10 +626,14 @@ class ControlSystem:
                 tf = np.einsum(
                     'ijf,jkf,kl,lmf->imf', cltf, self.ctrlMat, self.inMat,
                     self.plant)
-            elif sigFrom == 'cal':
+            elif sigFrom == 'optcal':
                 tf = np.einsum(
                     'ijf,jkf,kl,lmf,mn->inf', cltf, self.ctrlMat, self.inMat,
                     self.plant, self.outMat)
+            elif sigFrom == 'cal':
+                tf = np.einsum(
+                    'ijf,jkf,kl,lmf,mnf,np->ipf', cltf, self.ctrlMat,
+                    self.inMat, self.plant, self.mMech, self.outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
                     'ijf,jkf,kl,lmf,mn->inf', cltf, self.ctrlMat, self.inMat,
@@ -645,19 +654,27 @@ class ControlSystem:
                     self.outMat, self.ctrlMat, self.inMat)
             elif sigFrom == 'drive':
                 tf = np.einsum(
-                    'ijf,jk,klf,lm,mnf->inf', cltf, self.compMat,
+                    'ijf,jkf,kl,lmf,mn,npf->ipf', cltf, self.compMat,
                     self.outMat, self.ctrlMat, self.inMat, self.plant)
-            elif sigFrom == 'cal':
+            elif sigFrom == 'optcal':
                 tf = np.einsum(
-                    'ijf,jk,klf,lm,mnf,np->ipf', cltf, self.compMat,
+                    'ijf,jkf,kl,lmf,mn,npf,pq->iqf', cltf, self.compMat,
                     self.outMat, self.ctrlMat, self.inMat, self.plant,
                     self.outMat)
+            elif sigFrom == '':
+                tf = np.einsum(
+                    'ijf,jkf,kl,lmf,mn,npf,pqf,qr->irf', cltf, self.compMat,
+                    self.outMat, self.ctrlMat, self.inMat, self.plant,
+                    self.mMech, self.outMat)
 
         elif sigTo == 'drive':
             cltf = cltf_or_unity(sigTo)
-            if sigFrom == 'cal':
-                tf = np.einsum('ijf,jkf,kl->ilf',
-                               cltf, self.oltf['drive'], self.outMat)
+            if sigFrom == 'optcal':
+                tf = np.einsum(
+                    'ijf,jkf,kl->ilf', cltf, self.oltf['drive'], self.outMat)
+            elif sigFrom == 'cal':
+                tf = np.einsum(
+                    'ijf,jkf,kl->ilf', cltf, self.mMech, self.outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
                     'ijf,jkf->ikf', cltf, self.respMat)
@@ -679,9 +696,13 @@ class ControlSystem:
             if sigFrom == 'drive':
                 tf = np.einsum(
                     'ijf,jkf->ikf', cltf, self.plant)
-            if sigFrom == 'cal':
+            elif sigFrom == 'optcal':
                 tf = np.einsum(
                     'ijf,jkf,kl->ilf', cltf, self.plant, self.outMat)
+            elif sigFrom == 'cal':
+                tf = np.einsum(
+                    'ijf,jkf,klf,lm->imf', cltf, self.plant, self.mMech,
+                    self.outMat)
             elif sigFrom == 'comp':
                 tf = np.einsum(
                     'ijf,jkf,klf->ilf', cltf, self.plant, self.respMat)
@@ -781,10 +802,12 @@ class ControlSystem:
         return sensNoise
 
     def _getIndex(self, name, sig):
-        if sig in ['err', 'ctrl', 'cal']:
+        if sig in ['err', 'ctrl', 'cal', 'cal', 'optcal']:
             ind = list(self.dofs.keys()).index(name)
         elif sig in ['comp', 'drive', 'spot']:
             ind = self.drives.index(name)
         elif sig == 'sens':
             ind = self.probes.index(name)
+        else:
+            raise ValueError('Unrecognized signal ' + sig)
         return ind
