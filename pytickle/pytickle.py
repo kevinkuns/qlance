@@ -235,11 +235,11 @@ class PyTickle:
         self.sigDC_sweep = mat2py(self.eng.workspace['sigDC'])
         self.fDC_sweep = mat2py(self.eng.workspace['fDC'])
 
-    def getTF(self, probeName, driveNames, dof='pos', optOnly=False):
+    def getTF(self, probeNames, driveNames, dof='pos', optOnly=False):
         """Compute a transfer function
 
         Inputs:
-          probeName: name of the probe at which the TF is calculated
+          probeName: name of the probes at which the TF is calculated
           driveNames: names of the drives from which the TF is calculated
           dof: degree of freedom of the drives (Default: pos)
           optOnly: if True, only return the optical TF with no mechanics
@@ -299,21 +299,27 @@ class PyTickle:
         elif dof == 'yaw':
             tfData = tfData['yaw']
 
-        probeNum = self.probes.index(probeName)
 
         if isinstance(driveNames, str):
             driveNames = {driveNames: 1}
 
-        # loop through the drives to compute the TF
-        for driveName, drivePos in driveNames.items():
-            # get the drive index
-            driveNum = self._getDriveIndex(driveName, dof)
+        if isinstance(probeNames, str):
+            probeNames = {probeNames: 1}
 
-            # add the contribution from this drive
-            try:
-                tf += drivePos * tfData[probeNum, driveNum]
-            except IndexError:
-                tf += drivePos * tfData[driveNum]
+        # loop through the drives and probes to compute the TF
+        for probeName, probeCoeff in probeNames.items():
+            # get the probe index
+            probeNum = self.probes.index(probeName)
+
+            for driveName, drivePos in driveNames.items():
+                # get the drive index
+                driveNum = self._getDriveIndex(driveName, dof)
+
+                # add the contribution from this drive
+                try:
+                    tf += probeCoeff * drivePos * tfData[probeNum, driveNum]
+                except IndexError:
+                    tf += probeCoeff * drivePos * tfData[driveNum]
 
         return tf
 
@@ -1114,7 +1120,21 @@ class PyTickle:
         cmd += str2mat(name) + ", " + str(phase) + ");"
         self.eng.eval(cmd, nargout=0)
 
-    def getGouyPhase(self, name):
+    # def getGouyPhase(self, name):
+    #     """Get the Gouy phase of an existing Gouy phase optic
+
+    #     Inputs:
+    #       name: name of the Gouy phase optic
+
+    #     Returns:
+    #       phase: the phase [deg]
+    #     """
+    #     cmd = self.optName + ".getOptic(" + str2mat(name) + ");"
+    #     self.eng.eval(cmd, nargout=0)
+    #     phase = mat2py(self.eng.eval("ans.getPhase;"))
+    #     return phase * 180/np.pi
+
+    def getGouyPhase(self, name, port):
         """Get the Gouy phase of an existing Gouy phase optic
 
         Inputs:
@@ -1123,9 +1143,15 @@ class PyTickle:
         Returns:
           phase: the phase [deg]
         """
-        cmd = self.optName + ".getOptic(" + str2mat(name) + ");"
-        self.eng.eval(cmd, nargout=0)
-        phase = mat2py(self.eng.eval("ans.getPhase;"))
+        cmd = self.optName + ".getAllFieldBases()"
+        # get the vector of q = (z - z0) + i*zR
+        # take second column for pitch
+        vBasis = mat2py(self.eng.eval(cmd, nargout=1))[:, 1]
+        sinkNum = self._getSinkNum(name, port)
+        # tan(phi) = (z - z0)/zR = Re(q) / Im(q)
+        # so phi = arccot(Im(q)/Re(q)) = pi/2 - arctan(Im(q)/Re(q))
+        #        = pi/2 - arg(phi)
+        phase = np.pi/2 - np.angle(vBasis[sinkNum])
         return phase * 180/np.pi
 
     def setGouyPhase(self, name, phase):
@@ -1220,6 +1246,18 @@ class PyTickle:
         """
         cmd = self.optName + ".getSinkName(" + str(linkNum) + ");"
         return self.eng.eval(cmd, nargout=1)
+
+    def _getSinkNum(self, name, port):
+        cmd = "{:s}.getFieldIn({:s}, {:s})".format(
+            self.optName, str2mat(name), str2mat(port))
+        sinkNum = self.eng.eval(cmd, nargout=1)
+        try:
+            sinkNum = int(sinkNum) - 1
+        except TypeError:
+            raise ValueError(
+                "There does not appear to be a sink at {:s} {:s}".format(
+                    name, port))
+        return sinkNum
 
     def _getLinkNum(self, linkStart, linkEnd):
         """Find the link number of a particular link in the Optickle model
