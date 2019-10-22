@@ -540,7 +540,7 @@ class PyTickle:
         probeNum = self.probes.index(probeName)
         return self.sigDC_tickle[probeNum]
 
-    def getDCpower(self, linkStart, linkEnd, fRF=0):
+    def getDCpower(self, linkStart, linkEnd, fRF=0, lambda0=1064e-9):
         """Get the DC power along a link
 
         Inputs:
@@ -548,6 +548,8 @@ class PyTickle:
           linkEnd: name of the end of the link
           fRF: frequency of the sideband power to return [Hz]
             (Default: 0, i.e. the carrier)
+          lambda0: wavelength of the sideband power to return [m]
+            (Default: 1064e-9)
 
         Returns:
           power: the DC power [W]
@@ -560,7 +562,7 @@ class PyTickle:
         if self.vRF.size == 1:
             power = np.abs(self.fDC[linkNum])**2
         else:
-            nRF = self._getSidebandInd(fRF)
+            nRF = self._getSidebandInd(fRF, lambda0)
             power = np.abs(self.fDC[linkNum, nRF])**2
 
         return power
