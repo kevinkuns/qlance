@@ -440,7 +440,9 @@ class ControlSystem:
                 driveName = driveData[0]
                 dofType = driveData[-1]
                 drive2bsm[si, di] = self.opt.computeBeamSpotMotion(
-                    opticName, 'fr', driveName, dofType)
+                    opticName, driveName, dofType)
+                # drive2bsm[si, di] = self.opt.computeBeamSpotMotion(
+                #     opticName, 'fr', driveName, dofType)
 
         self.drive2bsm = drive2bsm
 

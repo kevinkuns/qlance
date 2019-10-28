@@ -323,12 +323,14 @@ class PyTickle:
 
         return tf
 
-    def computeBeamSpotMotion(self, opticName, spotPort, driveName, dof):
+    def computeBeamSpotMotion(self, opticName, driveName, dof):
         """Compute the beam spot motion on one optic due to angular motion of another
+
+        The beam spot motion must have been monitored by calling monitorBeamSpotMotion
+        before tickling the model.
 
         Inputs:
           opticName: name of the optic to compute the BSM on
-          spotPort: port of the optic to compute the BSM at
           driveName: drive name of the optic from which to compute the BSM from
           dof: degree of freedom of the optic driving the BSM
 
@@ -336,15 +338,22 @@ class PyTickle:
           bsm: the beam spot motion [m/rad]
 
         Example:
-          To compute the beam spot motion on the front of ETMX due to pitch
-          motion of ITMX
-            bsm = opt.computeBeamSpotMotion('ETMX', 'fr', 'ITMX', 'pitch')
+          To compute the beam spot motion on the front of EX due to pitch
+          motion of IX
+            opt.monitorBeamSpotMotion('EX', 'fr')
+            bsm = opt.computeBeamSpotMotion('EX', 'IX', 'pitch')
         """
+        # figure out monitoring probe information
+        probeName = opticName + '_DC'
+        probe_info = self.eng.eval(
+            "opt.getSinkName(opt.getFieldProbed('{:s}'))".format(probeName))
+        spotPort = probe_info.split('<-')[-1]
+
         # get TF to monitoring probe power [W/rad]
-        tf = self.getTF(opticName + '_DC', driveName, dof)
+        tf = self.getTF(probeName, driveName, dof)
 
         # DC power on the monitoring probe
-        Pdc = self.getSigDC(opticName + '_DC')
+        Pdc = self.getSigDC(probeName)
 
         # get the beam size on the optic
         w, _, _, _ = self.getBeamProperties(opticName, spotPort)
@@ -953,8 +962,8 @@ class PyTickle:
           spotPort: port of the optic to monitor the BSM at
 
         Example:
-          To monitor beam spot motion on the front of ETMX
-            opt.monitorBeamSpotMotion('ETMX', 'fr')
+          To monitor beam spot motion on the front of EX
+            opt.monitorBeamSpotMotion('EX', 'fr')
         """
         # add a sink at the optic 'optic_DC'
         name = opticName + '_DC'
