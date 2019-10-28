@@ -341,7 +341,7 @@ class PyTickle:
             bsm = opt.computeBeamSpotMotion('ETMX', 'fr', 'ITMX', 'pitch')
         """
         # get TF to monitoring probe power [W/rad]
-        tf = np.abs(self.getTF(opticName + '_DC', driveName, dof))
+        tf = self.getTF(opticName + '_DC', driveName, dof)
 
         # DC power on the monitoring probe
         Pdc = self.getSigDC(opticName + '_DC')

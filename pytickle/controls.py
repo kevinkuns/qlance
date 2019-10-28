@@ -265,8 +265,8 @@ class ControlSystem:
         self.compMat = None
         self.respMat = None
         self.mMech = None
+        self.drive2bsm = None
         self.outComp = None
-        self.sigs = ['err', 'ctrl', 'comp', 'drive', 'sens']
 
     def setPyTicklePlant(self, opt):
         """Set a PyTickle model to be the plant
@@ -280,7 +280,7 @@ class ControlSystem:
             self.opt = opt
             self.ss = 2j*np.pi*opt.ff
 
-    def tickle(self):
+    def tickle(self, drive2bsm=False):
         self.inMat = self.computeInputMatrix()
         self.outMat = self.computeOutputMatrix()
         self.plant = self.computePlant()
@@ -290,9 +290,12 @@ class ControlSystem:
         self.mMech = self.computeMechMod()
         # self.respMat = np.einsum('ijf,jkf->ikf', self.mMech, response)
         self.outComp = np.einsum('ijf,jk->ikf', self.compMat, self.outMat)
-        self.oltf = {sig: self.computeOLTF(sig) for sig in self.sigs}
+        self.oltf = {tp: self.computeOLTF(tp)
+                     for tp in ['err', 'ctrl', 'comp', 'drive', 'sens']}
         self.cltf = {sig: self.computeCLTF(oltf)
                       for sig, oltf in self.oltf.items()}
+        if drive2bsm:
+            self.computeBeamSpotMotion()
 
     def addDOF(self, name, probes, drives, dofType='pos'):
         """Add a degree of freedom to the model
@@ -332,12 +335,12 @@ class ControlSystem:
                 driveData = drive.split('.')
                 driveName = driveData[0]
                 dofType = driveData[-1]
-                tf = self.opt.getTF(probe, driveName, dof=dofType, optOnly=True)
+                tf = self.opt.getTF(probe, driveName, dof=dofType, optOnly=False)
                 plant[pi, di, :] = tf
         return plant
 
     def computeInputMatrix(self):
-        """Compute the sensing matrix from probes to DOFs
+        """Compute the input matrix from probes to DOFs
 
         Returns:
           sensMat: a (nDOF, nProbes) array
@@ -426,6 +429,20 @@ class ControlSystem:
                     driveToName, driveFromName, dofToType)
         return mMech
 
+    def computeBeamSpotMotion(self):
+        nDrives = len(self.drives)
+        nff = len(self.opt.ff)
+        drive2bsm = np.zeros((nDrives, nDrives, nff), dtype=complex)
+        for si, spot_drive in enumerate(self.drives):
+            opticName = spot_drive.split('.')[0]
+            for di, drive in enumerate(self.drives):
+                driveData = drive.split('.')
+                driveName = driveData[0]
+                dofType = driveData[-1]
+                drive2bsm[si, di] = self.opt.computeBeamSpotMotion(
+                    opticName, 'fr', driveName, dofType)
+
+        self.drive2bsm = drive2bsm
 
     def computeOLTF(self, tstpnt):
         """Compute the OLTF from DOFs to DOFs
@@ -443,13 +460,9 @@ class ControlSystem:
             oltf = self.getTF('', 'sens', '', 'err', closed=False)
             oltf = multiplyMat(oltf, self.inMat)
 
-        elif tstpnt == 'pos':
-            oltf = self.getTF('', 'pos', '', 'sens', closed=False)
-            oltf = multiplyMat(oltf, self.plant)
-
         elif tstpnt == 'drive':
-            oltf = self.getTF('', 'drive', '', 'pos', closed=False)
-            oltf = multiplyMat(oltf, self.mMech)
+            oltf = self.getTF('', 'drive', '', 'sens', closed=False)
+            oltf = multiplyMat(oltf, self.plant)
 
         elif tstpnt == 'comp':
             oltf = self.getTF('', 'comp', '', 'drive', closed=False)
@@ -546,41 +559,39 @@ class ControlSystem:
         filt = self.getFilter(dof_to, dof_from)
         return filt.plotFilter(self.opt.ff, mag_ax, phase_ax, dB, **kwargs)
 
-    def getOLTF(self, dof_to, dof_from, sig='err'):
+    def getOLTF(self, dof_to, dof_from, tstpnt):
         """Compute the OLTF from DOFs to DOFs
 
         Inputs:
           dof_to: output DOF
           dof_from: input DOF
-          sig: which signal to compute the TF for:
-            1) 'err': error signal (Default)
-            2) 'ctrl': control signal
+          tstpnt: which test pont to compute the TF for:
         """
-        # if sig not in ['err', 'ctrl']:
-        #     raise ValueError('The signal must be either err or ctrl')
+        oltf = self.oltf[tstpnt]
+        if dof_from:
+            from_ind = self._getIndex(dof_from, tstpnt)
+            oltf = oltf[:, from_ind]
+        if dof_to:
+            to_ind = self._getIndex(dof_to, tstpnt)
+            oltf = oltf[to_ind]
+        return oltf
 
-        oltf = self.oltf[sig]
-        dof_to_ind = list(self.dofs.keys()).index(dof_to)
-        dof_from_ind = list(self.dofs.keys()).index(dof_from)
-        return oltf[dof_to_ind, dof_from_ind, :]
-
-    def getCLTF(self, dof_to, dof_from, sig='err'):
+    def getCLTF(self, dof_to, dof_from, tstpnt):
         """Compute the CLTF from DOFs to DOFs
 
         Inputs:
           dof_to: output DOF
           dof_from: input DOF
-          sig: which signal to compute the TF for:
-            1) 'err': error signal (Default)
-            2) 'ctrl': control signal
+          tstpnt: which test point to compute the TF for:
         """
-        # if sig not in ['err', 'ctrl']:
-        #     raise ValueError('The signal must be either err or ctrl')
-
-        cltf = self.cltf[sig]
-        dof_to_ind = list(self.dofs.keys()).index(dof_to)
-        dof_from_ind = list(self.dofs.keys()).index(dof_from)
-        return cltf[dof_to_ind, dof_from_ind, :]
+        cltf = self.cltf[tstpnt]
+        if dof_from:
+            from_ind = self._getIndex(dof_from, tstpnt)
+            cltf = cltf[:, from_ind]
+        if dof_to:
+            to_ind = self._getIndex(dof_to, tstpnt)
+            cltf = cltf[to_ind]
+        return cltf
 
     def getTF(self, dof_to, tp_to, dof_from, tp_from, closed=True):
         """Get a transfer function between two test points in a loop
@@ -595,31 +606,22 @@ class ControlSystem:
             if closed:
                 return self.cltf[tp_to]
             else:
-                # unity = np.zeros_like(self.cltf[tp_to])
-                # inds = np.arange(self.cltf[tp_to].shape[0])
-                # unity[inds, inds, :] = 1
-                # return unity
                 return 1
 
-        tstpnts = ['err', 'sens', 'pos', 'drive', 'comp', 'ctrl']
-        mats = [self.inMat, self.plant, self.mMech, self.respMat,
-                self.outComp, self.ctrlMat]
-        matstrs = ['inMat', 'plant', 'mMech', 'respMat', 'outComp', 'ctrlMat']
+        # test points and their matrices in cyclic order for computing TFs
+        # around the main loop
+        tstpnts = ['err', 'sens', 'drive', 'comp', 'ctrl']
+        mats = [self.inMat, self.plant, self.respMat, self.outComp,
+                self.ctrlMat]
 
-        ########################################################################
         # Main loop if the input test point is not a calibration test point
-        ########################################################################
         if tp_from in tstpnts:
 
-            ####################################################################
             # If the test points are the same, this is just a CLTF
-            ####################################################################
             if tp_to == tp_from:
                 tf = cltf_or_unity(tp_to)
 
-            ####################################################################
-            # Main loop if the output test point is not beam spot motion
-            ####################################################################
+            # Main loop if the output test point is not pos or beam spot motion
             elif tp_to in tstpnts:
                 start = False
                 tf = cltf_or_unity(tp_to)
@@ -631,58 +633,36 @@ class ControlSystem:
                         break
                     tf = multiplyMat(tf, mat)
 
-            ####################################################################
-            # If the output test point is beam spot motion, first compute the
-            # TF to drive and prepend the conversion from rad to spot motion
-            ####################################################################
-            elif tp_to == 'spot':
-                # Get the conversion from drives to beam spot motion
-                nDrives = len(self.drives)
-                nff = len(self.opt.ff)
-                drive2bsm = np.zeros((nDrives, nDrives, nff), dtype=complex)
-                for si, spot_drive in enumerate(self.drives):
-                    opticName = spot_drive.split('.')[0]
-                    for di, drive in enumerate(self.drives):
-                        driveData = drive.split('.')
-                        driveName = driveData[0]
-                        dofType = driveData[-1]
-                        drive2bsm[si, di] = self.opt.computeBeamSpotMotion(
-                            opticName, 'fr', driveName, dofType)
-
+            # If the output test point is pos or beam spot motion, first compute
+            # the TF to drive and then prepend the corrections
+            elif tp_to in ['pos', 'spot']:
                 # Get the loop transfer function to drives
                 if tp_from == 'drive':
                     loopTF = cltf_or_unity('drive')
                 else:
-                    loopTF = self.getTF('', 'drive', '', tp_from)
+                    loopTF = self.getTF('', 'drive', '', tp_from, closed=closed)
 
-                tf = np.einsum('ijf,jkf->ikf', drive2bsm, loopTF)
+                # for pos, apply mechanical modification
+                if tp_to == 'pos':
+                    tf = multiplyMat(self.mMech, loopTF)
 
-            ####################################################################
+                # for beam spot motion, apply conversion from drives to motion
+                elif tp_to == 'spot':
+                    tf = multiplyMat(self.drive2bsm, loopTF)
+
             # No valid output test point
-            ####################################################################
             else:
                 raise ValueError('Unrecognized test point to ' + tp_to)
 
-        ########################################################################
         # If the input test point is a calibration test point, first compute
         # the TF from the corresponding drive and append the output matrix
-        ########################################################################
         elif tp_from == 'cal':
-            # Get the loop transfer function from drives
             loopTF = self.getTF('', tp_to, '', 'drive', closed=closed)
             tf = multiplyMat(loopTF, self.outMat)
 
-        elif tp_from == 'optcal':
-            # Get the loop transfer function from positions
-            loopTF = self.getTF('', tp_to, '', 'pos', closed=closed)
-            tf = multiplyMat(loopTF, self.outMat)
-
-        ########################################################################
         # No valid input test point
-        ########################################################################
         else:
             raise ValueError('Unrecognized test point from ' + tp_from)
-
 
         # Reduce size of returned TF if necessary
         if dof_from:
@@ -695,7 +675,7 @@ class ControlSystem:
 
         return tf
 
-    def getTotalNoiseTo(self, dof_to, tp_to, tp_from, noiseASDs):
+    def getTotalNoiseTo(self, dof_to, tp_to, tp_from, noiseASDs, closed=True):
         """Compute the total noise at a test point due to multiple sources
 
         Inputs:
@@ -708,7 +688,7 @@ class ControlSystem:
         Returns:
           totalASD: the total ASD [u/rtHz]
         """
-        ampTF = self.getTF(dof_to, tp_to, '', tp_from)
+        ampTF = self.getTF(dof_to, tp_to, '', tp_from, closed=closed)
         powTF = np.abs(ampTF)**2
         totalPSD = np.zeros(powTF.shape[-1])
         for dof_from, noiseASD in noiseASDs.items():
@@ -763,7 +743,7 @@ class ControlSystem:
         return sensNoise
 
     def _getIndex(self, name, tstpnt):
-        if tstpnt in ['err', 'ctrl', 'cal', 'cal', 'optcal']:
+        if tstpnt in ['err', 'ctrl', 'cal', 'cal']:
             ind = list(self.dofs.keys()).index(name)
         elif tstpnt in ['comp', 'drive', 'pos', 'spot']:
             ind = self.drives.index(name)
