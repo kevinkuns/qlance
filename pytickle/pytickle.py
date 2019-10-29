@@ -124,6 +124,7 @@ class PyTickle:
         self.poses = None
         self.sigDC_sweep = None
         self.fDC_sweep = None
+        self.qq = None
 
         # Track whether the probe basis has been rotated.
         # If it has, do not let any more probes be added
@@ -197,6 +198,9 @@ class PyTickle:
             if noise:
                 self.noiseAC[dof] = mat2py(
                     self.eng.workspace['noiseAC'])
+            if dof in ['pitch', 'yaw']:
+                self.qq = mat2py(
+                    self.eng.eval(self.optName + ".getAllFieldBases()"))[:, -1]
 
     def sweepLinear(self, startPos, endPos, npts):
         """Run Optickle's sweepLinear function
@@ -1145,25 +1149,45 @@ class PyTickle:
     #     phase = mat2py(self.eng.eval("ans.getPhase;"))
     #     return phase * 180/np.pi
 
-    def getGouyPhase(self, name, port):
-        """Get the Gouy phase of an existing Gouy phase optic
+    # def getGouyPhase(self, name, port):
+    #     """Get the Gouy phase of an existing Gouy phase optic
+
+    #     Inputs:
+    #       name: name of the Gouy phase optic
+
+    #     Returns:
+    #       phase: the phase [deg]
+    #     """
+    #     cmd = self.optName + ".getAllFieldBases()"
+    #     # get the vector of q = (z - z0) + i*zR
+    #     # take second column for pitch
+    #     vBasis = mat2py(self.eng.eval(cmd, nargout=1))[:, 1]
+    #     sinkNum = self._getSinkNum(name, port)
+    #     # tan(phi) = (z - z0)/zR = Re(q) / Im(q)
+    #     # so phi = arccot(Im(q)/Re(q)) = pi/2 - arctan(Im(q)/Re(q))
+    #     #        = pi/2 - arg(phi)
+    #     phase = np.pi/2 - np.angle(vBasis[sinkNum])
+    #     return phase * 180/np.pi
+
+    def getGouyPhase(self, linkStart, linkEnd):
+        """Compute the accumulated Gouy phase along a path
+
+        Gouy phase is
+          psi = arccot(Im(q)/Re(q)) = pi/2 - arctan(Im(q)/Re(q))
+              = pi/2 - arg(q)
 
         Inputs:
-          name: name of the Gouy phase optic
+          linkStart: name of the start of the path
+          linkEnd: name of the end of the path
 
         Returns:
-          phase: the phase [deg]
+          dpsi: the accumulated Gouy phase along the path [deg]
         """
-        cmd = self.optName + ".getAllFieldBases()"
-        # get the vector of q = (z - z0) + i*zR
-        # take second column for pitch
-        vBasis = mat2py(self.eng.eval(cmd, nargout=1))[:, 1]
-        sinkNum = self._getSinkNum(name, port)
-        # tan(phi) = (z - z0)/zR = Re(q) / Im(q)
-        # so phi = arccot(Im(q)/Re(q)) = pi/2 - arctan(Im(q)/Re(q))
-        #        = pi/2 - arg(phi)
-        phase = np.pi/2 - np.angle(vBasis[sinkNum])
-        return phase * 180/np.pi
+        linkNum = self._getLinkNum(linkStart, linkEnd)
+        qq = self.qq[linkNum]
+        dl = self.getLinkLength(linkStart, linkEnd)
+        dphi = np.angle(qq - dl, deg=True) - np.angle(qq, deg=True)
+        return dphi
 
     def setGouyPhase(self, name, phase):
         """Set the Gouy phase of an existing Gouy phase optic
