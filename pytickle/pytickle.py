@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import scipy.constants as scc
 from numbers import Number
 from collections import OrderedDict
+import pandas as pd
 from . import plotting
 from . import utils
 
@@ -1254,6 +1255,38 @@ class PyTickle:
         w = w0 * np.sqrt(1 + (z/zR)**2)
         R = zR**2 / z + z
         return w, zR, z, w0, R
+
+    def showBeamProperties(self):
+        """Print the beam properties along each link of the model
+
+        The beam properties are
+          w: beam radius at the end of the link
+          zR: Rayleigh range
+          z - z0: distance of the end of the link past the waist
+          w0: beam waist
+          R: radius of curvature at the end of the link
+          dpsi: accumulated Gouy phase along the link
+        """
+        nLink = int(self.eng.eval("opt.Nlink"))
+        sinks = [self._getSinkName(ii) for ii in range(1, nLink + 1)]
+        sources = [self._getSourceName(ii) for ii in range(1, nLink + 1)]
+        beam_properties = {}
+        for source, sink in zip(sources, sinks):
+            w, zR, z, w0, R = self.getBeamProperties(*sink.split('<-'))
+            dpsi = self.getGouyPhase(source.split('->')[0], sink.split('<-')[0])
+            beam_properties[source + ' --> ' + sink] = [
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(w[0])[::-1]),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(zR)[::-1]),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(z)[::-1]),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(w0[0])[::-1]),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(R)[::-1]),
+                '{:0.0f} deg'.format(dpsi)]
+
+        beam_properties = pd.DataFrame(
+            beam_properties, index=['w', 'zR', 'z - z0', 'w0', 'R', 'dpsi']).T
+        with pd.option_context('display.max_rows', None,
+                               'display.max_columns', None):
+            display(beam_properties)
 
     def _getDriveIndex(self, name, dof):
         """Find the drive index of a given drive and degree of freedom
