@@ -360,7 +360,7 @@ class PyTickle:
         Pdc = self.getSigDC(probeName)
 
         # get the beam size on the optic
-        w, _, _, _ = self.getBeamProperties(opticName, spotPort)
+        w, _, _, _, _ = self.getBeamProperties(opticName, spotPort)
         w = np.abs(w[self.vRF == 0])
 
         # convert to spot motion [m/rad]
@@ -1241,19 +1241,19 @@ class PyTickle:
 
         Returns:
           w: beam radius on the optic [m]
+          zR: Rayleigh range of the beam [m]
           z: distance from the beam waist to the optic [m]
             Negative values indicate that the optic is before the waist.
-          z0: Rayleigh range of the beam [m]
+          w0: beam waist [m]
           R: radius of curvature of the phase front on the optic [m]
         """
-        cmd = "[w, z0, z, R] = {:s}.getBeamSize({:s}, {:s});".format(
-            self.optName, str2mat(name), str2mat(port))
-        self.eng.eval(cmd, nargout=0)
-        w = mat2py(self.eng.workspace['w'])
-        z0 = mat2py(self.eng.workspace['z0'])
-        z = mat2py(self.eng.workspace['z'])
-        R = mat2py(self.eng.workspace['R'])
-        return w, z0, z, R
+        qq = self.qq[self._getSinkNum(name, port)]
+        z = np.real(qq)
+        zR = np.imag(qq)
+        w0 = np.sqrt(self.lambda0*zR/np.pi)
+        w = w0 * np.sqrt(1 + (z/zR)**2)
+        R = zR**2 / z + z
+        return w, zR, z, w0, R
 
     def _getDriveIndex(self, name, dof):
         """Find the drive index of a given drive and degree of freedom
