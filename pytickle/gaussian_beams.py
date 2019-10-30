@@ -22,29 +22,58 @@ class GaussianPropagation:
     def __init__(self, opt):
         self.opt = opt
 
-    def getABCD(self, name, inPort, outPort):
-        """Get the ABCD matrix of an optic
+    def getABCD(self, *args, dof='pitch'):
+        """Get the ABCD matrix of an optic or path
 
-        Inputs:
+        Returns the ABCD matrix of an optic if three arguments are supplied
+        and the ABCD matrix of a path if two arguments are supplied
+
+        Inputs (3 for optic):
           name: name of the optic
           inPort: input port of the transformation
           outPort: output port of the transformation
+          dof: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
+
+        Inputs (2 for path):
+          linkStart: name of the start of the link
+          linkEnd: name of the end of the link
+          dof: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
 
         Returns:
           abcd: the ABCD matrix
 
-        Example:
+        Examples:
           To compute the ABCD matrix for reflection from the front of EX:
             gp.getABCD('EX', 'fr', 'fr')
+          To compute the ABCD matrix for propagation from IX to EX:
+            gp.getABCD('IX', 'EX')
         """
-        self._eval("obj = {:s}.getOptic({:s})".format(
+        if len(args) == 3:
+            name, inPort, outPort = args
+
+            if dof == 'pitch':
+                ax = "y"
+            elif dof == 'yaw':
+                ax = "x"
+
+            self._eval("obj = {:s}.getOptic({:s})".format(
             self.opt.optName, str2mat(name)))
-        self._eval("nIn = obj.getInputPortNum({:s})".format(
-            str2mat(inPort)))
-        self._eval("nOut = obj.getOutputPortNum({:s})".format(
-            str2mat(outPort)))
-        self._eval("qm = obj.getBasisMatrix()")
-        abcd = mat2py(self._eval("qm(nOut, nIn).y", 1))
+            self._eval("nIn = obj.getInputPortNum({:s})".format(
+                str2mat(inPort)))
+            self._eval("nOut = obj.getOutputPortNum({:s})".format(
+                str2mat(outPort)))
+            self._eval("qm = obj.getBasisMatrix()")
+            abcd = mat2py(self._eval("qm(nOut, nIn).{:s}".format(ax), 1))
+
+        elif len(args) == 2:
+            linkStart, linkEnd = args
+            linkLen = self.opt.getLinkLength(linkStart, linkEnd)
+            abcd = np.array([[1, linkLen],
+                             [0, 1]])
+
+        else:
+            raise ValueError('Incorrect number of arguments')
+
         return abcd
 
     def _eval(self, cmd, nargout=0):
