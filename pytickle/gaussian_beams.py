@@ -2,6 +2,22 @@ import numpy as np
 from .utils import mat2py, py2mat, str2mat
 
 
+def applyABCD(abcd, qi, n=1):
+    """Transform a complex q parameter through an ABCD matrix
+
+    Inputs:
+      abcd: the ABCD matrix
+      qi: the initial q parameter
+      n: index of refraction (Default: 1)
+
+    Returns:
+      qf: the final q parameter
+    """
+    qi = qi / n
+    qf = (abcd[0, 0]*qi + abcd[0, 1]) / (abcd[1, 0]*qi + abcd[1, 1])
+    return qf * n
+
+
 class GaussianPropagation:
     def __init__(self, opt):
         self.opt = opt
