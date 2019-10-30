@@ -52,12 +52,12 @@ class PyTickle:
         self.eng.workspace['vRF'] = py2mat(vRF)
         self.eng.workspace['lambda0'] = py2mat(lambda0)
         self.eng.workspace['pol'] = py2mat(matPol)
-        self.eng.eval(
+        self._eval(
             self.optName + " = Optickle(vRF, lambda0, pol);", nargout=0)
 
         # initialize pytickle class variables
         self.lambda0 = mat2py(self.eng.eval(self.optName + ".lambda"))
-        self.vRF = mat2py(self.eng.eval(self.optName + ".vFrf"))
+        self.vRF = mat2py(self._eval(self.optName + ".vFrf", 1))
         self.pol = np.array(pol)
         self.nRF = OrderedDict()
         for ri, fRF in enumerate(vRF):
@@ -132,7 +132,7 @@ class PyTickle:
         if ff is None:
             output = "[fDC, sigDC_tickle]"
             cmd = "{:s} = {:s}.tickle([], 0);".format(output, self.optName)
-            self.eng.eval(cmd, nargout=0)
+            self._eval(cmd, nargout=0)
             self.fDC = mat2py(self.eng.workspace['fDC'])
             self.sigDC_tickle = mat2py(self.eng.workspace['sigDC_tickle'])
 
@@ -144,8 +144,8 @@ class PyTickle:
             cmd = "{:s} = {:s}.tickle2([], f, {:d});".format(
                 output, self.optName, self._dof2opt(dof))
 
-            self.eng.eval(cmd, nargout=0)
-            self.eng.eval("sigAC = getProdTF(mOpt, mMech);", nargout=0)
+            self._eval(cmd, nargout=0)
+            self._eval("sigAC = getProdTF(mOpt, mMech);", nargout=0)
 
             self.fDC = mat2py(self.eng.workspace['fDC'])
             self.sigDC_tickle = mat2py(self.eng.workspace['sigDC_tickle'])
@@ -157,7 +157,7 @@ class PyTickle:
                     self.eng.workspace['noiseAC'])
             if dof in ['pitch', 'yaw']:
                 self.qq = mat2py(
-                    self.eng.eval(self.optName + ".getAllFieldBases()"))[:, -1]
+                    self._eval(self.optName + ".getAllFieldBases()", 1))[:, -1]
 
     def sweepLinear(self, startPos, endPos, npts):
         """Run Optickle's sweepLinear function
@@ -306,8 +306,8 @@ class PyTickle:
         """
         # figure out monitoring probe information
         probeName = opticName + '_DC'
-        probe_info = self.eng.eval(
-            "opt.getSinkName(opt.getFieldProbed('{:s}'))".format(probeName))
+        probe_info = self._eval(
+            "opt.getSinkName(opt.getFieldProbed('{:s}'))".format(probeName), 1)
         spotPort = probe_info.split('<-')[-1]
 
         # get TF to monitoring probe power [W/rad]
@@ -610,7 +610,7 @@ class PyTickle:
             self.eng.workspace[key] = py2mat(val)
             cmd += ", " + key
         cmd += ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
         self._updateNames()
 
     def addBeamSplitter(self, name, aoi=45, Chr=0, Thr=0.5, Lhr=0,
@@ -635,7 +635,7 @@ class PyTickle:
             self.eng.workspace[key] = py2mat(val)
             cmd += ", " + key
         cmd += ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
         self._updateNames()
 
     def addPBS(self, name, aoi=45, Chr=0, transS=0, reflP=0, Lhr=0, Rar=0,
@@ -672,7 +672,7 @@ class PyTickle:
         cmd += str2mat(nameOut) + ", " + str2mat(portOut)
         cmd += ", " + str2mat(nameIn) + ", " + str2mat(portIn)
         cmd += ", " + str(linkLen) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
 
     def addSource(self, name, ampRF):
         """Add a laser
@@ -687,7 +687,7 @@ class PyTickle:
             self.eng.workspace['ampRF'] = py2mat([ampRF])
         cmd = self.optName + ".addSource("
         cmd += str2mat(name) + ", ampRF);"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
         self._updateNames()
 
     def addSqueezer(self, name, lambda0=1064e-9, fRF=0, pol='S', sqAng=0,
@@ -779,7 +779,7 @@ class PyTickle:
             self.eng.workspace['x'] = py2mat(x)
             self.eng.workspace['escEff'] = py2mat(escEff)
             cmd += "x, escEff, sqzOption);"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
 
     def addWaveplate(self, name, lfw, theta):
         """Add a waveplate
@@ -796,7 +796,7 @@ class PyTickle:
         self.eng.workspace['theta'] = py2mat(theta)
         cmd = self.optName + ".addWaveplate("
         cmd += str2mat(name) + ", lfw, theta);"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
         self._updateNames()
 
     def addModulator(self, name, cMod):
@@ -808,7 +808,7 @@ class PyTickle:
         """
         cmd = self.optName + ".addModulator(" + str2mat(name)
         cmd += ", " + str(cMod) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
         self._updateNames()
 
     def addRFmodulator(self, name, fMod, aMod):
@@ -821,7 +821,7 @@ class PyTickle:
         """
         cmd = self.optName + ".addRFmodulator(" + str2mat(name)
         cmd += ", " + str(fMod) + ", " + str(aMod) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
         self._updateNames()
 
     def addSink(self, name, loss=1):
@@ -849,7 +849,7 @@ class PyTickle:
         cmd += str2mat(name) + ", " + str2mat(sinkName)
         cmd += ", " + str2mat(sinkPort) + ", "
         cmd += str(freq) + ", " + str(phase) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
         self._updateNames()
 
     def addReadout(self, sinkName, freqs, phases, names=None):
@@ -886,7 +886,7 @@ class PyTickle:
         phase *= np.pi/180
         cmd = self.optName + ".addGouyPhase(" + str2mat(name) + ", " \
             + str(phase) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
 
     def addGouyReadout(self, name, phaseA, dphaseB=90):
         """Add Gouy phases and sinks for WFS readout
@@ -937,7 +937,7 @@ class PyTickle:
     def setPosOffset(self, name, dist):
         cmd = self.optName + ".setPosOffset(" + str2mat(name)
         cmd += ", " + str(dist) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
 
     def setMechTF(self, name, z, p, k, dof='pos'):
         """Set the mechanical transfer function of an optic
@@ -958,9 +958,9 @@ class PyTickle:
         self.eng.workspace['k'] = py2mat(k, is_complex=True)
         self.eng.workspace['nDOF'] = py2mat(nDOF)
 
-        self.eng.eval("tf = zpk(z, p, k);", nargout=0)
+        self._eval("tf = zpk(z, p, k);", nargout=0)
         cmd = self.optName + ".setMechTF(" + str2mat(name) + ", tf, nDOF);"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
 
     def addHomodyneReadout(
             self, name, phase, qe=1, BnC=True, LOpower=1, nu=None, pol='S',
@@ -985,7 +985,7 @@ class PyTickle:
             self.eng.workspace['nu'] = py2mat(nu)
             cmd = "Optickle.matchFreqPol(" + self.optName + ", nu"
             cmd += ", " + str(npol) + ");"
-            ampRF = self.eng.eval(cmd)
+            ampRF = self._eval(cmd, 1)
             ampRF = np.sqrt(LOpower)*ampRF
             self.addSource(name + '_LO', ampRF)
             self.setHomodynePhase(name + '_LO', phase, BnC)
@@ -1010,9 +1010,9 @@ class PyTickle:
         else:
             phase = np.pi*phase/180
         cmd = "LO = " + self.optName + ".getOptic(" + str2mat(LOname) + ");"
-        self.eng.eval(cmd, nargout=0)
-        self.eng.eval("RFamp = abs(LO.vArf);", nargout=0)
-        self.eng.eval("LO.vArf = RFamp * exp(1i*" + str(phase) + ");",
+        self._eval(cmd, nargout=0)
+        self._eval("RFamp = abs(LO.vArf);", nargout=0)
+        self._eval("LO.vArf = RFamp * exp(1i*" + str(phase) + ");",
                       nargout=0)
 
     def rotateHomodyneBasis(self, probes):
@@ -1043,7 +1043,7 @@ class PyTickle:
         """
         cmd = self.optName + ".setCavityBasis("
         cmd += str2mat(name1) + ", " + str2mat(name2) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
 
     def setOpticParam(self, name, param, val):
         """Set the value of an optic's parameter
@@ -1056,7 +1056,7 @@ class PyTickle:
         cmd = self.optName + ".setOpticParam("
         cmd += str2mat(name) + ", " + str2mat(param)
         cmd += ", " + str(val) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
 
     def getOpticParam(self, name, param):
         """Get the value of an optic's paramter
@@ -1066,8 +1066,8 @@ class PyTickle:
           param: name of the parameter
         """
         cmd = self.optName + ".getOptic(" + str2mat(name) + ");"
-        self.eng.eval(cmd, nargout=0)
-        return self.eng.eval("ans." + param + ";")
+        self._eval(cmd, nargout=0)
+        return self._eval("ans." + param + ";", 1)
 
     def getProbePhase(self, name):
         """Get the phase of a probe
@@ -1079,7 +1079,7 @@ class PyTickle:
           phase: phase of the probe [deg]
         """
         cmd = self.optName + ".getProbePhase(" + str2mat(name) + ");"
-        return self.eng.eval(cmd, nargout=1)
+        return self._eval(cmd, nargout=1)
 
     def setProbePhase(self, name, phase):
         """Set the phase of a probe
@@ -1090,41 +1090,7 @@ class PyTickle:
         """
         cmd = self.optName + ".setProbePhase("
         cmd += str2mat(name) + ", " + str(phase) + ");"
-        self.eng.eval(cmd, nargout=0)
-
-    # def getGouyPhase(self, name):
-    #     """Get the Gouy phase of an existing Gouy phase optic
-
-    #     Inputs:
-    #       name: name of the Gouy phase optic
-
-    #     Returns:
-    #       phase: the phase [deg]
-    #     """
-    #     cmd = self.optName + ".getOptic(" + str2mat(name) + ");"
-    #     self.eng.eval(cmd, nargout=0)
-    #     phase = mat2py(self.eng.eval("ans.getPhase;"))
-    #     return phase * 180/np.pi
-
-    # def getGouyPhase(self, name, port):
-    #     """Get the Gouy phase of an existing Gouy phase optic
-
-    #     Inputs:
-    #       name: name of the Gouy phase optic
-
-    #     Returns:
-    #       phase: the phase [deg]
-    #     """
-    #     cmd = self.optName + ".getAllFieldBases()"
-    #     # get the vector of q = (z - z0) + i*zR
-    #     # take second column for pitch
-    #     vBasis = mat2py(self.eng.eval(cmd, nargout=1))[:, 1]
-    #     sinkNum = self._getSinkNum(name, port)
-    #     # tan(phi) = (z - z0)/zR = Re(q) / Im(q)
-    #     # so phi = arccot(Im(q)/Re(q)) = pi/2 - arctan(Im(q)/Re(q))
-    #     #        = pi/2 - arg(phi)
-    #     phase = np.pi/2 - np.angle(vBasis[sinkNum])
-    #     return phase * 180/np.pi
+        self._eval(cmd, nargout=0)
 
     def getGouyPhase(self, linkStart, linkEnd):
         """Compute the accumulated Gouy phase along a path
@@ -1155,9 +1121,9 @@ class PyTickle:
         """
         phase *= np.pi / 180
         cmd = "gouy = " + self.optName + ".getOptic(" + str2mat(name) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
         cmd = "gouy.setPhase(" + str(phase) + ");"
-        self.eng.eval(cmd, nargout=0)
+        self._eval(cmd, nargout=0)
 
     def getLinkLength(self, linkStart, linkEnd):
         """Get the length of a link
@@ -1169,7 +1135,7 @@ class PyTickle:
         Returns:
           linkLen: the length of the link [m]
         """
-        linkLens = self.eng.eval(self.optName + ".getLinkLengths", nargout=1)
+        linkLens = self._eval(self.optName + ".getLinkLengths", nargout=1)
         linkLens = mat2py(linkLens)
         linkNum = self._getLinkNum(linkStart, linkEnd)
         return linkLens[linkNum]
@@ -1186,7 +1152,7 @@ class PyTickle:
         linkNum = self._getLinkNum(linkStart, linkEnd) + 1
         self.eng.workspace['linkNum'] = py2mat(linkNum)
         self.eng.workspace['linkLen'] = py2mat(linkLen)
-        self.eng.eval(
+        self._eval(
             self.optName + ".setLinkLength(linkNum, linkLen);", nargout=0)
 
     def getBeamProperties(self, name, port):
@@ -1223,7 +1189,7 @@ class PyTickle:
           R: radius of curvature at the end of the link
           dpsi: accumulated Gouy phase along the link
         """
-        nLink = int(self.eng.eval("opt.Nlink"))
+        nLink = int(self._eval("opt.Nlink", 1))
         sinks = [self._getSinkName(ii) for ii in range(1, nLink + 1)]
         sources = [self._getSourceName(ii) for ii in range(1, nLink + 1)]
         beam_properties = {}
@@ -1244,6 +1210,60 @@ class PyTickle:
                                'display.max_columns', None):
             display(beam_properties)
 
+    def getABCD(self, *args, dof='pitch'):
+        """Get the ABCD matrix of an optic or path
+
+        Returns the ABCD matrix of an optic if three arguments are supplied
+        and the ABCD matrix of a path if two arguments are supplied
+
+        Inputs (3 for optic):
+          name: name of the optic
+          inPort: input port of the transformation
+          outPort: output port of the transformation
+          dof: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
+
+        Inputs (2 for path):
+          linkStart: name of the start of the link
+          linkEnd: name of the end of the link
+          dof: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
+
+        Returns:
+          abcd: the ABCD matrix
+
+        Examples:
+          To compute the ABCD matrix for reflection from the front of EX:
+            opt.getABCD('EX', 'fr', 'fr')
+          To compute the ABCD matrix for propagation from IX to EX:
+            opt.getABCD('IX', 'EX')
+        """
+        if len(args) == 3:
+            name, inPort, outPort = args
+
+            if dof == 'pitch':
+                ax = "y"
+            elif dof == 'yaw':
+                ax = "x"
+
+            self._eval("obj = {:s}.getOptic({:s});".format(
+            self.optName, str2mat(name)))
+            self._eval("nIn = obj.getInputPortNum({:s});".format(
+                str2mat(inPort)))
+            self._eval("nOut = obj.getOutputPortNum({:s});".format(
+                str2mat(outPort)))
+            self._eval("qm = obj.getBasisMatrix();")
+            abcd = mat2py(self._eval("qm(nOut, nIn).{:s}".format(ax), 1))
+
+        elif len(args) == 2:
+            linkStart, linkEnd = args
+            linkLen = self.getLinkLength(linkStart, linkEnd)
+            abcd = np.array([[1, linkLen],
+                             [0, 1]])
+
+        else:
+            raise ValueError('Incorrect number of arguments')
+
+        return abcd
+
     def _getDriveIndex(self, name, dof):
         """Find the drive index of a given drive and degree of freedom
         """
@@ -1260,7 +1280,7 @@ class PyTickle:
           linkNum: the link number
         """
         cmd = self.optName + ".getSourceName(" + str(linkNum) + ");"
-        return self.eng.eval(cmd, nargout=1)
+        return self._eval(cmd, nargout=1)
 
     def _getSinkName(self, linkNum):
         """Find the name of the optic that is the sink for a link
@@ -1269,12 +1289,12 @@ class PyTickle:
           linkNum: the link number
         """
         cmd = self.optName + ".getSinkName(" + str(linkNum) + ");"
-        return self.eng.eval(cmd, nargout=1)
+        return self._eval(cmd, nargout=1)
 
     def _getSinkNum(self, name, port):
         cmd = "{:s}.getFieldIn({:s}, {:s})".format(
             self.optName, str2mat(name), str2mat(port))
-        sinkNum = self.eng.eval(cmd, nargout=1)
+        sinkNum = self._eval(cmd, nargout=1)
         try:
             sinkNum = int(sinkNum) - 1
         except TypeError:
@@ -1295,8 +1315,8 @@ class PyTickle:
         """
         linkStart = str2mat(linkStart)
         linkEnd = str2mat(linkEnd)
-        linkNum = self.eng.eval(
-            self.optName + ".getLinkNum(" + linkStart + ", " + linkEnd + ");")
+        linkNum = self._eval(
+            self.optName + ".getLinkNum(" + linkStart + ", " + linkEnd + ");", 1)
         try:
             linkNum = int(linkNum) - 1
         except TypeError:
@@ -1308,8 +1328,8 @@ class PyTickle:
     def _updateNames(self):
         """Refresh the pytickle model's list of probe and drive names
         """
-        self.probes = self.eng.eval(self.optName + ".getProbeName")
-        self.drives = self.eng.eval(self.optName + ".getDriveNames")
+        self.probes = self._eval(self.optName + ".getProbeName", 1)
+        self.drives = self._eval(self.optName + ".getDriveNames", 1)
 
     def _pol2opt(self, pol):
         """Convert S and P polarizations to 1s and 0s for Optickle
@@ -1371,3 +1391,15 @@ class PyTickle:
 
         else:
             return int(ind)
+
+    def _eval(self, cmd, nargout=0):
+        """Evaluate a matlab command using the pytickle model's engine
+
+        Inputs:
+          cmd: the matlab command string
+          nargout: the number of outputs to be returned (Defualt: 0)
+
+        Returns:
+          The outputs from matlab
+        """
+        return self.eng.eval(cmd, nargout=nargout)

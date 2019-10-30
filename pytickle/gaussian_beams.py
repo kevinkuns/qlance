@@ -1,80 +1,58 @@
 import numpy as np
+from itertools import tee
 from .utils import mat2py, py2mat, str2mat
 
 
-def applyABCD(abcd, qi, n=1):
+def pairwise(iterable):
+    """ Iterator for s -> (s0,s1), (s1,s2), (s2, s3), ...
+
+    From https://docs.python.org/3.7/library/itertools.html#itertools-recipes
+    """
+    a, b = tee(iterable)
+    next(b, None)
+    return zip(a, b)
+
+
+def applyABCD(abcd, qi, ni=1, nf=1):
     """Transform a complex q parameter through an ABCD matrix
 
     Inputs:
       abcd: the ABCD matrix
       qi: the initial q parameter
-      n: index of refraction (Default: 1)
+      ni: initial index of refraction (Default: 1)
+      nf: final index of refraction (Default: 1)
 
     Returns:
       qf: the final q parameter
     """
-    qi = qi / n
+    qi = qi / ni
     qf = (abcd[0, 0]*qi + abcd[0, 1]) / (abcd[1, 0]*qi + abcd[1, 1])
-    return qf * n
+    return qf * nf
 
 
 class GaussianPropagation:
-    def __init__(self, opt):
+    def __init__(self, opt, *optics):
+        if len(optics) < 2:
+            raise ValueError('Need at least two optics to trace a beam')
+
         self.opt = opt
+        self.optics = list(optics)
 
-    def getABCD(self, *args, dof='pitch'):
-        """Get the ABCD matrix of an optic or path
 
-        Returns the ABCD matrix of an optic if three arguments are supplied
-        and the ABCD matrix of a path if two arguments are supplied
+    def propagateABCD(self, *optics, q=1):
+        abcd_path = np.identity(2)
+        abcd_start = np.identity(2)
+        for optStart, optEnd in pairwise(list(optics)):
+            outPort, inPort = self._getLinkPorts(optStart, optEnd)
+            abcd_path = np.einsum(
+                'ij,jk,kl->il', self.getABCD(optStart, optEnd),
+                abcd_start, abcd_path)
+            abcd_start = self.getABCD(optEnd, inPort, outPort)
 
-        Inputs (3 for optic):
-          name: name of the optic
-          inPort: input port of the transformation
-          outPort: output port of the transformation
-          dof: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
+        return abcd_path
 
-        Inputs (2 for path):
-          linkStart: name of the start of the link
-          linkEnd: name of the end of the link
-          dof: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
-
-        Returns:
-          abcd: the ABCD matrix
-
-        Examples:
-          To compute the ABCD matrix for reflection from the front of EX:
-            gp.getABCD('EX', 'fr', 'fr')
-          To compute the ABCD matrix for propagation from IX to EX:
-            gp.getABCD('IX', 'EX')
-        """
-        if len(args) == 3:
-            name, inPort, outPort = args
-
-            if dof == 'pitch':
-                ax = "y"
-            elif dof == 'yaw':
-                ax = "x"
-
-            self._eval("obj = {:s}.getOptic({:s})".format(
-            self.opt.optName, str2mat(name)))
-            self._eval("nIn = obj.getInputPortNum({:s})".format(
-                str2mat(inPort)))
-            self._eval("nOut = obj.getOutputPortNum({:s})".format(
-                str2mat(outPort)))
-            self._eval("qm = obj.getBasisMatrix()")
-            abcd = mat2py(self._eval("qm(nOut, nIn).{:s}".format(ax), 1))
-
-        elif len(args) == 2:
-            linkStart, linkEnd = args
-            linkLen = self.opt.getLinkLength(linkStart, linkEnd)
-            abcd = np.array([[1, linkLen],
-                             [0, 1]])
-
-        else:
-            raise ValueError('Incorrect number of arguments')
-
-        return abcd
+    def traceBeam(self, *args, q=None):
+        pass
 
     def _eval(self, cmd, nargout=0):
         """Evaluate a matlab command using the pytickle model's engine
@@ -87,3 +65,27 @@ class GaussianPropagation:
           The outputs from matlab
         """
         return self.opt.eng.eval(cmd, nargout=nargout)
+
+    def _getLinkPorts(self, linkStart, linkEnd):
+        """Get the ports of the start and end of a link
+        """
+        self._eval("nlink = {:s}.getLinkNum({:s}, {:s});".format(
+            self.opt.optName, str2mat(linkStart), str2mat(linkEnd)))
+        self._eval("link = opt.link(nlink);")
+        self._eval(("optStart = {opt}.getOptic({opt}".format(opt=self.opt.optName)
+                    + ".getOpticName(link.snSource));"))
+        self._eval(("optEnd = {opt}.getOptic({opt}".format(opt=self.opt.optName)
+                    + ".getOpticName(link.snSink));"))
+        startInfo = self._eval("optStart.getOutputName(link.portSource)", 1)
+        endInfo = self._eval("optEnd.getInputName(link.portSink)", 1)
+        startName, startPort = startInfo.split('->')
+        endName, endPort = endInfo.split('<-')
+
+        if startName != linkStart:
+            raise ValueError(
+                'linkStart {:s} != startName {:s}'.format(linkStart, startName))
+        if endName != linkEnd:
+            raise ValueError(
+                'linkEnd {:s} != endName {:s}'.format(linkEnd, endName))
+
+        return startPort, endPort
