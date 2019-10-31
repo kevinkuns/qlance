@@ -12,6 +12,7 @@ import pandas as pd
 from . import plotting
 from . import utils
 from .utils import mat2py, py2mat, str2mat
+from .gaussian_beams import beam_properties_from_q
 
 
 class PyTickle:
@@ -1171,12 +1172,7 @@ class PyTickle:
           R: radius of curvature of the phase front on the optic [m]
         """
         qq = self.qq[self._getSinkNum(name, port)]
-        z = np.real(qq)
-        zR = np.imag(qq)
-        w0 = np.sqrt(self.lambda0*zR/np.pi)
-        w = w0 * np.sqrt(1 + (z/zR)**2)
-        R = zR**2 / z + z
-        return w, zR, z, w0, R
+        return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     def showBeamProperties(self):
         """Print the beam properties along each link of the model

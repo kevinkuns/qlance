@@ -34,6 +34,29 @@ def applyABCD(abcd, qi, ni=1, nf=1):
     return qf * nf
 
 
+def beam_properties_from_q(qq, lambda0=1064e-9):
+    """Compute the properties of a Gaussian beam from a q parameter
+
+    Inputs:
+      qq: the complex q paramter
+      lambda0: wavelength [m] (Default: 1064e-9)
+
+    Returns:
+      w: beam radius on the optic [m]
+      zR: Rayleigh range of the beam [m]
+      z: distance from the beam waist to the optic [m]
+        Negative values indicate that the optic is before the waist.
+      w0: beam waist [m]
+      R: radius of curvature of the phase front on the optic [m]
+    """
+    z = np.real(qq)
+    zR = np.imag(qq)
+    w0 = np.sqrt(lambda0*zR/np.pi)
+    w = w0 * np.sqrt(1 + (z/zR)**2)
+    R = zR**2 / z + z
+    return w, zR, z, w0, R
+
+
 def spaceABCD(length, n=1):
     """ABCD matrix for propagation through free space
 
