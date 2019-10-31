@@ -34,6 +34,18 @@ def applyABCD(abcd, qi, ni=1, nf=1):
     return qf * nf
 
 
+def spaceABCD(length, n=1):
+    """ABCD matrix for propagation through free space
+
+    Inputs:
+      length: propagation distance [m]
+      n: index of refraction (Default: 1)
+    """
+    abcd = np.array([[1, length/n],
+                     [0, 1]])
+    return abcd
+
+
 class GaussianPropagation:
     def __init__(self, opt, *optics):
         self.nopt = len(optics)
@@ -80,8 +92,7 @@ class GaussianPropagation:
             opt_ABCD = self.opt.getABCD(opt1, port_in, port_out)
             path_ABCD[ii] = opt_ABCD
             link_lens[ii] = self.opt.getLinkLength(opt0, opt1)
-            len_ABCD = np.array([[1, link_lens[ii]],
-                                 [0, 1]])
+            len_ABCD = spaceABCD(link_lens[ii])
             tot_ABCD = np.einsum(
                 'ij,jk,kl->il', opt_ABCD, len_ABCD, tot_ABCD)
 
@@ -90,14 +101,13 @@ class GaussianPropagation:
             link_lens[0] = self.opt.getLinkLength(*optics)
         else:
             link_lens[-1] = self.opt.getLinkLength(*optics[-2:])
-        len_ABCD = np.array([[1, link_lens[-1]],
-                             [0, 1]])
+        len_ABCD = spaceABCD(link_lens[-1])
         tot_ABCD = np.einsum('ij,jk->ik', len_ABCD, tot_ABCD)
         print(tot_ABCD)
 
         return link_lens, path_ABCD, tot_ABCD
 
-    def traceBeam(self, *args, q=None):
+    def traceBeam(self, qi, direction='fr'):
         pass
 
     def getStability(self):
