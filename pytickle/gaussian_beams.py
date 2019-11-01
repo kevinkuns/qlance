@@ -48,13 +48,15 @@ def beam_properties_from_q(qq, lambda0=1064e-9):
         Negative values indicate that the optic is before the waist.
       w0: beam waist [m]
       R: radius of curvature of the phase front on the optic [m]
+      psi: Gouy phase [deg]
     """
     z = np.real(qq)
     zR = np.imag(qq)
     w0 = np.sqrt(lambda0*zR/np.pi)
     w = w0 * np.sqrt(1 + (z/zR)**2)
     R = zR**2 / z + z
-    return w, zR, z, w0, R
+    psi = (np.pi/2 - np.angle(qq)) * 180/np.pi
+    return w, zR, z, w0, R, psi
 
 
 def free_space_ABCD(length, n=1):

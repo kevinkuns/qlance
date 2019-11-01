@@ -318,7 +318,7 @@ class PyTickle:
         Pdc = self.getSigDC(probeName)
 
         # get the beam size on the optic
-        w, _, _, _, _ = self.getBeamProperties(opticName, spotPort)
+        w, _, _, _, _, _ = self.getBeamProperties(opticName, spotPort)
         w = np.abs(w[self.vRF == 0])
 
         # convert to spot motion [m/rad]
@@ -1196,6 +1196,7 @@ class PyTickle:
             Negative values indicate that the optic is before the waist.
           w0: beam waist [m]
           R: radius of curvature of the phase front on the optic [m]
+          psi: Gouy phase [deg]
         """
         qq = self.qq[self._getSinkNum(name, port)]
         return beam_properties_from_q(qq, lambda0=self.lambda0)
@@ -1216,7 +1217,7 @@ class PyTickle:
         sources = [self._getSourceName(ii) for ii in range(1, nLink + 1)]
         beam_properties = {}
         for source, sink in zip(sources, sinks):
-            w, zR, z, w0, R = self.getBeamProperties(*sink.split('<-'))
+            w, zR, z, w0, R, _ = self.getBeamProperties(*sink.split('<-'))
             dpsi = self.getGouyPhase(source.split('->')[0], sink.split('<-')[0])
             beam_properties[source + ' --> ' + sink] = [
                 '{:0.2f} {:s}m'.format(*utils.siPrefix(w[0])[::-1]),
