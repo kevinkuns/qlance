@@ -85,6 +85,8 @@ class GaussianPropagation:
                       for direction in ['fr', 'bk']}
         self.link_lens = {direction: np.zeros(self.nopt - 1)
                           for direction in ['fr', 'bk']}
+        self.Chrs = OrderedDict(
+            {optic: self.opt.getOpticParam(optic, 'Chr') for optic in optics})
 
 
         frwd_prop = self.propagateABCD(*optics)
@@ -174,20 +176,29 @@ class GaussianPropagation:
 
         return dist, qq
 
-    def plotBeamProperties(self, qi, bkwd=True, npts=100, plot_locs=True):
+    def plotBeamProperties(
+            self, qi, bkwd=True, npts=100, plot_locs=True, plot_model=True):
         dist, qq_fr = self.traceBeam(qi, direction='fr', npts=npts)
 
+        # locations of the optic in the path
+        optlocs = np.cumsum(
+            np.concatenate((np.array([0]), self.link_lens['fr'])))
+
         if plot_locs:
-            optlocs = np.cumsum(
-                np.concatenate((np.array([0]), self.link_lens['fr'])))
+            fig = plotBeamProperties(dist, qq_fr, optlocs=optlocs)
         else:
-            optlocs = None
-        fig = plotBeamProperties(dist, qq_fr, optlocs=optlocs)
+            fig = plotBeamProperties(dist, qq_fr, optlocs=None)
 
         if bkwd:
             qi_bk = applyABCD(self.ABCD_n, qq_fr[-1])
             _, qq_bk = self.traceBeam(qi_bk, direction='bk', npts=npts)
             plotBeamProperties(dist, qq_bk, fig, bkwd=True, ls='-.')
+
+        if plot_model:
+            for Chr, optloc in zip(self.Chrs.values(), optlocs):
+                fig.axes[1].plot(optloc, Chr, 'C0o')
+                fig.axes[1].plot(optloc, -Chr, 'C0o', alpha=0.4)
+
         return fig
 
     def getStability(self):
