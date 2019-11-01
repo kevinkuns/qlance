@@ -2,7 +2,7 @@ import numpy as np
 from collections import OrderedDict
 from itertools import tee
 from .utils import mat2py, py2mat, str2mat
-from .plotting import plotBeamProperties
+from . import plotting
 
 
 def triples(iterable):
@@ -87,12 +87,12 @@ class GaussianPropagation:
                           for direction in ['fr', 'bk']}
         self.Chrs = OrderedDict(
             {optic: self.opt.getOpticParam(optic, 'Chr') for optic in optics})
-
+        self.qq_opt = {}
 
         frwd_prop = self.propagateABCD(*optics)
         bkwd_prop = self.propagateABCD(*optics[::-1])
-        self.link_lens['fr'], self.ABCDs['fr'], M_fr = frwd_prop
-        self.link_lens['bk'], self.ABCDs['bk'], M_bk = bkwd_prop
+        self.link_lens['fr'], self.ABCDs['fr'], M_fr, self.qq_opt['fr'] = frwd_prop
+        self.link_lens['bk'], self.ABCDs['bk'], M_bk, self.qq_opt['bk'] = bkwd_prop
 
         # Find the initial and final ABCD matrices
         if self.nopt == 1:
@@ -133,25 +133,36 @@ class GaussianPropagation:
         tot_ABCD= np.identity(2)
         path_ABCD = np.zeros((nopt - 2, 2, 2))
         link_lens = np.zeros(nopt - 1)
+        qq_opt = {optic: {} for optic in optics}
+
         for ii, (opt0, opt1, opt2) in enumerate(triples(list(optics))):
-            _, port_in = self._getLinkPorts(opt0, opt1)
-            port_out, _ = self._getLinkPorts(opt1, opt2)
+            port0, port_in = self._getLinkPorts(opt0, opt1)
+            port_out, port2 = self._getLinkPorts(opt1, opt2)
             opt_ABCD = self.opt.getABCD(opt1, port_in, port_out, dof=self.dof)
             path_ABCD[ii] = opt_ABCD
             link_lens[ii] = self.opt.getLinkLength(opt0, opt1)
             len_ABCD = free_space_ABCD(link_lens[ii])
             tot_ABCD = np.einsum(
                 'ij,jk,kl->il', opt_ABCD, len_ABCD, tot_ABCD)
+            qq_opt[opt1]['in'] = self.opt.getFieldBasis(opt1, port_in)
+            qq_opt[opt1]['out'] = self.opt.getFieldBasis(opt1, port_out)
+            if opt0 == optics[0]:
+                qq_opt[opt0]['out'] = self.opt.getFieldBasis(opt0, port0)
+            if opt2 == optics[-1]:
+                qq_opt[opt2]['in'] = self.opt.getFieldBasis(opt2, port2)
 
         # add the length of the last link not accounted for with triples
         if nopt == 2:
             link_lens[0] = self.opt.getLinkLength(*optics)
+            port0, port1 = self._getLinkPorts(*optics)
+            qq_opt[optics[0]]['out'] = self.opt.getFieldBasis(optics[0], port0)
+            qq_opt[optics[1]]['in'] = self.opt.getFieldBasis(optics[1], port1)
         else:
             link_lens[-1] = self.opt.getLinkLength(*optics[-2:])
         len_ABCD = free_space_ABCD(link_lens[-1])
         tot_ABCD = np.einsum('ij,jk->ik', len_ABCD, tot_ABCD)
 
-        return link_lens, path_ABCD, tot_ABCD
+        return link_lens, path_ABCD, tot_ABCD, qq_opt
 
     def traceBeam(self, qi, direction='fr', npts=100):
         """Compute the beam properties along the beam path
@@ -160,6 +171,7 @@ class GaussianPropagation:
           qi: the initial q paramter
           direction: beam direction 'fr' or 'bk' (Default: 'fr')
           npts: number of points to evaluate along each link in the path
+            (Default: 100)
 
         Returns:
           dist: the distance from the inital point along the path
@@ -178,6 +190,21 @@ class GaussianPropagation:
 
     def plotBeamProperties(
             self, qi, bkwd=True, npts=100, plot_locs=True, plot_model=True):
+        """Plot the beam properties along the beam path
+
+        Inputs:
+          qi: the initial q parameter
+          bkwd: if True the beam is propagated backward as well (Default: True)
+          npts: number of points to evaluate along each link in the path
+            (Default: 100)
+          plot_locs: if True the locations of the optics are marked with vertical
+            dashed lines (Default: True)
+          plot_model: if True, the beam parameters and mirror radii of curvature
+            as determined by the optickle model are marked (Default: True)
+
+        Returns:
+          fig: the figure
+        """
         dist, qq_fr = self.traceBeam(qi, direction='fr', npts=npts)
 
         # locations of the optic in the path
@@ -185,19 +212,42 @@ class GaussianPropagation:
             np.concatenate((np.array([0]), self.link_lens['fr'])))
 
         if plot_locs:
-            fig = plotBeamProperties(dist, qq_fr, optlocs=optlocs)
+            fig = plotting.plotBeamProperties(dist, qq_fr, optlocs=optlocs)
         else:
-            fig = plotBeamProperties(dist, qq_fr, optlocs=None)
+            fig = plotting.plotBeamProperties(dist, qq_fr, optlocs=None)
 
         if bkwd:
             qi_bk = applyABCD(self.ABCD_n, qq_fr[-1])
             _, qq_bk = self.traceBeam(qi_bk, direction='bk', npts=npts)
-            plotBeamProperties(dist, qq_bk, fig, bkwd=True, ls='-.')
+            plotting.plotBeamProperties(dist, qq_bk, fig, bkwd=True, ls='-.')
 
         if plot_model:
-            for Chr, optloc in zip(self.Chrs.values(), optlocs):
+            rad_ax = fig.axes[0]
+            roc_ax = fig.axes[1]
+            ph_ax = fig.axes[2]
+            marker = {'out': '>', 'in': '<'}
+            c = {'fr': 'C0', 'bk': 'C1'}
+            # qq_opt_fr = self.qq_opt['fr']
+            for optic, optloc in zip(self.optics, optlocs):
+                # qq_opt = qq_opt_fr[optic]
+                Chr = self.Chrs[optic]
                 fig.axes[1].plot(optloc, Chr, 'C0o')
                 fig.axes[1].plot(optloc, -Chr, 'C0o', alpha=0.4)
+
+                if bkwd:
+                    directions = ['fr', 'bk']
+                else:
+                    directions = ['fr']
+                for direction in directions:
+                    qq_opt = self.qq_opt[direction][optic]
+                    for port, qq in qq_opt.items():
+                        w, _, _, _, R, psi = beam_properties_from_q(qq)
+                        rad_ax.plot(
+                            optloc, w, c=c[direction], marker=marker[port])
+                        roc_ax.plot(
+                            optloc, 1/R, c=c[direction], marker=marker[port])
+                        ph_ax.plot(
+                            optloc, psi, c=c[direction], marker=marker[port])
 
         return fig
 

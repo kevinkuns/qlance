@@ -105,6 +105,19 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
 
 
 def plotBeamProperties(dist, qq, fig=None, optlocs=None, bkwd=False, **kwargs):
+    """Plot the beam properties along a beam path
+
+    Inputs:
+      dist: the distance from the initial point along the path
+      qq: the q parameter along the path
+      fig: if not None the beam path is plotted on this figure (Defualt: None)
+      bkwd: if True the beam is assumed to be backward propagating
+        (Defualt: False)
+      **kwargs: key word arguments for the plots
+
+    Returns:
+      fig: the figure if not given
+    """
     if fig:
         rad_ax = fig.axes[0]
         roc_ax = fig.axes[1]
@@ -122,8 +135,9 @@ def plotBeamProperties(dist, qq, fig=None, optlocs=None, bkwd=False, **kwargs):
         qq = qq[::-1]
     w, _, _, _, R, psi = beam_properties_from_q(qq)
     if bkwd:
-        R = -R
-        psi = -psi
+        # R = -R
+        # psi = -psi
+        pass
 
     # Beam radius plot
     rad_ax.plot(dist, w, **kwargs)

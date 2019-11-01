@@ -9,6 +9,7 @@ import scipy.constants as scc
 from numbers import Number
 from collections import OrderedDict
 import pandas as pd
+# from . import plotting
 from . import plotting
 from . import utils
 from .utils import mat2py, py2mat, str2mat
@@ -367,7 +368,7 @@ class PyTickle:
         """
         ff = self.ff
         tf = self.getTF(probeName, driveNames, dof=dof, optOnly=optOnly)
-        fig = plotting.plotTF(ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
+        fig = plotTF(ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
                               phase2freq=phase2freq, **kwargs)
         return fig
 
