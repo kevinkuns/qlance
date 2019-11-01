@@ -1156,6 +1156,32 @@ class PyTickle:
         self._eval(
             self.optName + ".setLinkLength(linkNum, linkLen);", nargout=0)
 
+    def getFieldBasis(self, optic, port=None, verbose=False):
+        if port:
+            qq = self.qq[self._getSinkNum(optic, port)]
+            if verbose:
+                print('Taking the basis determined by the model')
+
+        else:
+            self._eval("obj = {:s}.getOptic({:s});".format(
+                self.optName, str2mat(optic)))
+
+            if self._eval("isa(obj, 'Mirror')", 1):
+                qq = mat2py(self._eval("obj.getFrontBasis();", 1))
+                if np.shape(qq)[0]:
+                    qq = qq[1]  # take pitch
+                    if verbose:
+                        print('Taking the front basis specified by the model')
+                else:
+                    print(optic + ' does not have a basis set')
+                    qq = None
+            else:
+                qq = None
+                if verbose:
+                    print(optic + ' is not a mirror')
+
+        return qq
+
     def getBeamProperties(self, name, port):
         """Compute the properties of a Gaussian beam at an optic
 
@@ -1241,7 +1267,7 @@ class PyTickle:
                 ax = "x"
 
             self._eval("obj = {:s}.getOptic({:s});".format(
-            self.optName, str2mat(name)))
+                self.optName, str2mat(name)))
             self._eval("nIn = obj.getInputPortNum({:s});".format(
                 str2mat(inPort)))
             self._eval("nOut = obj.getOutputPortNum({:s});".format(

@@ -57,7 +57,7 @@ def beam_properties_from_q(qq, lambda0=1064e-9):
     return w, zR, z, w0, R
 
 
-def spaceABCD(length, n=1):
+def free_space_ABCD(length, n=1):
     """ABCD matrix for propagation through free space
 
     Inputs:
@@ -70,13 +70,14 @@ def spaceABCD(length, n=1):
 
 
 class GaussianPropagation:
-    def __init__(self, opt, *optics):
+    def __init__(self, opt, *optics, dof='pitch'):
         self.nopt = len(optics)
         if self.nopt < 2:
             raise ValueError('Need at least two optics to trace a beam')
 
         self.opt = opt
         self.optics = list(optics)
+        self.dof = 'pitch'
         self.fr_ABCDs = np.zeros((self.nopt, 2, 2))
         self.bk_ABCDs = np.zeros((self.nopt, 2, 2))
         self.fr_lens = np.zeros(self.nopt - 1)
@@ -96,11 +97,12 @@ class GaussianPropagation:
             port_bk_out, _ = self._getLinkPorts(optics[-1], optics[-2])
             _, port_bk_in = self._getLinkPorts(optics[1], optics[0])
 
-        self.ABCD_0 = self.opt.getABCD(optics[0], port_fr_in, port_fr_out)
-        self.ABCD_n = self.opt.getABCD(optics[-1], port_bk_in, port_bk_out)
+        self.ABCD_0 = self.opt.getABCD(
+            optics[0], port_fr_in, port_fr_out, dof=self.dof)
+        self.ABCD_n = self.opt.getABCD(
+            optics[-1], port_bk_in, port_bk_out, dof=self.dof)
 
         # Compute the round trip ABCD matrix
-        print(M_bk, M_fr)
         self.rt_ABCD = np.einsum(
             'ij,jk,kl,lm->im', self.ABCD_0, M_bk, self.ABCD_n, M_fr)
 
@@ -112,10 +114,10 @@ class GaussianPropagation:
         for ii, (opt0, opt1, opt2) in enumerate(triples(list(optics))):
             _, port_in = self._getLinkPorts(opt0, opt1)
             port_out, _ = self._getLinkPorts(opt1, opt2)
-            opt_ABCD = self.opt.getABCD(opt1, port_in, port_out)
+            opt_ABCD = self.opt.getABCD(opt1, port_in, port_out, dof=self.dof)
             path_ABCD[ii] = opt_ABCD
             link_lens[ii] = self.opt.getLinkLength(opt0, opt1)
-            len_ABCD = spaceABCD(link_lens[ii])
+            len_ABCD = free_space_ABCD(link_lens[ii])
             tot_ABCD = np.einsum(
                 'ij,jk,kl->il', opt_ABCD, len_ABCD, tot_ABCD)
 
@@ -124,9 +126,8 @@ class GaussianPropagation:
             link_lens[0] = self.opt.getLinkLength(*optics)
         else:
             link_lens[-1] = self.opt.getLinkLength(*optics[-2:])
-        len_ABCD = spaceABCD(link_lens[-1])
+        len_ABCD = free_space_ABCD(link_lens[-1])
         tot_ABCD = np.einsum('ij,jk->ik', len_ABCD, tot_ABCD)
-        print(tot_ABCD)
 
         return link_lens, path_ABCD, tot_ABCD
 
