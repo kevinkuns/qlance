@@ -80,13 +80,16 @@ class GaussianPropagation:
         self.opt = opt
         self.optics = list(optics)
         self.dof = 'pitch'
-        self.fr_ABCDs = np.zeros((self.nopt, 2, 2))
-        self.bk_ABCDs = np.zeros((self.nopt, 2, 2))
-        self.fr_lens = np.zeros(self.nopt - 1)
-        self.bk_lens = np.zeros(self.nopt - 1)
+        self.ABCDs = {direction: np.zeros((self.nopt, 2, 2))
+                      for direction in ['fr', 'bk']}
+        self.link_lens = {direction: np.zeros(self.nopt - 1)
+                          for direction in ['fr', 'bk']}
 
-        self.fr_lens, self.fr_ABCDs, M_fr = self.propagateABCD(*optics)
-        self.bk_lens, self.bk_ABCDs, M_bk = self.propagateABCD(*optics[::-1])
+
+        frwd_prop = self.propagateABCD(*optics)
+        bkwd_prop = self.propagateABCD(*optics[::-1])
+        self.link_lens['fr'], self.ABCDs['fr'], M_fr = frwd_prop
+        self.link_lens['bk'], self.ABCDs['bk'], M_bk = bkwd_prop
 
         # Find the initial and final ABCD matrices
         if self.nopt == 1:
@@ -109,6 +112,20 @@ class GaussianPropagation:
             'ij,jk,kl,lm->im', self.ABCD_0, M_bk, self.ABCD_n, M_fr)
 
     def propagateABCD(self, *optics):
+        """Compute the ABCD matrices along a beam path
+
+        Inputs:
+          *optics: a list of optics defining the path
+
+        Returns:
+          link_lens: the length of each link in the path
+          path_ABCD: a (Noptic - 2, 2, 2) array of each ABCD matrix in the path
+          tot_ABCD: the total ABCD matrix of the path
+
+        Example:
+          To compute the properties of the PRC from the ITM to the PRM
+            prop = gp.propagateABCD('IX', 'BS', 'PR3', 'PR2', 'PR')
+        """
         nopt = len(optics)  # optics not necessarily self.optics
         tot_ABCD= np.identity(2)
         path_ABCD = np.zeros((nopt - 2, 2, 2))
@@ -133,8 +150,28 @@ class GaussianPropagation:
 
         return link_lens, path_ABCD, tot_ABCD
 
-    def traceBeam(self, qi, direction='fr'):
-        pass
+    def trace_beam(self, qi, direction='fr', npts=100):
+        """Compute the beam properties along the beam path
+
+        Inputs:
+          qi: the initial q paramter
+          direction: beam direction 'fr' or 'bk' (Default: 'fr')
+          npts: number of points to evaluate along each link in the path
+
+        Returns:
+          dist: the distance from the inital point along the path
+          qq: the q parameter along the path
+        """
+        dist = np.linspace(0, self.link_lens[direction][0], npts)
+        qq = qi + dist
+
+        for li, link_len in enumerate(self.link_lens[direction][1:]):
+            link_dist = np.linspace(0, link_len, npts)
+            dist = np.concatenate((dist, dist[-1] + link_dist))
+            qi = applyABCD(self.ABCDs[direction][li], qq[-1])
+            qq = np.concatenate((qq, qi + link_dist))
+
+        return dist, qq
 
     def getStability(self):
         """Compute the stability parameter m for the resonator
