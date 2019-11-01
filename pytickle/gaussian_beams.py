@@ -2,6 +2,7 @@ import numpy as np
 from collections import OrderedDict
 from itertools import tee
 from .utils import mat2py, py2mat, str2mat
+from .plotting import plotBeamProperties
 
 
 def triples(iterable):
@@ -150,7 +151,7 @@ class GaussianPropagation:
 
         return link_lens, path_ABCD, tot_ABCD
 
-    def trace_beam(self, qi, direction='fr', npts=100):
+    def traceBeam(self, qi, direction='fr', npts=100):
         """Compute the beam properties along the beam path
 
         Inputs:
@@ -172,6 +173,22 @@ class GaussianPropagation:
             qq = np.concatenate((qq, qi + link_dist))
 
         return dist, qq
+
+    def plotBeamProperties(self, qi, bkwd=True, npts=100, plot_locs=True):
+        dist, qq_fr = self.traceBeam(qi, direction='fr', npts=npts)
+
+        if plot_locs:
+            optlocs = np.cumsum(
+                np.concatenate((np.array([0]), self.link_lens['fr'])))
+        else:
+            optlocs = None
+        fig = plotBeamProperties(dist, qq_fr, optlocs=optlocs)
+
+        if bkwd:
+            qi_bk = applyABCD(self.ABCD_n, qq_fr[-1])
+            _, qq_bk = self.traceBeam(qi_bk, direction='bk', npts=npts)
+            plotBeamProperties(dist, qq_bk, fig, bkwd=True, ls='-.')
+        return fig
 
     def getStability(self):
         """Compute the stability parameter m for the resonator

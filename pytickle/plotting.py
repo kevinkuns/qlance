@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import FormatStrFormatter, FuncFormatter
 from .utils import mag2db
+from .gaussian_beams import beam_properties_from_q
 
 
 def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
@@ -63,7 +64,7 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
         old_ylims = mag_ax.get_ylim()
 
     if phase2freq:
-        tf = tf/ff
+        tf = tf/(1j*ff)
 
     if dB:
         mag_ax.semilogx(ff, mag2db(np.abs(tf)), **kwargs)
@@ -103,64 +104,55 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
         return fig
 
 
-def plotAbsTF(ff, tf, ax=None, dB=False, phase2freq=False, **kwargs):
-    """Plots the magnitude of a transfer function
-
-    Inputs:
-    ff: the frequency at which the transfer function is evaluated [Hz]
-    tf: the transfer function
-    ax: If not None, existing axis to plot the transfer function on
-        (default: None)
-    dB: If True, plots the magnitude in dB (default: False)
-    phase2freq: If true, the transfer function tf/f is plotted instead
-        of tf, which converts a phase TF to a frequency TF
-        (default: False)
-    **kwargs: any arguments (color, linestyle, label, etc.) to pass
-        to the plot
-
-    Returns:
-      fig: if no mag_ax and phase_ax have been given, returns the new fig
-
-    See plotTF for more information.
-    """
-    if ax is None:
-        newFig = True
-    else:
+def plotBeamProperties(dist, qq, fig=None, optlocs=None, bkwd=False, **kwargs):
+    if fig:
+        rad_ax = fig.axes[0]
+        roc_ax = fig.axes[1]
+        ph_ax = fig.axes[2]
         newFig = False
-
-    if newFig:
+    else:
         fig = plt.figure()
-        ax = fig.gca()
-    else:
-        old_ylims = ax.get_ylim()
+        gs = gridspec.GridSpec(3, 1, height_ratios=[1, 1, 1], hspace=0.05)
+        rad_ax = fig.add_subplot(gs[0])
+        roc_ax = fig.add_subplot(gs[1], sharex=rad_ax)
+        ph_ax = fig.add_subplot(gs[2], sharex=rad_ax)
+        newFig = True
 
-    if phase2freq:
-        tf = tf/ff
+    if bkwd:
+        qq = qq[::-1]
+    w, _, _, _, R, psi = beam_properties_from_q(qq)
+    if bkwd:
+        R = -R
+        psi = -psi
 
-    if dB:
-        ax.semilogx(ff, mag2db(np.abs(tf)), **kwargs)
-        ax.set_ylabel('Magnitude [dB]')
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.0f'))
-    else:
-        ax.loglog(ff, np.abs(tf), **kwargs)
-        ax.set_ylabel('Magnitude')
-        magTF = np.abs(tf)
-        # If the TF is close to being constant magnitude, increase ylims
-        # in order to show y tick labels and avoid a misleading plot.
-        if np.abs(np.max(magTF)/np.min(magTF)) < 10:
-            # mag_ax.set_yscale('linear')
-            ax.set_ylim(np.mean(magTF)/10.1, np.mean(magTF)*10.1)
+    # Beam radius plot
+    rad_ax.plot(dist, w, **kwargs)
+    scale_axis(rad_ax.yaxis, 1e3)
+    rad_ax.set_ylabel('Beam radius [mm]')
+    rad_ax.grid(True, which='major', alpha=0.5)
+    plt.setp(rad_ax.get_xticklabels(), visible=False)
 
-    # If plotting ontop of an old TF, adjust the ylims so that the old TF
-    # is still visible
-    if not newFig:
-        new_ylims = ax.get_ylim()
-        ax.set_ylim(min(old_ylims[0], new_ylims[0]),
-                    max(old_ylims[1], new_ylims[1]))
+    # Inverse ROC plot
+    roc_ax.plot(dist, 1/R, **kwargs)
+    roc_ax.set_ylabel('Inverse ROC [1/m]')
+    roc_ax.grid(True, which='major', alpha=0.5)
+    plt.setp(roc_ax.get_xticklabels(), visible=False)
 
-    ax.set_xlim(min(ff), max(ff))
-    ax.set_xlabel('Frequency [Hz]')
-    ax.grid(True, which='both', alpha=0.5)
-    ax.grid(alpha=0.25, which='minor')
+    # Gouy phase plot
+    ph_ax.plot(dist, psi, **kwargs)
+    ph_ax.set_ylabel('Gouy phase [deg]')
+    ph_ax.set_xlabel('Distance [m]')
+    ph_ax.grid(True, which='major', alpha=0.5)
+
+    if optlocs is not None:
+        for optloc in optlocs:
+            rad_ax.axvline(optloc, c='xkcd:forrest green', ls=':', alpha=0.5)
+            roc_ax.axvline(optloc, c='xkcd:forrest green', ls=':', alpha=0.5)
+            ph_ax.axvline(optloc, c='xkcd:forrest green', ls=':', alpha=0.5)
+
     if newFig:
         return fig
+
+
+def scale_axis(ax, sf):
+    ax.set_major_formatter(FuncFormatter(lambda x, p: '{:0.0f}'.format(sf*x)))
