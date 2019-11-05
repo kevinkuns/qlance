@@ -264,6 +264,21 @@ class GaussianPropagation:
         """
         return self.rt_ABCD.trace() / 2
 
+    def getRTGouyPhase(self):
+        """Compute the round trip Gouy phase for the resonator
+
+        The round trip Gouy phase is
+          arccos((A + D)/2)
+        where A and D characterize the round trip ABCD matrix.
+
+        Note that for a two mirror resonator with g factors g1 and g2 this is
+          2 * arccos(sqrt(g1*g2))
+
+        Returns:
+          dphi: the round trip Gouy phase [deg]
+        """
+        return np.arccos(self.getStability()) * 180/np.pi
+
     def _eval(self, cmd, nargout=0):
         """Evaluate a matlab command using the pytickle model's engine
 
