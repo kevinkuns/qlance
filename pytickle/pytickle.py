@@ -1055,10 +1055,18 @@ class PyTickle:
           param: name of the parameter
           val: value of the paramter
         """
-        cmd = self.optName + ".setOpticParam("
-        cmd += str2mat(name) + ", " + str2mat(param)
-        cmd += ", " + str(val) + ");"
-        self._eval(cmd, nargout=0)
+        # get the optic and load the value into the workspace
+        self.eng.workspace['val'] = py2mat(val)
+        self._eval("obj = {:s}.getOptic({:s});".format(
+            self.optName, str2mat(name)))
+
+        # Beamsplitters are write protected but can be tricked by modifying
+        # the internal mirror directly
+        if self._eval("isa(obj, 'BeamSplitter')", 1):
+            self._eval("obj.mir." + str(param) + " = val;")
+
+        else:
+            self._eval("obj." + str(param) + " = val;")
 
     def getOpticParam(self, name, param):
         """Get the value of an optic's paramter
@@ -1067,9 +1075,18 @@ class PyTickle:
           name: name of the optic
           param: name of the parameter
         """
-        cmd = self.optName + ".getOptic(" + str2mat(name) + ");"
-        self._eval(cmd, nargout=0)
-        return self._eval("ans." + param + ";", 1)
+        self._eval("obj = {:s}.getOptic({:s});".format(
+            self.optName, str2mat(name)))
+
+        # Need to access a beamsplitter's internal mirror to get the
+        # true properties
+        if self._eval("isa(obj, 'BeamSplitter')", 1):
+            val = mat2py(self._eval("obj.mir." + str(param), 1))
+
+        else:
+            val = mat2py(self._eval("obj." + str(param), 1))
+
+        return val
 
     def getProbePhase(self, name):
         """Get the phase of a probe
