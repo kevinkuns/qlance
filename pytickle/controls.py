@@ -4,7 +4,7 @@ from collections import OrderedDict
 from .utils import assertType
 from functools import partial
 from numbers import Number
-from itertools import cycle
+from itertools import cycle, zip_longest
 from . import plotting
 
 
@@ -73,11 +73,21 @@ def zpk(zs, ps, k, ss):
     else:
         filt = k * np.ones(len(ss), dtype=complex)
 
-    for z in assertArr(zs):
-        filt *= (ss - z)
+    # for z in assertArr(zs):
+    #     filt *= (ss - z)
 
-    for p in assertArr(ps):
-        filt /= (ss - p)
+    # for p in assertArr(ps):
+    #     filt /= (ss - p)
+
+    # Do this with pole/zero pairs instead of all the zeros and then all the
+    # poles to avoid numerical issues when dividing huge numerators by huge
+    # denominators for filters with many poles and zeros
+    for z, p in zip_longest(assertArr(zs), assertArr(ps)):
+        if z is not None:
+            filt *= (ss - z)
+
+        if p is not None:
+            filt /= (ss - p)
 
     return filt
 
