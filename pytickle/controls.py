@@ -112,6 +112,25 @@ def resRoots(f0, Q, Hz=True):
     return r1, r2
 
 
+def res_from_roots(rr, Hz=True):
+    """Compute the resonance frequency and Q from a complex pole
+
+    Inputs:
+      rr: the complex pole
+      Hz: If True the roots are in the frequency domain and f0 is in Hz
+        If False, the roots are in the s-domain and f0 is in rad/s
+        (Default: True)
+
+    Returns:
+      f0: the resonance frequency
+      Q: the Q factor
+    """
+    rr = (-1)**(not Hz) * rr
+    f0 = np.abs(rr)
+    Q = 1/(2*np.cos(np.angle(rr)))
+    return f0, Q
+
+
 def catzp(*args):
     """Concatenate a list of zeros or poles
 
