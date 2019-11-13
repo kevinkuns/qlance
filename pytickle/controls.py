@@ -720,6 +720,8 @@ class ControlSystem:
           totalASD: the total ASD [u/rtHz]
         """
         ampTF = self.getTF(dof_to, tp_to, '', tp_from, closed=closed)
+        if len(ampTF.shape) == 1:
+            ampTF = np.einsum('i,j->ij', ampTF, np.ones_like(self.opt.ff))
         powTF = np.abs(ampTF)**2
         totalPSD = np.zeros(powTF.shape[-1])
         for dof_from, noiseASD in noiseASDs.items():
