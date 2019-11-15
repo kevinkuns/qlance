@@ -490,7 +490,7 @@ class PyTickle:
           sig: signal power at those positions [W]
         """
         probeNum = self.probes.index(probeName)
-        driveNum = self.drives.index(driveName)
+        driveNum = self._getDriveIndex(driveName, 'pos')
 
         poses = self.poses[driveNum, :]
         try:
