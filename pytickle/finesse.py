@@ -2,6 +2,7 @@ import numpy as np
 import pykat
 import pykat.detectors as kdet
 import pykat.commands as kcom
+from . import plotting
 from numbers import Number
 from tqdm import tqdm
 
@@ -60,3 +61,16 @@ class KatFR:
                 tf += pc * drive_pos * self.freqresp[probe][drive]
 
         return tf
+
+    def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
+               dB=False, phase2freq=False, **kwargs):
+        """Plot a transfer function.
+
+        See documentation for plotTF in plotting
+        """
+        ff = self.ff
+        tf = self.getTF(probeName, driveNames)
+        fig = plotting.plotTF(
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
+            phase2freq=phase2freq, **kwargs)
+        return fig
