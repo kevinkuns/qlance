@@ -177,16 +177,21 @@ class GaussianPropagation:
           dist: the distance from the inital point along the path
           qq: the q parameter along the path
         """
+        qq_opt = OrderedDict({optic: {} for optic in self.optics})
+        qq_opt[self.optics[0]]['out'] = qi
         dist = np.linspace(0, self.link_lens[direction][0], npts)
         qq = qi + dist
+        qq_opt[self.optics[1]]['in'] = qq[-1]
 
         for li, link_len in enumerate(self.link_lens[direction][1:]):
             link_dist = np.linspace(0, link_len, npts)
             dist = np.concatenate((dist, dist[-1] + link_dist))
             qi = applyABCD(self.ABCDs[direction][li], qq[-1])
+            qq_opt[self.optics[li + 1]]['out'] = qi
             qq = np.concatenate((qq, qi + link_dist))
+            qq_opt[self.optics[li + 2]]['in'] = qq[-1]
 
-        return dist, qq
+        return dist, qq, qq_opt
 
     def plotBeamProperties(
             self, qi, bkwd=True, npts=100, plot_locs=True, plot_model=True):
@@ -205,7 +210,7 @@ class GaussianPropagation:
         Returns:
           fig: the figure
         """
-        dist, qq_fr = self.traceBeam(qi, direction='fr', npts=npts)
+        dist, qq_fr, _ = self.traceBeam(qi, direction='fr', npts=npts)
 
         # locations of the optic in the path
         optlocs = np.cumsum(
@@ -218,7 +223,7 @@ class GaussianPropagation:
 
         if bkwd:
             qi_bk = applyABCD(self.ABCD_n, qq_fr[-1])
-            _, qq_bk = self.traceBeam(qi_bk, direction='bk', npts=npts)
+            _, qq_bk, _ = self.traceBeam(qi_bk, direction='bk', npts=npts)
             plotting.plotBeamProperties(dist, qq_bk, fig, bkwd=True, ls='-.')
 
         if plot_model:

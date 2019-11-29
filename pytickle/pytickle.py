@@ -368,8 +368,9 @@ class PyTickle:
         """
         ff = self.ff
         tf = self.getTF(probeName, driveNames, dof=dof, optOnly=optOnly)
-        fig = plotTF(ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
-                              phase2freq=phase2freq, **kwargs)
+        fig = plotting.plotTF(
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
+            phase2freq=phase2freq, **kwargs)
         return fig
 
     def plotQuantumASD(self, probeName, driveNames, Larm=None, mass=None,

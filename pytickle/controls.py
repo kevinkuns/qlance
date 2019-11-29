@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.linalg import inv
+import pandas as pd
 from collections import OrderedDict
-from .utils import assertType
+from .utils import assertType, siPrefix
 from functools import partial
 from numbers import Number
 from itertools import cycle, zip_longest
@@ -168,6 +169,23 @@ def catfilt(*args):
         return out
 
     return Filter(newFilt)
+
+
+def compute_margins(ff, tf):
+    """Compute the UGF and phase margin of an OLTF
+
+    Inputs:
+      ff: the frequency vector [Hz]
+      tf: the OLTF
+
+    Returns:
+      ugf: the UGF [Hz]
+      pm: phase margin [deg]
+    """
+    ind = np.argmin(np.abs(np.abs(tf) - 1))
+    ugf = ff[ind]
+    pm = np.angle(tf[ind], True)
+    return ugf, pm
 
 
 class DegreeOfFreedom:
@@ -624,6 +642,22 @@ class ControlSystem:
             cltf = cltf[to_ind]
         return cltf
 
+    def compute_margins(self, dof_to, dof_from, tstpnt):
+        oltf = self.getOLTF(dof_to, dof_from, tstpnt)
+        return compute_margins(self.opt.ff, oltf)
+
+    def print_margins(self, tstpnt):
+        margins = {}
+        for dof in self.dofs.keys():
+            ugf, pm = self.compute_margins(dof, dof, tstpnt)
+            margins[dof] = ['{:0.2f} {:s}Hz'.format(*siPrefix(ugf)[::-1]),
+                            '{:0.2f} deg'.format(pm)]
+
+        margins = pd.DataFrame(margins, index=['UGF', 'phase margin']).T
+        with pd.option_context('display.max_rows', None,
+                               'display.max_columns', None):
+            display(margins)
+
     def getTF(self, dof_to, tp_to, dof_from, tp_from, closed=True):
         """Get a transfer function between two test points in a loop
 
@@ -719,7 +753,12 @@ class ControlSystem:
         Returns:
           totalASD: the total ASD [u/rtHz]
         """
-        ampTF = self.getTF(dof_to, tp_to, '', tp_from, closed=closed)
+        if tp_to == 'cal':
+            ampTF = inv(self.outMat)
+            to_ind = self._getIndex(dof_to, 'cal')
+            ampTF = ampTF[to_ind]
+        else:
+            ampTF = self.getTF(dof_to, tp_to, '', tp_from, closed=closed)
         if len(ampTF.shape) == 1:
             ampTF = np.einsum('i,j->ij', ampTF, np.ones_like(self.opt.ff))
         powTF = np.abs(ampTF)**2

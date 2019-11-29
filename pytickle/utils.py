@@ -55,7 +55,7 @@ def addOpticklePath(eng, path=None):
 
 
 def normalizeDOF(dof):
-    """Normalize a degree of freedom for use in transfer functions, et
+    """Normalize a degree of freedom for use in transfer functions, etc
     """
     vals = np.array(list(dof.values()))
     norm = np.sum(np.abs(vals))
