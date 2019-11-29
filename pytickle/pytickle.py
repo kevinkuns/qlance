@@ -856,7 +856,27 @@ class PyTickle:
         self._updateNames()
 
     def addReadout(self, sinkName, freqs, phases, names=None):
-        # Figure out the naming scheme.
+        """Add RF and DC probes to a detection port
+
+        Inputs:
+          sinkName: the sink name
+          freqs: demodulation frequencies
+          phases: demodulation phases
+          names: suffixes for RF probe names (Optional).
+            If blank and there are multiple demod frequencies, the suffixes
+            1, 2, 3, ... are added
+
+        Examples:
+          * self.addReadout('REFL', f1, 0)
+          adds the probes 'REFL_DC', 'REFL_I', and 'REFL_Q' at demod frequency
+          f1 and phases 0 and 90 to the REFL sink.
+
+          * self.addReadout('POP', [11e6, 55e6], [0, 30], ['11', '55'])
+          adds the probes POP_DC, POP_I11, POP_Q11, POP_I55, and POP_Q55 at
+          demod frequency 11 w/ phases 0 and 90 and at demod phase 55 MHz and
+          phases 30 and 100 to the POP sink.
+        """
+        # Get demod frequencies and phases
         if isinstance(freqs, Number):
             freqs = np.array([freqs])
         if isinstance(phases, Number):
@@ -864,6 +884,8 @@ class PyTickle:
         if len(freqs) != len(phases):
             raise ValueError(
                 'Frequency and phase vectors are not the same length.')
+
+        # Figure out the naming scheme
         if names is None:
             if len(freqs) > 1:
                 names = (np.arange(len(freqs), dtype=int) + 1).astype(str)
@@ -871,7 +893,8 @@ class PyTickle:
                 names = ['']
         elif isinstance(names, str):
             names = [names]
-        # Add the probes.
+
+        # Add the probes
         self.addProbeIn(sinkName + '_DC', sinkName, 'in', 0, 0)
         for freq, phase, name in zip(freqs, phases, names):
             nameI = sinkName + '_I' + name
