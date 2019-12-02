@@ -873,8 +873,8 @@ class PyTickle:
 
           * self.addReadout('POP', [11e6, 55e6], [0, 30], ['11', '55'])
           adds the probes POP_DC, POP_I11, POP_Q11, POP_I55, and POP_Q55 at
-          demod frequency 11 w/ phases 0 and 90 and at demod phase 55 MHz and
-          phases 30 and 100 to the POP sink.
+          demod frequency 11 MHz w/ phases 0 and 90 and at demod phase 55 MHz
+          and phases 30 and 100 to the POP sink.
         """
         # Get demod frequencies and phases
         if isinstance(freqs, Number):

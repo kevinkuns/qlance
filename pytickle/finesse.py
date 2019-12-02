@@ -7,7 +7,8 @@ from numbers import Number
 from tqdm import tqdm
 
 
-def add_probe(kat, name, node, freq, phase, freqresp=True):
+def add_probe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
+              dof='pos'):
     """Add a probe to a finesse model
 
     Inputs:
@@ -18,25 +19,37 @@ def add_probe(kat, name, node, freq, phase, freqresp=True):
       phase: demodulation phase
       freqresp: if True, the probe is used for a frequency response
         measurement (Default: True)
+      alternate_beam: if True, the alternate beam is probed (Default: False)
+      dof: which DOF is probed: pos, pitch, or yaw (Default: pos)
 
     Examples:
       add_probe(kat, 'REFL_DC', 'REFL_in', 0, 0)
       add_probe(kat, 'REFL_Q', 'REFL_in', fmod, 90)
     """
+    if dof == 'pos':
+        pdtype = None
+    elif dof == 'pitch':
+        pdtype = 'y-split'
+    elif dof == 'yaw':
+        pdtype = 'x-split'
+    else:
+        raise ValueError('Unrecognized dof ' + dof)
+    kwargs = {'pdtype': pdtype, 'alternate_beam': alternate_beam}
+
     if freq:
-        kwargs = {'f1': freq, 'phase1': phase}
+        kwargs.update({'f1': freq, 'phase1': phase})
         if freqresp:
             kwargs['f2'] = 1
         kat.add(kdet.pd(name, 1 + freqresp, node, **kwargs))
 
     else:
-        kwargs = {}
         if freqresp:
             kwargs['f1'] = 1
         kat.add(kdet.pd(name, 0 + freqresp, node, **kwargs))
 
 
-def add_readout(kat, name, node, freqs, phases, freqresp=True, fnames=None):
+def add_readout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=False,
+                dof='pos', fnames=None):
     """Add RF and DC probes to a detection port
 
     Inputs:
@@ -46,6 +59,8 @@ def add_readout(kat, name, node, freqs, phases, freqresp=True, fnames=None):
       freqs: demodulation frequencies
       phases: demodulation phases
       freqresp: same as for add_probe
+      alternate_beam: same as for add_probe
+      dof: same as for add_probe
       fnames: suffixes for RF probe names (Optional)
         If blank and there are multiple demod frequencies, the suffixes
         1, 2, 3, ... are added
@@ -58,7 +73,7 @@ def add_readout(kat, name, node, freqs, phases, freqresp=True, fnames=None):
       * add_readout(kat, 'POP', 'POP_in', [11e6, 55e6], [0, 30],
                     fnames=['11', '55'])
       adds the probes POP_DC, POP_I11, POP_Q11, POP_I55, and POP_Q55 at
-      demod frequency 11 w/ phases 0 and 90 and at demod phase 55 MHz and
+      demod frequency 11 MHz w/ phases 0 and 90 and at demod phase 55 MHz and
       phases 30 and 100 to the node POP_in
     """
     # Get demod frequencies and phases
@@ -80,27 +95,37 @@ def add_readout(kat, name, node, freqs, phases, freqresp=True, fnames=None):
         fnames = [fnames]
 
     # Add the probes
-    add_probe(kat, name + '_DC', node, 0, 0)
+    add_probe(kat, name + '_DC', node, 0, 0, freqresp=freqresp,
+              alternate_beam=alternate_beam, dof=dof)
     for freq, phase, fname in zip(freqs, phases, fnames):
         nameI = name + '_I' + fname
         nameQ = name + '_Q' + fname
-        add_probe(kat, nameI, node, freq, phase, freqresp=freqresp)
-        add_probe(kat, nameQ, node, freq, phase + 90, freqresp=freqresp)
+        add_probe(
+            kat, nameI, node, freq, phase, freqresp=freqresp,
+            alternate_beam=alternate_beam, dof=dof)
+        add_probe(
+            kat, nameQ, node, freq, phase + 90, freqresp=freqresp,
+            alternate_beam=alternate_beam, dof=dof)
 
 
 class KatFR:
-    def __init__(self, kat, drives):
+    def __init__(self, kat):
+        self._dofs = ['pos', 'pitch', 'yaw']
         self.kat = kat
-        self.drives = drives
-        self.probes = kat.detectors.keys()
-        self.freqresp = {probe: {} for probe in self.probes}
+        self.drives = {dof: [] for dof in self._dofs}
+        self.probes = list(kat.detectors.keys())
+        self.freqresp = {dof: {probe: {} for probe in self.probes}
+                         for dof in self._dofs}
         self.ff = None
 
-    def tickle(self, fmin, fmax, npts, linlog='log', verbose=1):
-        if verbose:
-            pbar = tqdm(total=len(self.drives))
+    def tickle(self, fmin, fmax, npts, dof='pos', linlog='log', verbose=1):
+        if dof not in self._dofs:
+            raise ValueError('Unrecognized dof ' + dof)
 
-        for drive in self.drives:
+        if verbose:
+            pbar = tqdm(total=len(self.drives[dof]))
+
+        for drive in self.drives[dof]:
             # make a seperate kat for each drive
             kat = self.kat.deepcopy()
             if verbose <= 1:
@@ -120,14 +145,15 @@ class KatFR:
                     raise ValueError('Too many demodulations')
 
             # run the simulation for this drive
-            kat.signals.apply(kat.components[drive].phi, 1, 0)
+            # kat.signals.apply(kat.components[drive].phi, 1, 0)
+            kat.signals.apply(self._get_drive_dof(kat, drive, dof), 1, 0)
             kat.parse('yaxis lin re:im')
             kat.parse('scale meter')
             out = kat.run()
 
             # store the results
             for probe in self.probes:
-                self.freqresp[probe][drive] = out[probe]
+                self.freqresp[dof][probe][drive] = out[probe]
 
             if verbose:
                 pbar.update()
@@ -137,7 +163,10 @@ class KatFR:
 
         self.ff = out.x
 
-    def getTF(self, probes, drives):
+    def getTF(self, probes, drives, dof='pos'):
+        if dof not in self._dofs:
+            raise ValueError('Unrecognized dof ' + dof)
+
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
             # TF is at a single frequency
@@ -156,19 +185,39 @@ class KatFR:
         for probe, pc in probes.items():
             for drive, drive_pos in drives.items():
                 # add the contribution from this drive
-                tf += pc * drive_pos * self.freqresp[probe][drive]
+                tf += pc * drive_pos * self.freqresp[dof][probe][drive]
 
         return tf
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
-               dB=False, phase2freq=False, **kwargs):
+               dof='pos', dB=False, phase2freq=False, **kwargs):
         """Plot a transfer function.
 
         See documentation for plotTF in plotting
         """
         ff = self.ff
-        tf = self.getTF(probeName, driveNames)
+        tf = self.getTF(probeName, driveNames, dof=dof)
         fig = plotting.plotTF(
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
             phase2freq=phase2freq, **kwargs)
         return fig
+
+    def add_drive(self, drive, dof='pos'):
+        if dof not in self._dofs:
+            raise ValueError('Unrecognized dof ' + dof)
+
+        if drive in self.drives[dof]:
+            print('drive {:} with dof {:s} is already added'.format(drive, dof))
+        else:
+            self.drives[dof].append(drive)
+
+    @staticmethod
+    def _get_drive_dof(kat, drive, dof):
+        if dof == 'pos':
+            return kat.components[drive].phi
+        elif dof == 'pitch':
+            return kat.components[drive].ybeta
+        elif dof == 'yaw':
+            return kat.components[drive].xbeta
+        else:
+            raise ValueError('Unrecognized dof ' + dof)
