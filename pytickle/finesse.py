@@ -1,10 +1,45 @@
 import numpy as np
 import pykat
+import pykat.components as kcomp
 import pykat.detectors as kdet
 import pykat.commands as kcom
 from . import plotting
 from numbers import Number
 from tqdm import tqdm
+
+
+def addMirror(kat, name, aoi=0, Chr=0, Thr=0, Lhr=0, pos=0):
+    # FIXME: deal with "mirrors" with non-zero aoi's correctly
+    if Chr == 0:
+        Rcx = None
+        Rcy = None
+    else:
+        Rcx = 1/Chr
+        Rcy = 1/Chr
+
+    phi = 2*np.pi * pos/kat.lambda0
+    fr = name + '_fr'
+    bk = name + '_bk'
+    kat.add(kcomp.mirror(
+        name, fr, bk, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
+
+
+def addBeamSplitter(kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, pos=0):
+    if Chr == 0:
+        Rcx = None
+        Rcy = None
+    else:
+        Rcx = 1/Chr
+        Rcy = 1/Chr
+
+    phi = 2*np.pi * pos/kat.lambda0
+    frI = name + '_frI'
+    frR = name + '_frR'
+    bkT = name + '_bkT'
+    bkO = name + '_bkO'
+    kat.add(kcomp.beamSplitter(
+        name, frI, frR, bkT, bkO, T=Thr, L=Lhr, alpha=aoi, phi=phi,
+        Rcx=Rcx, Rcy=Rcy))
 
 
 def add_probe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
