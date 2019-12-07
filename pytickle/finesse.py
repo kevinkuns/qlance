@@ -143,12 +143,39 @@ def add_readout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=Fa
             alternate_beam=alternate_beam, dof=dof)
 
 
+def get_drive_dof(kat, drive, dof):
+    """Return the component for a given degree of freedom
+
+    Inputs:
+      kat: the finesse model
+      drive: the name of the drive
+      dof: which DOF to drive: pos, pitch, or yaw
+
+    Returns:
+      the component
+    """
+    if dof == 'pos':
+        return kat.components[drive].phi
+    elif dof == 'pitch':
+        return kat.components[drive].ybeta
+    elif dof == 'yaw':
+        return kat.components[drive].xbeta
+    else:
+        raise ValueError('Unrecognized dof ' + dof)
+
+
 class KatFR:
     def __init__(self, kat):
         self._dofs = ['pos', 'pitch', 'yaw']
         self.kat = kat
-        self.drives = {dof: [] for dof in self._dofs}
-        self.probes = list(kat.detectors.keys())
+        self.drives = [name for name, comp in kat.components.items()
+                       if isinstance(comp, (kcomp.mirror, kcomp.beamSplitter))]
+        self.probes = [name for name, det in kat.detectors.items()
+                       if isinstance(det, kdet.pd)]
+        self.pos_detectors = [name for name, det in kat.detectors.items()
+                              if isinstance(det, kdet.xd)]
+        self.amp_detectors = [name for name, det in kat.detectors.items()
+                              if isinstance(det, kdet.ad)]
         self.freqresp = {dof: {probe: {} for probe in self.probes}
                          for dof in self._dofs}
         self.ff = None
@@ -158,9 +185,9 @@ class KatFR:
             raise ValueError('Unrecognized dof ' + dof)
 
         if verbose:
-            pbar = tqdm(total=len(self.drives[dof]))
+            pbar = tqdm(total=len(self.drives))
 
-        for drive in self.drives[dof]:
+        for drive in self.drives:
             # make a seperate kat for each drive
             kat = self.kat.deepcopy()
             if verbose <= 1:
@@ -171,7 +198,8 @@ class KatFR:
                 kcom.xaxis(linlog, [fmin, fmax], kat.signals.f, npts))
 
             # apply the signal to each detector
-            for det in kat.detectors.values():
+            for probe in self.probes:
+                det = kat.detectors[probe]
                 if det.num_demods == 1:
                     det.f1.put(kat.xaxis.x)
                 elif det.num_demods == 2:
@@ -180,9 +208,8 @@ class KatFR:
                     raise ValueError('Too many demodulations')
 
             # run the simulation for this drive
-            # kat.signals.apply(kat.components[drive].phi, 1, 0)
-            kat.signals.apply(self._get_drive_dof(kat, drive, dof), 1, 0)
-            kat.parse('yaxis lin re:im')
+            kat.signals.apply(get_drive_dof(kat, drive, dof), 1, 0)
+            kat.parse('yaxis re:im')
             kat.parse('scale meter')
             out = kat.run()
 
@@ -245,14 +272,3 @@ class KatFR:
             print('drive {:} with dof {:s} is already added'.format(drive, dof))
         else:
             self.drives[dof].append(drive)
-
-    @staticmethod
-    def _get_drive_dof(kat, drive, dof):
-        if dof == 'pos':
-            return kat.components[drive].phi
-        elif dof == 'pitch':
-            return kat.components[drive].ybeta
-        elif dof == 'yaw':
-            return kat.components[drive].xbeta
-        else:
-            raise ValueError('Unrecognized dof ' + dof)
