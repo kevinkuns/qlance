@@ -143,25 +143,37 @@ def add_readout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=Fa
             alternate_beam=alternate_beam, dof=dof)
 
 
-def get_drive_dof(kat, drive, dof):
+def get_drive_dof(kat, drive, dof, force=False):
     """Return the component for a given degree of freedom
 
     Inputs:
       kat: the finesse model
       drive: the name of the drive
-      dof: which DOF to drive: pos, pitch, or yaw
+      dof: which DOF to drive pos, pitch, or yaw
+      force: if True a force or torque is applied instead of the motion
+        (Default: False)
 
     Returns:
       the component
     """
-    if dof == 'pos':
-        return kat.components[drive].phi
-    elif dof == 'pitch':
-        return kat.components[drive].ybeta
-    elif dof == 'yaw':
-        return kat.components[drive].xbeta
-    else:
+    if dof not in ['pos', 'pitch', 'yaw']:
         raise ValueError('Unrecognized dof ' + dof)
+
+    if force:
+        if dof == 'pos':
+            return kat.components[drive].Fz
+        elif dof == 'pitch':
+            return kat.components[drive].Fry
+        elif dof == 'yaw':
+            return kat.components[drive].Frx
+
+    else:
+        if dof == 'pos':
+            return kat.components[drive].phi
+        elif dof == 'pitch':
+            return kat.components[drive].ybeta
+        elif dof == 'yaw':
+            return kat.components[drive].xbeta
 
 
 class KatFR:
@@ -178,11 +190,17 @@ class KatFR:
                               if isinstance(det, kdet.ad)]
         self.freqresp = {dof: {probe: {} for probe in self.probes}
                          for dof in self._dofs}
+        self.mechmod = {dof: {drive: {} for drive in self.pos_detectors}
+                         for dof in self._dofs}
         self.ff = None
 
-    def tickle(self, fmin, fmax, npts, dof='pos', linlog='log', verbose=1):
+    def tickle(self, fmin, fmax, npts, dof='pos', linlog='log', rtype='both',
+               verbose=1):
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
+
+        if rtype not in ['opt', 'mech', 'both']:
+            raise ValueError('Unrecognized response type ' + rtype)
 
         if verbose:
             pbar = tqdm(total=len(self.drives))
@@ -197,25 +215,40 @@ class KatFR:
             kat.add(
                 kcom.xaxis(linlog, [fmin, fmax], kat.signals.f, npts))
 
-            # apply the signal to each detector
-            for probe in self.probes:
-                det = kat.detectors[probe]
-                if det.num_demods == 1:
-                    det.f1.put(kat.xaxis.x)
-                elif det.num_demods == 2:
-                    det.f2.put(kat.xaxis.x)
-                else:
-                    raise ValueError('Too many demodulations')
+            # apply the signal to each photodiode for optomechanical plant
+            if rtype in ['opt', 'both']:
+                for probe in self.probes:
+                    det = kat.detectors[probe]
+                    if det.num_demods == 1:
+                        det.f1.put(kat.xaxis.x)
+                    elif det.num_demods == 2:
+                        det.f2.put(kat.xaxis.x)
+                    else:
+                        raise ValueError('Too many demodulations')
 
-            # run the simulation for this drive
-            kat.signals.apply(get_drive_dof(kat, drive, dof), 1, 0)
+            # run the simulation for this drive and store the results
             kat.parse('yaxis re:im')
-            kat.parse('scale meter')
-            out = kat.run()
 
-            # store the results
-            for probe in self.probes:
-                self.freqresp[dof][probe][drive] = out[probe]
+            # compute the optomechanical plant
+            if rtype in ['opt', 'both']:
+                kat_opt = kat.deepcopy()
+                kat_opt.signals.apply(
+                    get_drive_dof(kat, drive, dof, force=False), 1, 0)
+                kat_opt.parse('scale meter')
+                out = kat_opt.run()
+
+                for probe in self.probes:
+                    self.freqresp[dof][probe][drive] = out[probe]
+
+            # compute the radiation pressure modifications to drives
+            if rtype in ['mech', 'both']:
+                kat_mech = kat.deepcopy()
+                kat_mech.signals.apply(
+                    get_drive_dof(kat, drive, dof, force=True), 1, 0)
+                out = kat_mech.run()
+
+                for drive_out in self.pos_detectors:
+                    self.mechmod[dof][drive_out][drive] = out[drive_out]
 
             if verbose:
                 pbar.update()
