@@ -860,8 +860,8 @@ class PyTickle:
 
         Inputs:
           sinkName: the sink name
-          freqs: demodulation frequencies
-          phases: demodulation phases
+          freqs: demodulation frequencies [Hz]
+          phases: demodulation phases [deg]
           names: suffixes for RF probe names (Optional).
             If blank and there are multiple demod frequencies, the suffixes
             1, 2, 3, ... are added

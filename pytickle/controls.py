@@ -2,28 +2,11 @@ import numpy as np
 from scipy.linalg import inv
 import pandas as pd
 from collections import OrderedDict
-from .utils import assertType, siPrefix
+from .utils import assertType, siPrefix, append_str_if_unique
 from functools import partial
 from numbers import Number
 from itertools import cycle, zip_longest
 from . import plotting
-
-
-def append_str_if_unique(array, elements):
-    """Append elements to an array only if that element is unique
-
-    Inputs:
-      array: the array to which the elements should be appended
-      elements: the elements to append to the array
-    """
-    if isinstance(elements, str):
-        elements = [elements]
-    elif isinstance(elements, dict) or isinstance(elements, OrderedDict):
-        elements = elements.keys()
-
-    for element in elements:
-        if element not in array:
-            array.append(element)
 
 
 def assertArr(arr):

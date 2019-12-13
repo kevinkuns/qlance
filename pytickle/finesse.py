@@ -42,7 +42,7 @@ def addBeamSplitter(kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, pos=0):
         Rcx=Rcx, Rcy=Rcy))
 
 
-def add_probe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
+def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
               dof='pos'):
     """Add a probe to a finesse model
 
@@ -58,8 +58,8 @@ def add_probe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
       dof: which DOF is probed: pos, pitch, or yaw (Default: pos)
 
     Examples:
-      add_probe(kat, 'REFL_DC', 'REFL_in', 0, 0)
-      add_probe(kat, 'REFL_Q', 'REFL_in', fmod, 90)
+      addProbe(kat, 'REFL_DC', 'REFL_in', 0, 0)
+      addProbe(kat, 'REFL_Q', 'REFL_in', fmod, 90)
     """
     if dof == 'pos':
         pdtype = None
@@ -83,7 +83,7 @@ def add_probe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
         kat.add(kdet.pd(name, 0 + freqresp, node, **kwargs))
 
 
-def add_readout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=False,
+def addReadout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=False,
                 dof='pos', fnames=None):
     """Add RF and DC probes to a detection port
 
@@ -91,8 +91,8 @@ def add_readout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=Fa
       kat: the finesse model
       name: name of the port
       node: node that the readout probes
-      freqs: demodulation frequencies
-      phases: demodulation phases
+      freqs: demodulation frequencies [Hz]
+      phases: demodulation phases [deg]
       freqresp: same as for add_probe
       alternate_beam: same as for add_probe
       dof: same as for add_probe
@@ -101,15 +101,15 @@ def add_readout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=Fa
         1, 2, 3, ... are added
 
     Examples:
-      * add_readout(kat, 'REFL', 'REFL_in', f1, 0)
+      * addReadout(kat, 'REFL', 'REFL_in', f1, 0)
       adds the probes 'REFL_DC', 'REFL_I', and 'REFL_Q' at demod frequency
       f1 and phases 0 and 90 to the node REFL_in
 
-      * add_readout(kat, 'POP', 'POP_in', [11e6, 55e6], [0, 30],
+      * addReadout(kat, 'POP', 'POP_in', [11e6, 55e6], [0, 30],
                     fnames=['11', '55'])
       adds the probes POP_DC, POP_I11, POP_Q11, POP_I55, and POP_Q55 at
       demod frequency 11 MHz w/ phases 0 and 90 and at demod phase 55 MHz and
-      phases 30 and 100 to the node POP_in
+      phases 30 and 120 to the node POP_in
     """
     # Get demod frequencies and phases
     if isinstance(freqs, Number):
@@ -130,17 +130,36 @@ def add_readout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=Fa
         fnames = [fnames]
 
     # Add the probes
-    add_probe(kat, name + '_DC', node, 0, 0, freqresp=freqresp,
+    addProbe(kat, name + '_DC', node, 0, 0, freqresp=freqresp,
               alternate_beam=alternate_beam, dof=dof)
     for freq, phase, fname in zip(freqs, phases, fnames):
         nameI = name + '_I' + fname
         nameQ = name + '_Q' + fname
-        add_probe(
+        addProbe(
             kat, nameI, node, freq, phase, freqresp=freqresp,
             alternate_beam=alternate_beam, dof=dof)
-        add_probe(
+        addProbe(
             kat, nameQ, node, freq, phase + 90, freqresp=freqresp,
             alternate_beam=alternate_beam, dof=dof)
+
+
+def addGouyReadout(kat, name, phaseA, dphaseB=90):
+    """Add Gouy phases for WFS readout
+
+    Inputs:
+      kat: the finesse model
+      name: base name of the probes
+      phaseA: Gouy phase of the A probe [deg]
+      dphaseB: additional Gouy phase of the B probe relative to the
+        A probe [deg] (Default: 90 deg)
+    """
+    phaseB = phaseA + dphaseB
+    bs_name = name + '_WFS_BS'
+    addBeamSplitter(kat, bs_name, Thr=0.5, aoi=45)
+    kat.add(kcomp.space(
+        name + '_A', bs_name + '_frR', name + '_A', 0, gx=phaseA, gy=phaseA))
+    kat.add(kcomp.space(
+        name + '_B', bs_name + '_bkT', name + '_B', 0, gx=phaseB, gy=phaseB))
 
 
 def get_drive_dof(kat, drive, dof, force=False):
@@ -298,12 +317,3 @@ class KatFR:
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
             phase2freq=phase2freq, **kwargs)
         return fig
-
-    def add_drive(self, drive, dof='pos'):
-        if dof not in self._dofs:
-            raise ValueError('Unrecognized dof ' + dof)
-
-        if drive in self.drives[dof]:
-            print('drive {:} with dof {:s} is already added'.format(drive, dof))
-        else:
-            self.drives[dof].append(drive)
