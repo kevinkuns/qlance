@@ -215,7 +215,8 @@ class KatFR:
             kat.add(
                 kcom.xaxis(linlog, [fmin, fmax], kat.signals.f, npts))
 
-            # apply the signal to each photodiode for optomechanical plant
+            # apply the signal to each photodiode to compute the
+            # optomechanical plant
             if rtype in ['opt', 'both']:
                 for probe in self.probes:
                     det = kat.detectors[probe]
@@ -234,7 +235,8 @@ class KatFR:
                 kat_opt = kat.deepcopy()
                 kat_opt.signals.apply(
                     get_drive_dof(kat, drive, dof, force=False), 1, 0)
-                kat_opt.parse('scale meter')
+                if dof == 'pos':
+                    kat_opt.parse('scale meter')
                 out = kat_opt.run()
 
                 for probe in self.probes:
