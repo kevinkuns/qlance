@@ -63,6 +63,36 @@ def normalizeDOF(dof):
     return dof_normalized
 
 
+def remove_conjugates(arr):
+    """Removes the complex conjugates from an array of complex numbers
+
+    Raises an error if not all of the complex numbers have conjugates.
+    Purely real numbers are unchanged.
+
+    Useful for defining Finesse transfer functions because Finesse
+    automatically adds the conjugate poles or zeros and so must be defined
+    with only one of the conjugates.
+
+    Inputs:
+      arr: the array of complex numbers
+
+    Returns:
+      an array with the real and complex numbers with positive imaginary part
+    """
+    arr = np.array(arr)
+    real = arr[np.isreal(arr)]
+    pos = np.sort(arr[arr.imag > 0])
+    neg = np.sort(arr[arr.imag < 0].conj())
+
+    # make sure all of the complex numbers have conjugates
+    if len(pos) != len(neg):
+        raise ValueError('Not all of the complex numbers have conjugates')
+    if not np.allclose(pos, neg):
+        raise ValueError('Some numbers have unequal conjugates')
+
+    return np.hstack((real, pos))
+
+
 def mag2db(arr, pow=False):
     """Convert magnidude to decibels
     """
@@ -129,6 +159,24 @@ def assertType(data, dtype):
         elif dtype == OrderedDict:
             data = OrderedDict({data: 1})
     return data
+
+
+def append_str_if_unique(array, elements):
+    """Append elements to an array only if that element is unique
+
+    Inputs:
+      array: the array to which the elements should be appended
+      elements: the elements to append to the array
+    """
+    if isinstance(elements, str):
+        elements = [elements]
+    elif isinstance(elements, dict) or isinstance(elements, OrderedDict):
+        elements = elements.keys()
+
+    for element in elements:
+        if element not in array:
+            array.append(element)
+
 
 
 def printLine(arr, pad):
