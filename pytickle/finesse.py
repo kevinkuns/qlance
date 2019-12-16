@@ -343,8 +343,12 @@ class KatFR:
                 kat_mech.signals.apply(
                     get_drive_dof(kat, drive, dof, force=True), 1, 0)
                 out = kat_mech.run()
+                comp = kat_mech.components[drive]
+                plant = ctrl.Filter(*extract_zpk(comp, dof), Hz=False)
+                tf = plant.computeFilter(out.x)
 
                 for drive_out in self.pos_detectors:
+                    self.mechmod[dof][drive_out][drive] = out[drive_out] / tf
                     self._mechTF[dof][drive_out][drive] = out[drive_out]
 
             if verbose:
