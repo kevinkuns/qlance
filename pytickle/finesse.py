@@ -1,14 +1,18 @@
 import numpy as np
 import pykat
-import pykat.components as kcomp
+import pykat.components as kcmp
 import pykat.detectors as kdet
-import pykat.commands as kcom
+import pykat.commands as kcmd
+from . import controls as ctrl
 from . import plotting
+from .utils import append_str_if_unique, add_conjugates
 from numbers import Number
 from tqdm import tqdm
 
 
-def addMirror(kat, name, aoi=0, Chr=0, Thr=0, Lhr=0, pos=0):
+def addMirror(
+        kat, name, aoi=0, Chr=0, Thr=0, Lhr=0, Rar=0, Lmd=0, Nmd=1.45, pos=0,
+        pitch=0, yaw=0, dh=0):
     # FIXME: deal with "mirrors" with non-zero aoi's correctly
     if Chr == 0:
         Rcx = None
@@ -20,8 +24,13 @@ def addMirror(kat, name, aoi=0, Chr=0, Thr=0, Lhr=0, pos=0):
     phi = 2*np.pi * pos/kat.lambda0
     fr = name + '_fr'
     bk = name + '_bk'
-    kat.add(kcomp.mirror(
+    fr_s = fr + '_s'
+    bk_s = fr + '_s'
+    kat.add(kcmp.mirror(
         name, fr, bk, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
+    # kat.add(kcmp.mirror(
+    #     name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
+    # kat.add(name + '_AR', bk_s, bk, R=Rar)
 
 
 def addBeamSplitter(kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, pos=0):
@@ -37,7 +46,7 @@ def addBeamSplitter(kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, pos=0):
     frR = name + '_frR'
     bkT = name + '_bkT'
     bkO = name + '_bkO'
-    kat.add(kcomp.beamSplitter(
+    kat.add(kcmp.beamSplitter(
         name, frI, frR, bkT, bkO, T=Thr, L=Lhr, alpha=aoi, phi=phi,
         Rcx=Rcx, Rcy=Rcy))
 
@@ -156,9 +165,9 @@ def addGouyReadout(kat, name, phaseA, dphaseB=90):
     phaseB = phaseA + dphaseB
     bs_name = name + '_WFS_BS'
     addBeamSplitter(kat, bs_name, Thr=0.5, aoi=45)
-    kat.add(kcomp.space(
+    kat.add(kcmp.space(
         name + '_A', bs_name + '_frR', name + '_A', 0, gx=phaseA, gy=phaseA))
-    kat.add(kcomp.space(
+    kat.add(kcmp.space(
         name + '_B', bs_name + '_bkT', name + '_B', 0, gx=phaseB, gy=phaseB))
 
 
@@ -195,22 +204,89 @@ def get_drive_dof(kat, drive, dof, force=False):
             return kat.components[drive].xbeta
 
 
+def extract_zpk(comp, dof):
+    """Extract the zpk of a mechanical transfer function for a kat component
+
+    Extracts the zeros, poles, and gain of the longitudinal, pitch, or yaw
+    response of a kat component.
+
+    The zeros and poles are returned in the s-domain.
+
+    Inputs:
+      comp: the component
+      dof: the degree of freedom (pos, pitch, or yaw)
+
+    Returns:
+      zs: the zeros
+      ps: the poles
+      k: the gain
+
+    Examples:
+      extract_zpk(kat.EX, 'pos')
+      extract_zpk(kat.components['IX'], 'pitch')
+    """
+    if dof == 'pos':
+        tf = comp.zmech.value
+    elif dof == 'pitch':
+        tf = comp.rymech.value
+    elif dof == 'yaw':
+        tf = comp.rxmech.value
+    else:
+        raise ValueError('Unrecognized dof ' + dof)
+
+    if isinstance(tf, kcmd.tf):
+        zs = []
+        ps = []
+        for z in tf.zeros:
+            zs.extend(ctrl.resRoots(2*np.pi*z.f, z.Q, Hz=False))
+        for p in tf.poles:
+            ps.extend(ctrl.resRoots(2*np.pi*p.f, p.Q, Hz=False))
+        zs = np.array(zs)
+        ps = np.array(ps)
+        k = tf.gain
+
+    elif isinstance(tf, kcmd.tf2):
+        zs = add_conjugates(tf.zeros)
+        ps = add_conjugates(tf.poles)
+        k = tf.gain
+
+    else:
+        raise ValueError('Unrecognized transfer function')
+
+    return zs, ps, k
+
+
 class KatFR:
-    def __init__(self, kat):
+    def __init__(self, kat, all_drives=True):
         self._dofs = ['pos', 'pitch', 'yaw']
         self.kat = kat
-        self.drives = [name for name, comp in kat.components.items()
-                       if isinstance(comp, (kcomp.mirror, kcomp.beamSplitter))]
+
+        # populate the list of drives and position detectors if necessary
+        if all_drives:
+            self.drives = [
+                name for name, comp in kat.components.items()
+                if isinstance(comp, (kcmp.mirror, kcmp.beamSplitter))]
+            self.pos_detectors = [name for name, det in kat.detectors.items()
+                                  if isinstance(det, kdet.xd)]
+        else:
+            self.drives = []
+            self.pos_detectors = []
+
+        # populate the list of probes
         self.probes = [name for name, det in kat.detectors.items()
-                       if isinstance(det, kdet.pd)]
-        self.pos_detectors = [name for name, det in kat.detectors.items()
-                              if isinstance(det, kdet.xd)]
+                   if isinstance(det, kdet.pd)]
         self.amp_detectors = [name for name, det in kat.detectors.items()
                               if isinstance(det, kdet.ad)]
+
+        # initialize response dictionaries
         self.freqresp = {dof: {probe: {} for probe in self.probes}
                          for dof in self._dofs}
         self.mechmod = {dof: {drive: {} for drive in self.pos_detectors}
                          for dof in self._dofs}
+        self._mechTF = {dof: {drive: {} for drive in self.pos_detectors}
+                        for dof in self._dofs}
+
+
         self.ff = None
 
     def tickle(self, fmin, fmax, npts, dof='pos', linlog='log', rtype='both',
@@ -232,7 +308,7 @@ class KatFR:
 
             kat.signals.f = 1
             kat.add(
-                kcom.xaxis(linlog, [fmin, fmax], kat.signals.f, npts))
+                kcmd.xaxis(linlog, [fmin, fmax], kat.signals.f, npts))
 
             # apply the signal to each photodiode to compute the
             # optomechanical plant
@@ -269,7 +345,7 @@ class KatFR:
                 out = kat_mech.run()
 
                 for drive_out in self.pos_detectors:
-                    self.mechmod[dof][drive_out][drive] = out[drive_out]
+                    self._mechTF[dof][drive_out][drive] = out[drive_out]
 
             if verbose:
                 pbar.update()
@@ -304,6 +380,19 @@ class KatFR:
                 tf += pc * drive_pos * self.freqresp[dof][probe][drive]
 
         return tf
+
+    def addDrives(self, drives):
+        append_str_if_unique(self.drives, drives)
+
+    def removeDrives(self, drives):
+        if isinstance(drives, str):
+            drives = [drives]
+
+        for drive in drives:
+            try:
+                self.drives.remove(drive)
+            except ValueError:
+                pass
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
                dof='pos', dB=False, phase2freq=False, **kwargs):

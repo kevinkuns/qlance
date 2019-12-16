@@ -93,6 +93,16 @@ def remove_conjugates(arr):
     return np.hstack((real, pos))
 
 
+def add_conjugates(arr):
+    """Adds the conjugates to an array of complex numbers ignoring real numbers
+
+    This is effectively the inverse of remove_conjugates
+    """
+    arr = np.array(arr)
+    inds = np.iscomplex(arr)
+    return np.hstack((arr, arr[inds].conj()))
+
+
 def mag2db(arr, pow=False):
     """Convert magnidude to decibels
     """
