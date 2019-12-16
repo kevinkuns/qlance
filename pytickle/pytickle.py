@@ -971,6 +971,8 @@ class PyTickle:
         The transfer function is from radiation pressure to one of the degrees
         of freedom position, pitch, or yaw.
 
+        The zeros and poles should be in the s-domain.
+
         Inputs:
           name: name of the optic
           p: poles
@@ -987,6 +989,47 @@ class PyTickle:
         self._eval("tf = zpk(z, p, k);", nargout=0)
         cmd = self.optName + ".setMechTF(" + str2mat(name) + ", tf, nDOF);"
         self._eval(cmd, nargout=0)
+
+    def extract_zpk(self, name, dof='pos'):
+        """Get the mechanical transfer function of an optic
+
+        Returns the zeros, poles, and gain of the mechanical transfer function
+        of an optic.
+
+        The zeros and poles are returned in the s-domain.
+
+        Inputs:
+          name: name of the optic
+          dof: degree of freedom: pos, pitch, or yaw (defualt: pos)
+
+        Returns:
+          zs: the zeros
+          ps: the poles
+          k: the gain
+        """
+        self._eval("obj = {:s}.getOptic({:s});".format(
+            self.optName, str2mat(name)))
+        if dof == 'pos':
+            self._eval("tf = obj.mechTF;")
+        elif dof == 'pitch':
+            self._eval("tf = obj.mechTFpit;")
+        elif dof == 'yaw':
+            self._eval("tf = obj.mechTFyaw;")
+        else:
+            raise ValueError('Unrecognized dof ' + dof)
+
+        if self._eval("isempty(tf);", nargout=1):
+            print('No TF is set for dof ' + dof)
+            zs = []
+            ps = []
+            k = 0
+
+        else:
+            zs = mat2py(self._eval("tf.Z", nargout=1))
+            ps = mat2py(self._eval("tf.P", nargout=1))
+            k = float(mat2py(self._eval("tf.K", nargout=1)))
+
+        return zs, ps, k
 
     def addHomodyneReadout(
             self, name, phase, qe=1, BnC=True, LOpower=1, nu=None, pol='S',
