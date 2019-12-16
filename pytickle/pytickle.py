@@ -11,6 +11,7 @@ from collections import OrderedDict
 import pandas as pd
 # from . import plotting
 from . import plotting
+from . import controls as ctrl
 from . import utils
 from .utils import mat2py, py2mat, str2mat
 from .gaussian_beams import beam_properties_from_q
@@ -283,6 +284,48 @@ class PyTickle:
                     tf += probeCoeff * drivePos * tfData[probeNum, driveNum]
                 except IndexError:
                     tf += probeCoeff * drivePos * tfData[driveNum]
+
+        return tf
+
+    def getMechTF(self, outDrives, inDrives, dof='pos'):
+        """Compute a mechanical transfer function
+
+        Inputs:
+          outDrives: name of the output drives
+          inDrives: name of the input drives
+          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+
+        Returns:
+          tf: the transfer function
+            * In units of [m/N] for position
+            * In units of [rad/(N m)] for pitch and yaw
+        """
+        if dof not in ['pos', 'pitch', 'yaw']:
+            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+
+        # figure out the shape of the TF
+        if isinstance(self.ff, Number):
+            # TF is at a single frequency
+            tf = 0
+        else:
+            # TF is for a frequency vector
+            tf = np.zeros(len(self.ff), dtype='complex')
+
+
+        if isinstance(outDrives, str):
+            outDrives = {outDrives: 1}
+
+        if isinstance(inDrives, str):
+            inDrives = {inDrives: 1}
+
+        # loop through drives to compute the TF
+        for inDrive, c_in in inDrives.items():
+            # get the default mechanical plant of the optic being driven
+            plant = ctrl.Filter(*self.extract_zpk(inDrive, dof), Hz=False)
+
+            for outDrive, c_out in outDrives.items():
+                mmech = self.getMechMod(outDrive, inDrive, dof=dof)
+                tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
         return tf
 
