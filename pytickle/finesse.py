@@ -385,6 +385,16 @@ class KatFR:
 
         return tf
 
+    def getMechMod(self, drive_out, drive_in, dof='pos'):
+        if dof not in self._dofs:
+            raise ValueError('Unrecognized dof ' + dof)
+
+        out_det = drive_out + '_' + dof
+        if out_det not in self.pos_detectors:
+            raise ValueError(out_det + ' is not a detector in this model')
+
+        return self.mechmod[dof][out_det][drive_in]
+
     def addDrives(self, drives):
         append_str_if_unique(self.drives, drives)
 
