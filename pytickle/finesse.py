@@ -5,7 +5,7 @@ import pykat.detectors as kdet
 import pykat.commands as kcmd
 from . import controls as ctrl
 from . import plotting
-from .utils import append_str_if_unique, add_conjugates
+from .utils import append_str_if_unique, add_conjugates, remove_conjugates
 from numbers import Number
 from tqdm import tqdm
 
@@ -184,7 +184,7 @@ def get_drive_dof(kat, drive, dof, force=False):
     Returns:
       the component
     """
-    if dof not in ['pos', 'pitch', 'yaw']:
+    if dof not in ['pos', 'pitch', 'yaw', 'amp', 'freq']:
         raise ValueError('Unrecognized dof ' + dof)
 
     if force:
@@ -194,6 +194,10 @@ def get_drive_dof(kat, drive, dof, force=False):
             return kat.components[drive].Fry
         elif dof == 'yaw':
             return kat.components[drive].Frx
+        elif dof == 'amp':
+            return kat.components[drive].P
+        elif dof == 'freq':
+            return kat.components[drive].f
 
     else:
         if dof == 'pos':
@@ -202,6 +206,27 @@ def get_drive_dof(kat, drive, dof, force=False):
             return kat.components[drive].ybeta
         elif dof == 'yaw':
             return kat.components[drive].xbeta
+        elif dof == 'amp':
+            return kat.components[drive].P
+        elif dof == 'freq':
+            return kat.components[drive].f
+
+
+def has_dof(kat, drive, dof):
+    """Check whether a component has a given degree of freedom
+    """
+    comp = kat.components[drive]
+    if dof in ['pos', 'pitch', 'yaw']:
+        if isinstance(comp, (kcmp.mirror, kcmp.beamSplitter)):
+            return True
+        else:
+            return False
+
+    elif dof in ['amp', 'freq']:
+        if isinstance(comp, kcmp.laser):
+            return True
+        else:
+            return False
 
 
 def extract_zpk(comp, dof):
@@ -309,9 +334,11 @@ class KatFR:
 
         # populate the list of drives and position detectors if necessary
         if all_drives:
+            comps = (kcmp.mirror, kcmp.beamSplitter, kcmp.laser)
             self.drives = [
                 name for name, comp in kat.components.items()
-                if isinstance(comp, (kcmp.mirror, kcmp.beamSplitter))]
+                if isinstance(comp, comps)]
+
             self.pos_detectors = [name for name, det in kat.detectors.items()
                                   if isinstance(det, kdet.xd)]
         else:
@@ -332,7 +359,6 @@ class KatFR:
         self._mechTF = {dof: {drive: {} for drive in self.pos_detectors}
                         for dof in self._dofs}
 
-
         self.ff = None
 
     def tickle(self, fmin, fmax, npts, dof='pos', linlog='log', rtype='both',
@@ -343,10 +369,12 @@ class KatFR:
         if rtype not in ['opt', 'mech', 'both']:
             raise ValueError('Unrecognized response type ' + rtype)
 
-        if verbose:
-            pbar = tqdm(total=len(self.drives))
+        drives = [drive for drive in self.drives if has_dof(self.kat, drive, dof)]
 
-        for drive in self.drives:
+        if verbose:
+            pbar = tqdm(total=len(drives))
+
+        for drive in drives:
             # make a seperate kat for each drive
             kat = self.kat.deepcopy()
             if verbose <= 1:
@@ -389,9 +417,14 @@ class KatFR:
                 kat_mech.signals.apply(
                     get_drive_dof(kat, drive, dof, force=True), 1, 0)
                 out = kat_mech.run()
+
+                # extract the mechanical plant for this drive
                 comp = kat_mech.components[drive]
-                plant = ctrl.Filter(*extract_zpk(comp, dof), Hz=False)
-                tf = plant.computeFilter(out.x)
+                if dof in ['pos', 'pitch', 'yaw']:
+                    plant = ctrl.Filter(*extract_zpk(comp, dof), Hz=False)
+                    tf = plant.computeFilter(out.x)
+                else:
+                    tf = np.ones_like(out.x)
 
                 for drive_out in self.pos_detectors:
                     self.mechmod[dof][drive_out][drive] = out[drive_out] / tf
