@@ -1018,6 +1018,7 @@ class PyTickle:
 
         Inputs:
           name: name of the optic
+          z: zeros
           p: poles
           k: gain
           dof: degree of freedom: pos, pitch, or yaw (default: pos)

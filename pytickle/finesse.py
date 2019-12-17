@@ -256,9 +256,55 @@ def extract_zpk(comp, dof):
     return zs, ps, k
 
 
+def setMechTF(kat, name, zs, ps, k, dof='pos'):
+    """Set the mechanical transfer function of an optic
+
+    The transfer function is from radiation pressure to one of the degrees
+    of freedom position, pitch, or yaw.
+
+    The zeros and poles should be in the s-domain.
+
+    NOTE: Unlike with pure finesse code, the mechanical transfer function is
+    defined with the specified zpk model: ALL ZEROS AND POLES MUST BE GIVEN.
+
+    Inputs:
+      kat: the finesse model
+      name: name of the optic
+      zs: the zeros
+      ps: the poles
+      k: the gain
+      dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+    """
+    # define the transfer function and add it to the model
+    tf_name = '{:s}TF_{:s}'.format(dof, name)
+    tf = kcmd.tf2(tf_name)
+    for z in remove_conjugates(zs):
+        tf.addZero(z)
+    for p in remove_conjugates(ps):
+        tf.addPole(p)
+    tf.gain = k
+    kat.add(tf)
+
+    # get the component and set the mechanical TF
+    # masses and moments of inertia must be set to 1 for the gain to be correct
+    comp = kat.components[name]
+
+    if dof == 'pos':
+        comp.mass = 1
+        comp.zmech = tf
+    elif dof == 'pitch':
+        comp.Iy = 1
+        comp.rymech = tf
+    elif dof == 'yaw':
+        comp.Ix = 1
+        comp.rxmech = tf
+    else:
+        raise ValueError('Unrecognized dof ' + dof)
+
+
 class KatFR:
     def __init__(self, kat, all_drives=True):
-        self._dofs = ['pos', 'pitch', 'yaw']
+        self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
         self.kat = kat
 
         # populate the list of drives and position detectors if necessary
