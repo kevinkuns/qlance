@@ -365,7 +365,7 @@ class ControlSystem:
                 driveData = drive.split('.')
                 driveName = driveData[0]
                 dofType = driveData[-1]
-                tf = self.opt.getTF(probe, driveName, dof=dofType, optOnly=False)
+                tf = self.opt.getTF(probe, driveName, dof=dofType)
                 plant[pi, di, :] = tf
         return plant
 
