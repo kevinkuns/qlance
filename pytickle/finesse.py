@@ -517,6 +517,12 @@ class KatFR:
 
         return self.mechmod[dof][out_det][drive_in]
 
+    def getQuantumNoise(self, probeName, dof):
+        qnoise = list(self.freqresp[dof][probeName + '_shot'].values())[0]
+        if np.any(np.iscomplex(qnoise)):
+            print('Warning: some quantum noise spectra are complex')
+        return np.real(qnoise)
+
     def addDrives(self, drives):
         append_str_if_unique(self.drives, drives)
 
