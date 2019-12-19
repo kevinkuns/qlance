@@ -1,7 +1,7 @@
 import numpy as np
 from collections import OrderedDict
 from itertools import tee
-from .utils import mat2py, py2mat, str2mat
+from .matlab import mat2py, py2mat, str2mat
 from . import plotting
 
 

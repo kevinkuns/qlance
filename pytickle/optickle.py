@@ -13,7 +13,7 @@ import pandas as pd
 from . import plotting
 from . import controls as ctrl
 from . import utils
-from .utils import mat2py, py2mat, str2mat
+from .matlab import mat2py, py2mat, str2mat
 from .gaussian_beams import beam_properties_from_q
 
 
