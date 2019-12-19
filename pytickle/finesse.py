@@ -259,7 +259,24 @@ def extract_zpk(comp, dof):
     else:
         raise ValueError('Unrecognized dof ' + dof)
 
-    if isinstance(tf, kcmd.tf):
+    if tf is None:
+    # There's no mechanical transfer function defined, so the response is either
+    # 1/(M Omega^2) for pos or 1/(I Omega^2) for pitch or yaw
+        zs = []
+        ps = [0, 0]
+        if dof == 'pos':
+            kinv = comp.mass.value
+        elif dof == 'pitch':
+            kinv = comp.Iy.value
+        elif dof == 'yaw':
+            kinv = comp.Ix.value
+
+        if kinv is None:
+            k = 1
+        else:
+            k = 1/kinv
+
+    elif isinstance(tf, kcmd.tf):
         zs = []
         ps = []
         for z in tf.zeros:
