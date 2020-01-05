@@ -33,7 +33,9 @@ def addMirror(
     # kat.add(name + '_AR', bk_s, bk, R=Rar)
 
 
-def addBeamSplitter(kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, pos=0):
+def addBeamSplitter(
+        kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, Rar=0, Lmd=0, Nmd=1.45,
+        pos=0):
     if Chr == 0:
         Rcx = None
         Rcy = None
@@ -52,7 +54,7 @@ def addBeamSplitter(kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, pos=0):
 
 
 def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
-              dof='pos'):
+             dof='pos'):
     """Add a probe to a finesse model
 
     Inputs:
@@ -93,7 +95,7 @@ def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
 
 
 def addReadout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=False,
-                dof='pos', fnames=None):
+               dof='pos', fnames=None):
     """Add RF and DC probes to a detection port
 
     Inputs:
@@ -140,7 +142,7 @@ def addReadout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=Fal
 
     # Add the probes
     addProbe(kat, name + '_DC', node, 0, 0, freqresp=freqresp,
-              alternate_beam=alternate_beam, dof=dof)
+             alternate_beam=alternate_beam, dof=dof)
     for freq, phase, fname in zip(freqs, phases, fnames):
         nameI = name + '_I' + fname
         nameQ = name + '_Q' + fname
@@ -260,8 +262,8 @@ def extract_zpk(comp, dof):
         raise ValueError('Unrecognized dof ' + dof)
 
     if tf is None:
-    # There's no mechanical transfer function defined, so the response is either
-    # 1/(M Omega^2) for pos or 1/(I Omega^2) for pitch or yaw
+        # There's no mechanical transfer function defined, so the response is
+        # either 1/(M Omega^2) for pos or 1/(I Omega^2) for pitch or yaw
         zs = []
         ps = [0, 0]
         if dof == 'pos':
@@ -364,7 +366,7 @@ class KatFR:
 
         # populate the list of probes
         self.probes = [name for name, det in kat.detectors.items()
-                   if isinstance(det, kdet.pd)]
+                       if isinstance(det, kdet.pd)]
         self.amp_detectors = [name for name, det in kat.detectors.items()
                               if isinstance(det, kdet.ad)]
 
@@ -372,7 +374,7 @@ class KatFR:
         self.freqresp = {dof: {probe: {} for probe in self.probes}
                          for dof in self._dofs}
         self.mechmod = {dof: {drive: {} for drive in self.pos_detectors}
-                         for dof in self._dofs}
+                        for dof in self._dofs}
         self._mechTF = {dof: {drive: {} for drive in self.pos_detectors}
                         for dof in self._dofs}
 
@@ -386,7 +388,8 @@ class KatFR:
         if rtype not in ['opt', 'mech', 'both']:
             raise ValueError('Unrecognized response type ' + rtype)
 
-        drives = [drive for drive in self.drives if has_dof(self.kat, drive, dof)]
+        drives = [drive for drive in self.drives if has_dof(
+            self.kat, drive, dof)]
 
         if verbose:
             pbar = tqdm(total=len(drives))
@@ -504,7 +507,6 @@ class KatFR:
         else:
             # TF is for a frequency vector
             tf = np.zeros(len(self.ff), dtype='complex')
-
 
         if isinstance(outDrives, str):
             outDrives = {outDrives: 1}
