@@ -5,9 +5,12 @@ import pykat.detectors as kdet
 import pykat.commands as kcmd
 from . import controls as ctrl
 from . import plotting
-from .utils import append_str_if_unique, add_conjugates, remove_conjugates
+from .utils import (append_str_if_unique, add_conjugates,
+                    remove_conjugates, siPrefix)
 from numbers import Number
+import pandas as pd
 from tqdm import tqdm
+from itertools import compress
 
 
 def addMirror(
@@ -344,6 +347,60 @@ def setMechTF(kat, name, zs, ps, k, dof='pos'):
         comp.rxmech = tf
     else:
         raise ValueError('Unrecognized dof ' + dof)
+
+
+def setCavityBasis(kat, node_name1, node_name2):
+    """Specify a two mirror cavity to use for the Gaussian mode basis
+
+    Inputs:
+      kat: the finesse model
+      node_name1: the name of the node of the first mirror
+      node_name2: the name of the node of the second mirror
+
+    Example:
+      To use the basis defined by the front surfaces of IX and EX
+        setCavityBasis(kat, 'IX_fr', 'EX_fr')
+      This is equivalent to
+        kat.add(kcmd.cavity('cav_IX_EX', kat.IX, kat.IX_fr, kat.EX, kat.EX_fr))
+    """
+    # Get the list of nodes in this model
+    nodes = kat.nodes.getNodes()
+
+    def get_mirror_node(node_name):
+        """Get the node and optic connected to a given node name
+
+        Inputs:
+          node_name: the name of the node
+
+        Returns:
+          node: the node object
+          mirr: the mirror object connected to this node
+        """
+        try:
+            node = nodes[node_name]
+        except KeyError:
+            raise ValueError(node_name + ' is not a node in this model')
+
+        components = kat.nodes.getNodeComponents(node)
+        mirr_inds = [isinstance(comp, kcmp.mirror) for comp in components]
+        space_inds = [isinstance(comp, kcmp.space) for comp in components]
+
+        # make sure that this node is connected to one mirror and one space
+        num_mirrs = sum(mirr_inds)
+        num_spaces = sum(space_inds)
+        if num_mirrs != 1 or num_spaces != 1:
+            raise ValueError(
+                'A cavity should be two mirrors connected by a space but'
+                + ' node {:s} has {:d} mirrors and {:d} spaces.'.format(
+                    node_name, num_mirrs, num_spaces))
+
+        return node, list(compress(components, mirr_inds))[0]
+
+    # set the cavity basis
+    node1, mirr1 = get_mirror_node(node_name1)
+    node2, mirr2 = get_mirror_node(node_name2)
+    cav_name = 'cav_{:s}_{:s}'.format(mirr1.name, mirr2.name)
+    kat.add(kcmd.cavity(cav_name, mirr1, node1, mirr2, node2))
 
 
 class KatFR:
