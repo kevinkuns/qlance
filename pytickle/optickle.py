@@ -36,6 +36,7 @@ class PyTickle:
       probes: list of probe names associated with the model
       drives: list of drive names associated with the model
     """
+
     def __init__(self, eng, optName, vRF=0, lambda0=1064e-9, pol='S'):
         # convert RF and polarization information
         if isinstance(vRF, Number):
@@ -158,9 +159,11 @@ class PyTickle:
             if noise:
                 self.noiseAC[dof] = mat2py(
                     self.eng.workspace['noiseAC'])
-            if dof in ['pitch', 'yaw']:
-                self.qq = mat2py(
-                    self._eval(self.optName + ".getAllFieldBases()", 1))[:, -1]
+
+        # get the field basis if the dof is pitch or yaw
+        if dof in ['pitch', 'yaw']:
+            self.qq = mat2py(
+                self._eval(self.optName + ".getAllFieldBases()", 1))[:, -1]
 
     def sweepLinear(self, startPos, endPos, npts):
         """Run Optickle's sweepLinear function
@@ -263,7 +266,6 @@ class PyTickle:
         elif dof == 'yaw':
             tfData = tfData['yaw']
 
-
         if isinstance(driveNames, str):
             driveNames = {driveNames: 1}
 
@@ -310,7 +312,6 @@ class PyTickle:
         else:
             # TF is for a frequency vector
             tf = np.zeros(len(self.ff), dtype='complex')
-
 
         if isinstance(outDrives, str):
             outDrives = {outDrives: 1}
@@ -1126,7 +1127,7 @@ class PyTickle:
         self._eval(cmd, nargout=0)
         self._eval("RFamp = abs(LO.vArf);", nargout=0)
         self._eval("LO.vArf = RFamp * exp(1i*" + str(phase) + ");",
-                      nargout=0)
+                   nargout=0)
 
     def rotateHomodyneBasis(self, probes):
         if isinstance(probes, str):
@@ -1326,6 +1327,9 @@ class PyTickle:
           w0: beam waist [m]
           R: radius of curvature of the phase front on the optic [m]
           psi: Gouy phase [deg]
+
+        Example:
+          opt.getBeamProperties('EX', 'fr')
         """
         qq = self.qq[self._getSinkNum(name, port)]
         return beam_properties_from_q(qq, lambda0=self.lambda0)
@@ -1347,7 +1351,8 @@ class PyTickle:
         beam_properties = {}
         for source, sink in zip(sources, sinks):
             w, zR, z, w0, R, _ = self.getBeamProperties(*sink.split('<-'))
-            dpsi = self.getGouyPhase(source.split('->')[0], sink.split('<-')[0])
+            dpsi = self.getGouyPhase(
+                source.split('->')[0], sink.split('<-')[0])
             beam_properties[source + ' --> ' + sink] = [
                 '{:0.2f} {:s}m'.format(*utils.siPrefix(w[0])[::-1]),
                 '{:0.2f} {:s}m'.format(*utils.siPrefix(zR)[::-1]),
