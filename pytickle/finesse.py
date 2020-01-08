@@ -403,6 +403,50 @@ def setCavityBasis(kat, node_name1, node_name2):
     kat.add(kcmd.cavity(cav_name, mirr1, node1, mirr2, node2))
 
 
+def showfDC(basekat, freqs, verbose=False):
+    kat = basekat.deepcopy()
+    if isinstance(freqs, Number):
+        freqs = np.array([freqs])
+    freqs.sort()
+
+    links = []
+    for comp in kat.components.values():
+        if isinstance(comp, kcmp.space):
+            name = comp.name
+            end_node = comp.nodes[0].name
+            links.append(name)
+            for fi, freq in enumerate(freqs):
+                probe_name = '{:s}_f{:d}'.format(name, fi)
+                kat.add(kdet.ad(probe_name, freq, end_node))
+
+    kat.noxaxis = True
+    kat.verbose = verbose
+    out = kat.run()
+
+    def link2key(link):
+        space = kat.components[link]
+        key = '{:s}  -->  {:s}'.format(space.nodes[0].name,
+                                       space.nodes[1].name)
+        return key
+
+    fDC = {link2key(link): [] for link in links}
+    for link in links:
+        for fi, freq in enumerate(freqs):
+            power = np.abs(out['{:s}_f{:d}'.format(link, fi)])**2
+            pow_str = '{:0.1f} {:s}W'.format(*siPrefix(power)[::-1])
+            space = kat.components[link]
+            # key = '{:s} -> {:s}'.format(space.nodes[0].name,
+            #                             space.nodes[1].name)
+            fDC[link2key(link)].append(pow_str)
+
+    index = ['{:0.0f} {:s}Hz'.format(*siPrefix(freq)[::-1]) for freq in freqs]
+    fDC = pd.DataFrame(fDC, index=index).T
+    with pd.option_context('display.max_rows', None,
+                           'display.max_columns', None):
+        display(fDC)
+    # return kat, fDC
+
+
 class KatFR:
     def __init__(self, kat, all_drives=True):
         self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
