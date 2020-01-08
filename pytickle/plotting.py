@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.ticker import FormatStrFormatter, FuncFormatter
 from .utils import mag2db
-from .gaussian_beams import beam_properties_from_q
+# from .gaussian_beams import beam_properties_from_q
 
 
 def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
@@ -104,68 +104,68 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
         return fig
 
 
-def plotBeamProperties(dist, qq, fig=None, optlocs=None, bkwd=False, **kwargs):
-    """Plot the beam properties along a beam path
+# def plotBeamProperties(dist, qq, fig=None, optlocs=None, bkwd=False, **kwargs):
+#     """Plot the beam properties along a beam path
 
-    Inputs:
-      dist: the distance from the initial point along the path
-      qq: the q parameter along the path
-      fig: if not None the beam path is plotted on this figure (Defualt: None)
-      bkwd: if True the beam is assumed to be backward propagating
-        (Defualt: False)
-      **kwargs: key word arguments for the plots
+#     Inputs:
+#       dist: the distance from the initial point along the path
+#       qq: the q parameter along the path
+#       fig: if not None the beam path is plotted on this figure (Defualt: None)
+#       bkwd: if True the beam is assumed to be backward propagating
+#         (Defualt: False)
+#       **kwargs: key word arguments for the plots
 
-    Returns:
-      fig: the figure if not given
-    """
-    if fig:
-        rad_ax = fig.axes[0]
-        roc_ax = fig.axes[1]
-        ph_ax = fig.axes[2]
-        newFig = False
-    else:
-        fig = plt.figure()
-        gs = gridspec.GridSpec(3, 1, height_ratios=[1, 1, 1], hspace=0.05)
-        rad_ax = fig.add_subplot(gs[0])
-        roc_ax = fig.add_subplot(gs[1], sharex=rad_ax)
-        ph_ax = fig.add_subplot(gs[2], sharex=rad_ax)
-        newFig = True
+#     Returns:
+#       fig: the figure if not given
+#     """
+#     if fig:
+#         rad_ax = fig.axes[0]
+#         roc_ax = fig.axes[1]
+#         ph_ax = fig.axes[2]
+#         newFig = False
+#     else:
+#         fig = plt.figure()
+#         gs = gridspec.GridSpec(3, 1, height_ratios=[1, 1, 1], hspace=0.05)
+#         rad_ax = fig.add_subplot(gs[0])
+#         roc_ax = fig.add_subplot(gs[1], sharex=rad_ax)
+#         ph_ax = fig.add_subplot(gs[2], sharex=rad_ax)
+#         newFig = True
 
-    if bkwd:
-        qq = qq[::-1]
-    w, _, _, _, R, psi = beam_properties_from_q(qq)
-    if bkwd:
-        # R = -R
-        # psi = -psi
-        pass
+#     if bkwd:
+#         qq = qq[::-1]
+#     w, _, _, _, R, psi = beam_properties_from_q(qq)
+#     if bkwd:
+#         # R = -R
+#         # psi = -psi
+#         pass
 
-    # Beam radius plot
-    rad_ax.plot(dist, w, **kwargs)
-    scale_axis(rad_ax.yaxis, 1e3)
-    rad_ax.set_ylabel('Beam radius [mm]')
-    rad_ax.grid(True, which='major', alpha=0.5)
-    plt.setp(rad_ax.get_xticklabels(), visible=False)
+#     # Beam radius plot
+#     rad_ax.plot(dist, w, **kwargs)
+#     scale_axis(rad_ax.yaxis, 1e3)
+#     rad_ax.set_ylabel('Beam radius [mm]')
+#     rad_ax.grid(True, which='major', alpha=0.5)
+#     plt.setp(rad_ax.get_xticklabels(), visible=False)
 
-    # Inverse ROC plot
-    roc_ax.plot(dist, 1/R, **kwargs)
-    roc_ax.set_ylabel('Inverse ROC [1/m]')
-    roc_ax.grid(True, which='major', alpha=0.5)
-    plt.setp(roc_ax.get_xticklabels(), visible=False)
+#     # Inverse ROC plot
+#     roc_ax.plot(dist, 1/R, **kwargs)
+#     roc_ax.set_ylabel('Inverse ROC [1/m]')
+#     roc_ax.grid(True, which='major', alpha=0.5)
+#     plt.setp(roc_ax.get_xticklabels(), visible=False)
 
-    # Gouy phase plot
-    ph_ax.plot(dist, psi, **kwargs)
-    ph_ax.set_ylabel('Gouy phase [deg]')
-    ph_ax.set_xlabel('Distance [m]')
-    ph_ax.grid(True, which='major', alpha=0.5)
+#     # Gouy phase plot
+#     ph_ax.plot(dist, psi, **kwargs)
+#     ph_ax.set_ylabel('Gouy phase [deg]')
+#     ph_ax.set_xlabel('Distance [m]')
+#     ph_ax.grid(True, which='major', alpha=0.5)
 
-    if optlocs is not None:
-        for optloc in optlocs:
-            rad_ax.axvline(optloc, c='xkcd:forrest green', ls=':', alpha=0.5)
-            roc_ax.axvline(optloc, c='xkcd:forrest green', ls=':', alpha=0.5)
-            ph_ax.axvline(optloc, c='xkcd:forrest green', ls=':', alpha=0.5)
+#     if optlocs is not None:
+#         for optloc in optlocs:
+#             rad_ax.axvline(optloc, c='xkcd:forrest green', ls=':', alpha=0.5)
+#             roc_ax.axvline(optloc, c='xkcd:forrest green', ls=':', alpha=0.5)
+#             ph_ax.axvline(optloc, c='xkcd:forrest green', ls=':', alpha=0.5)
 
-    if newFig:
-        return fig
+#     if newFig:
+#         return fig
 
 
 def scale_axis(ax, sf):

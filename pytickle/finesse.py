@@ -5,14 +5,17 @@ import pykat.detectors as kdet
 import pykat.commands as kcmd
 from . import controls as ctrl
 from . import plotting
-from .utils import append_str_if_unique, add_conjugates, remove_conjugates
+from .utils import (append_str_if_unique, add_conjugates,
+                    remove_conjugates, siPrefix)
 from numbers import Number
+import pandas as pd
 from tqdm import tqdm
+from itertools import compress
 
 
 def addMirror(
-        kat, name, aoi=0, Chr=0, Thr=0, Lhr=0, Rar=0, Lmd=0, Nmd=1.45, pos=0,
-        pitch=0, yaw=0, dh=0):
+        kat, name, aoi=0, Chr=0, Thr=0, Lhr=0, Rar=0, Lmd=0, Nmd=1.45, phi=0,
+        pitch=0, yaw=0, dh=0, comp=False):
     # FIXME: deal with "mirrors" with non-zero aoi's correctly
     if Chr == 0:
         Rcx = None
@@ -21,19 +24,25 @@ def addMirror(
         Rcx = 1/Chr
         Rcy = 1/Chr
 
-    phi = 2*np.pi * pos/kat.lambda0
+    # phi = 2*np.pi * pos/kat.lambda0
     fr = name + '_fr'
     bk = name + '_bk'
     fr_s = fr + '_s'
-    bk_s = fr + '_s'
-    kat.add(kcmp.mirror(
-        name, fr, bk, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
-    # kat.add(kcmp.mirror(
-    #     name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
-    # kat.add(name + '_AR', bk_s, bk, R=Rar)
+    bk_s = bk + '_s'
+    if comp:
+        kat.add(kcmp.mirror(
+            name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
+        kat.add(kcmp.mirror(
+            name + '_AR', bk_s, bk, R=0, L=Rar, phi=phi))
+        kat.add(kcmp.space(name + '_sub', bk_s, fr_s, dh, Nmd))
+    else:
+        kat.add(kcmp.mirror(
+            name, fr, bk, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
 
 
-def addBeamSplitter(kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, pos=0):
+def addBeamSplitter(
+        kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, Rar=0, Lmd=0, Nmd=1.45,
+        phi=0, comp=False):
     if Chr == 0:
         Rcx = None
         Rcy = None
@@ -41,7 +50,7 @@ def addBeamSplitter(kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, pos=0):
         Rcx = 1/Chr
         Rcy = 1/Chr
 
-    phi = 2*np.pi * pos/kat.lambda0
+    # phi = 2*np.pi * pos/kat.lambda0
     frI = name + '_frI'
     frR = name + '_frR'
     bkT = name + '_bkT'
@@ -52,7 +61,7 @@ def addBeamSplitter(kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, pos=0):
 
 
 def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
-              dof='pos'):
+             dof='pos'):
     """Add a probe to a finesse model
 
     Inputs:
@@ -93,7 +102,7 @@ def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
 
 
 def addReadout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=False,
-                dof='pos', fnames=None):
+               dof='pos', fnames=None):
     """Add RF and DC probes to a detection port
 
     Inputs:
@@ -140,7 +149,7 @@ def addReadout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=Fal
 
     # Add the probes
     addProbe(kat, name + '_DC', node, 0, 0, freqresp=freqresp,
-              alternate_beam=alternate_beam, dof=dof)
+             alternate_beam=alternate_beam, dof=dof)
     for freq, phase, fname in zip(freqs, phases, fnames):
         nameI = name + '_I' + fname
         nameQ = name + '_Q' + fname
@@ -260,8 +269,8 @@ def extract_zpk(comp, dof):
         raise ValueError('Unrecognized dof ' + dof)
 
     if tf is None:
-    # There's no mechanical transfer function defined, so the response is either
-    # 1/(M Omega^2) for pos or 1/(I Omega^2) for pitch or yaw
+        # There's no mechanical transfer function defined, so the response is
+        # either 1/(M Omega^2) for pos or 1/(I Omega^2) for pitch or yaw
         zs = []
         ps = [0, 0]
         if dof == 'pos':
@@ -344,6 +353,104 @@ def setMechTF(kat, name, zs, ps, k, dof='pos'):
         raise ValueError('Unrecognized dof ' + dof)
 
 
+def setCavityBasis(kat, node_name1, node_name2):
+    """Specify a two mirror cavity to use for the Gaussian mode basis
+
+    Inputs:
+      kat: the finesse model
+      node_name1: the name of the node of the first mirror
+      node_name2: the name of the node of the second mirror
+
+    Example:
+      To use the basis defined by the front surfaces of IX and EX
+        setCavityBasis(kat, 'IX_fr', 'EX_fr')
+      This is equivalent to
+        kat.add(kcmd.cavity('cav_IX_EX', kat.IX, kat.IX_fr, kat.EX, kat.EX_fr))
+    """
+    # Get the list of nodes in this model
+    nodes = kat.nodes.getNodes()
+
+    def get_mirror_node(node_name):
+        """Get the node and optic connected to a given node name
+
+        Inputs:
+          node_name: the name of the node
+
+        Returns:
+          node: the node object
+          mirr: the mirror object connected to this node
+        """
+        try:
+            node = nodes[node_name]
+        except KeyError:
+            raise ValueError(node_name + ' is not a node in this model')
+
+        components = kat.nodes.getNodeComponents(node)
+        mirr_inds = [isinstance(comp, kcmp.mirror) for comp in components]
+        space_inds = [isinstance(comp, kcmp.space) for comp in components]
+
+        # make sure that this node is connected to one mirror and one space
+        num_mirrs = sum(mirr_inds)
+        num_spaces = sum(space_inds)
+        if num_mirrs != 1 or num_spaces != 1:
+            raise ValueError(
+                'A cavity should be two mirrors connected by a space but'
+                + ' node {:s} has {:d} mirrors and {:d} spaces.'.format(
+                    node_name, num_mirrs, num_spaces))
+
+        return node, list(compress(components, mirr_inds))[0]
+
+    # set the cavity basis
+    node1, mirr1 = get_mirror_node(node_name1)
+    node2, mirr2 = get_mirror_node(node_name2)
+    cav_name = 'cav_{:s}_{:s}'.format(mirr1.name, mirr2.name)
+    kat.add(kcmd.cavity(cav_name, mirr1, node1, mirr2, node2))
+
+
+def showfDC(basekat, freqs, verbose=False):
+    kat = basekat.deepcopy()
+    if isinstance(freqs, Number):
+        freqs = np.array([freqs])
+    freqs.sort()
+
+    links = []
+    for comp in kat.components.values():
+        if isinstance(comp, kcmp.space):
+            name = comp.name
+            end_node = comp.nodes[0].name
+            links.append(name)
+            for fi, freq in enumerate(freqs):
+                probe_name = '{:s}_f{:d}'.format(name, fi)
+                kat.add(kdet.ad(probe_name, freq, end_node))
+
+    kat.noxaxis = True
+    kat.verbose = verbose
+    out = kat.run()
+
+    def link2key(link):
+        space = kat.components[link]
+        key = '{:s}  -->  {:s}'.format(space.nodes[0].name,
+                                       space.nodes[1].name)
+        return key
+
+    fDC = {link2key(link): [] for link in links}
+    for link in links:
+        for fi, freq in enumerate(freqs):
+            power = np.abs(out['{:s}_f{:d}'.format(link, fi)])**2
+            pow_str = '{:0.1f} {:s}W'.format(*siPrefix(power)[::-1])
+            space = kat.components[link]
+            # key = '{:s} -> {:s}'.format(space.nodes[0].name,
+            #                             space.nodes[1].name)
+            fDC[link2key(link)].append(pow_str)
+
+    index = ['{:0.0f} {:s}Hz'.format(*siPrefix(freq)[::-1]) for freq in freqs]
+    fDC = pd.DataFrame(fDC, index=index).T
+    with pd.option_context('display.max_rows', None,
+                           'display.max_columns', None):
+        display(fDC)
+    # return kat, fDC
+
+
 class KatFR:
     def __init__(self, kat, all_drives=True):
         self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
@@ -364,7 +471,7 @@ class KatFR:
 
         # populate the list of probes
         self.probes = [name for name, det in kat.detectors.items()
-                   if isinstance(det, kdet.pd)]
+                       if isinstance(det, (kdet.pd, kdet.hd))]
         self.amp_detectors = [name for name, det in kat.detectors.items()
                               if isinstance(det, kdet.ad)]
 
@@ -372,7 +479,7 @@ class KatFR:
         self.freqresp = {dof: {probe: {} for probe in self.probes}
                          for dof in self._dofs}
         self.mechmod = {dof: {drive: {} for drive in self.pos_detectors}
-                         for dof in self._dofs}
+                        for dof in self._dofs}
         self._mechTF = {dof: {drive: {} for drive in self.pos_detectors}
                         for dof in self._dofs}
 
@@ -386,7 +493,8 @@ class KatFR:
         if rtype not in ['opt', 'mech', 'both']:
             raise ValueError('Unrecognized response type ' + rtype)
 
-        drives = [drive for drive in self.drives if has_dof(self.kat, drive, dof)]
+        drives = [drive for drive in self.drives if has_dof(
+            self.kat, drive, dof)]
 
         if verbose:
             pbar = tqdm(total=len(drives))
@@ -504,7 +612,6 @@ class KatFR:
         else:
             # TF is for a frequency vector
             tf = np.zeros(len(self.ff), dtype='complex')
-
 
         if isinstance(outDrives, str):
             outDrives = {outDrives: 1}

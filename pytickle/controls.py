@@ -310,14 +310,26 @@ class ControlSystem:
             self.opt = opt
             self.ss = 2j*np.pi*opt.ff
 
-    def tickle(self, drive2bsm=False):
+    def tickle(self, drive2bsm=False, mechmod=True):
+        """Compute the control system dynamics
+
+        Inputs:
+          drive2bsm: Compute the drive to beamspot motion response
+            (Default: False)
+          mechmod: Compute the radiation pressure mechanical modifications
+            (Default: True)
+
+        Note: The spot test point cannot be used if drive2bsm is False
+        and the pos test point cannot be used if mechmod is False
+        """
         self.inMat = self.computeInputMatrix()
         self.outMat = self.computeOutputMatrix()
         self.plant = self.computePlant()
         self.ctrlMat = self.computeController()
         self.compMat = self.computeCompensator()
         self.respMat = self.computeResponse()
-        self.mMech = self.computeMechMod()
+        if mechmod:
+            self.mMech = self.computeMechMod()
         # self.respMat = np.einsum('ijf,jkf->ikf', self.mMech, response)
         self.outComp = np.einsum('ijf,jk->ikf', self.compMat, self.outMat)
         self.oltf = {tp: self.computeOLTF(tp)
