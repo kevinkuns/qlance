@@ -14,8 +14,8 @@ from itertools import compress
 
 
 def addMirror(
-        kat, name, aoi=0, Chr=0, Thr=0, Lhr=0, Rar=0, Lmd=0, Nmd=1.45, pos=0,
-        pitch=0, yaw=0, dh=0):
+        kat, name, aoi=0, Chr=0, Thr=0, Lhr=0, Rar=0, Lmd=0, Nmd=1.45, phi=0,
+        pitch=0, yaw=0, dh=0, comp=False):
     # FIXME: deal with "mirrors" with non-zero aoi's correctly
     if Chr == 0:
         Rcx = None
@@ -24,21 +24,25 @@ def addMirror(
         Rcx = 1/Chr
         Rcy = 1/Chr
 
-    phi = 2*np.pi * pos/kat.lambda0
+    # phi = 2*np.pi * pos/kat.lambda0
     fr = name + '_fr'
     bk = name + '_bk'
     fr_s = fr + '_s'
-    bk_s = fr + '_s'
-    kat.add(kcmp.mirror(
-        name, fr, bk, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
-    # kat.add(kcmp.mirror(
-    #     name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
-    # kat.add(name + '_AR', bk_s, bk, R=Rar)
+    bk_s = bk + '_s'
+    if comp:
+        kat.add(kcmp.mirror(
+            name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
+        kat.add(kcmp.mirror(
+            name + '_AR', bk_s, bk, R=0, L=Rar, phi=phi))
+        kat.add(kcmp.space(name + '_sub', bk_s, fr_s, dh, Nmd))
+    else:
+        kat.add(kcmp.mirror(
+            name, fr, bk, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
 
 
 def addBeamSplitter(
         kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, Rar=0, Lmd=0, Nmd=1.45,
-        pos=0):
+        phi=0, comp=False):
     if Chr == 0:
         Rcx = None
         Rcy = None
@@ -46,7 +50,7 @@ def addBeamSplitter(
         Rcx = 1/Chr
         Rcy = 1/Chr
 
-    phi = 2*np.pi * pos/kat.lambda0
+    # phi = 2*np.pi * pos/kat.lambda0
     frI = name + '_frI'
     frR = name + '_frR'
     bkT = name + '_bkT'
@@ -467,7 +471,7 @@ class KatFR:
 
         # populate the list of probes
         self.probes = [name for name, det in kat.detectors.items()
-                       if isinstance(det, kdet.pd)]
+                       if isinstance(det, (kdet.pd, kdet.hd))]
         self.amp_detectors = [name for name, det in kat.detectors.items()
                               if isinstance(det, kdet.ad)]
 
