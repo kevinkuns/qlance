@@ -1,5 +1,5 @@
 # pytickle
-PyTickle is a wrapper for the Matlab [Optickle](https://github.com/Optickle/Optickle/tree/Optickle2) simulation.
+PyTickle simulates optomechanical systems as well as control loops involving them. PyTickle started as a python wrapper for the Matlab [Optickle](https://github.com/Optickle/Optickle/tree/Optickle2) simulation but now supports [Finesse](https://git.ligo.org/finesse/pykat/tree/master) models as well.
 
 ## Getting started
   1. Clone Optickle2 from [this](https://github.com/Optickle/Optickle/tree/Optickle2) repository. It is important to get Optickle2 and not Optickle.
@@ -23,3 +23,7 @@ If the variable `OPTICKLE_PATH` is defined, you can also just use
 ```python
 >>> pyt.addOpticklePath(eng)
 ```
+
+## Control Systems
+
+![Control Loop](documentation/control_loop.svg)
