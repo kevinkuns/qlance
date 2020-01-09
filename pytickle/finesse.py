@@ -180,6 +180,83 @@ def addGouyReadout(kat, name, phaseA, dphaseB=90):
         name + '_B', bs_name + '_bkT', name + '_B', 0, gx=phaseB, gy=phaseB))
 
 
+def set_probe_response(kat, name, resp):
+    """Set whether a probe will be used to measure DC or frequency response
+
+    Useful for changing how an existing probe will be used. For example
+    probes added to a model for DC sweeps can be changed to measure
+    transfer functions.
+
+    Inputs:
+      kat: the finesse model
+      name: name of the probe to setCavityBasis
+      resp: type of response:
+        'fr': frequency response
+        'dc': DC response for sweeps and DC operating point
+
+    Examples:
+      * If a probe was added for frequency response as
+          addProbe(kat, 'REFL_I', 'REFL_in', fmod, 0)
+        it can be used for sweeps by
+          set_probe_response(kat, 'REFL_I', 'dc')
+      * If a probe was added for DC measurements as
+          addProbe(kat, 'REFL_I', 'REFL_in', fmod, 0, freqresp=False)
+        it can be used for measuring transfer functions by
+          set_probe_response(kat, 'REFL_I', 'fr')
+    """
+    if resp == 'dc':
+        kwargs = {'freqresp': False}
+    elif resp == 'fr':
+        kwargs = {'freqresp': True}
+    else:
+        raise ValueError('Unrecognized signal type ' + resp)
+
+    # get the original parameters
+    det = kat.detectors[name]
+    node = det.node.name
+    kwargs['alternate_beam'] = det.alternate_beam
+
+    if det.pdtype is None:
+        kwargs['dof'] = 'pos'
+    elif det.pdtype == 'y-split':
+        kwargs['dof'] = 'pitch'
+    elif det.pdtype == 'x-split':
+        kwargs['dof'] = 'yaw'
+    else:
+        raise ValueError('Unrecognized pdtype ' + det.pdtype)
+
+    # figure out what kind of detector it was originally
+    if det.num_demods == 0:
+        # DC probe for DC response
+        freq = 0
+        phase = 0
+
+    elif det.num_demods == 1:
+        phase = det.phase1.value
+        if phase is None:
+            # DC probe for freq response
+            freq = 0
+            phase = 0
+
+        else:
+            # RF probe for DC response
+            freq = det.f1.value
+
+    elif det.num_demods == 2:
+        # RF probe for freq response
+        freq = det.f1.value
+        phase = det.phase1.value
+
+    else:
+        raise ValueError('Too many demodulations {:d}'.format(det.num_demods))
+
+    # Remove the old probe
+    det.remove()
+
+    # Add the new one
+    addProbe(kat, name, node, freq, phase, **kwargs)
+
+
 def get_drive_dof(kat, drive, dof, force=False):
     """Return the component for a given degree of freedom
 
@@ -448,7 +525,10 @@ def showfDC(basekat, freqs, verbose=False):
     with pd.option_context('display.max_rows', None,
                            'display.max_columns', None):
         display(fDC)
-    # return kat, fDC
+
+
+# def showsigDC(basekat, verbose=False):
+#     kat = basekat.deepcopy()
 
 
 class KatFR:
@@ -514,12 +594,16 @@ class KatFR:
             if rtype in ['opt', 'both']:
                 for probe in self.probes:
                     det = kat.detectors[probe]
+                    if det.num_demods == 0:
+                        raise ValueError(
+                            '{:s} has no demodulations'.format(probe))
                     if det.num_demods == 1:
                         det.f1.put(kat.xaxis.x)
                     elif det.num_demods == 2:
                         det.f2.put(kat.xaxis.x)
                     else:
-                        raise ValueError('Too many demodulations')
+                        raise ValueError(
+                            '{:s} has too many demodulations'.format(probe))
 
             # run the simulation for this drive and store the results
             kat.parse('yaxis re:im')
