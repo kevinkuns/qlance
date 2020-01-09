@@ -547,8 +547,23 @@ def showfDC(basekat, freqs, verbose=False):
         display(fDC)
 
 
-# def showsigDC(basekat, verbose=False):
-#     kat = basekat.deepcopy()
+def showsigDC(basekat, verbose=False):
+    kat = basekat.deepcopy()
+    set_all_probe_response(kat, 'dc')
+    kat.noxaxis = True
+    kat.verbose = verbose
+    out = kat.run()
+
+    sigDC = {}
+    for det_name, det in kat.detectors.items():
+        if isinstance(det, kdet.pd):
+            power = np.abs(out[det_name])
+            sigDC[det_name] = '{:0.1f} {:s}W'.format(*siPrefix(power)[::-1])
+
+    sigDC = pd.DataFrame(sigDC, index=['Power']).T
+    with pd.option_context('display.max_rows', None,
+                           'display.max_columns', None):
+        display(sigDC)
 
 
 class KatFR:
