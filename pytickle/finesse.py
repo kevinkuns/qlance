@@ -257,6 +257,26 @@ def set_probe_response(kat, name, resp):
     addProbe(kat, name, node, freq, phase, **kwargs)
 
 
+def set_all_probe_response(kat, resp):
+    """Set whether every probe in the model will measure DC or frquency response
+
+    Inputs:
+      kat: the finesse model
+      resp: type of response:
+        'fr': frequency response
+        'dc': DC response for sweeps and DC operating point
+
+    Example:
+      * To prepare all the probes in a model to measure a transfer function:
+          set_all_probe_response(kat, 'fr')
+      * To prepare all the probes in a model to measure a DC response:
+          set_all_probe_response(kat, 'dc')
+    """
+    for det in kat.detectors.values():
+        if isinstance(det, kdet.pd):
+            set_probe_response(kat, det.name, resp)
+
+
 def get_drive_dof(kat, drive, dof, force=False):
     """Return the component for a given degree of freedom
 

@@ -74,8 +74,9 @@ class TestFreqRespSetProbe:
 
     kat = katFP()
     fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=False)
-    for probe in ['REFL_DC', 'REFL_I', 'REFL_Q']:
-        fin.set_probe_response(kat, probe, 'fr')
+    # for probe in ['REFL_DC', 'REFL_I', 'REFL_Q']:
+    #     fin.set_probe_response(kat, probe, 'fr')
+    fin.set_all_probe_response(kat, 'fr')
     katFR = fin.KatFR(kat)
     katFR.tickle(1e-2, 1e4, 1000)
 
@@ -92,8 +93,9 @@ class TestSweepSetProbe:
 
     kat = katFP()
     fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=True)
-    for probe in ['REFL_DC', 'REFL_I', 'REFL_Q']:
-        fin.set_probe_response(kat, probe, 'dc')
+    # for probe in ['REFL_DC', 'REFL_I', 'REFL_Q']:
+    #     fin.set_probe_response(kat, probe, 'dc')
+    fin.set_all_probe_response(kat, 'dc')
     ePos = 5e-9 * 360/kat.lambda0
     kat.add(kcom.xaxis('lin', [-ePos, ePos], kat.EX.phi, 1000))
     kat.parse('yaxis abs')
