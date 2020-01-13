@@ -131,14 +131,32 @@ def katSweep(comp, dp=0, verbose=False):
 
     kat.add(kcmd.xaxis('lin', np.array(
         [-180, 180]) - dp, kat.components[comp].phi, 1000))
-    # kat.parse('yaxis re:im')
     kat.parse('yaxis abs')
 
     return kat
 
 
+def katSweep2(drives, spos, epos, dp=0, verbose=False):
+    kat = katMI(90, 0, 45)
+    kat.verbose = verbose
+    add_ads(kat, 'XARM', 'IX_fr')
+    add_ads(kat, 'YARM', 'IY_fr')
+    add_ads(kat, 'BSX', 'IX_bk')
+    add_ads(kat, 'BSY', 'IY_bk')
+    add_ads(kat, 'AS', 'AS_in')
+
+    kat = fin.KatSweep(kat)
+    kat.sweep(drives, spos - dp, epos - dp, 1000)
+    return kat
+
+
 def assert_amp(out, sweep, key):
     return np.allclose(out[key], data[sweep][()][key])
+
+
+def assert_amp2(kat, probe, sweep):
+    _, sig = kat.getSweepSignal(probe, 'EX')
+    return np.allclose(sig, data[sweep][()][probe])
 
 
 class TestSweep:
@@ -158,4 +176,22 @@ class TestSweep:
 
     def test_amps_IX(self):
         rslts = [assert_amp(self.outIX, 'sweep_IX', key) for key in self.keys]
+        assert all(rslts)
+
+
+class TestSweepXARM:
+
+    katXARM_DIFF = katSweep2({'EX': 1, 'IX': 1}, -180, 180)
+    katXARM_COMM = katSweep2({'EX': 1, 'IX': -1}, -180, 180)
+
+    keys = list(data['sweep_XARM_DIFF'][()].keys())
+
+    def test_amps_XARM_DIFF(self):
+        rslts = [assert_amp2(self.katXARM_DIFF, key, 'sweep_XARM_DIFF')
+                 for key in self.keys]
+        assert all(rslts)
+
+    def test_amps_XARM_COMM(self):
+        rslts = [assert_amp2(self.katXARM_COMM, key, 'sweep_XARM_COMM')
+                 for key in self.keys]
         assert all(rslts)

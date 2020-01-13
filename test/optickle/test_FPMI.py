@@ -108,11 +108,11 @@ class TestSchnupp:
         assert np.allclose(self.powfl, data['powfl'])
 
 
-def computeSweep(drive):
+def computeSweep(ePos):
     optSweep = optMI('optSweep')
-    ePos = {drive: 180 * optSweep.lambda0[0]/360}
+    # ePos = {drive: 180 * optSweep.lambda0[0]/360}
     sPos = {k: -v for k, v in ePos.items()}
-    optSweep.sweepLinear(sPos, ePos, 1000)
+    optSweep.sweepLinear(sPos, ePos, 1001)
     return optSweep
 
 
@@ -133,17 +133,32 @@ def getSweepPowers(opt, drive):
     return poses, powers
 
 
-def assert_amp(optic, powers_ref):
-    opt = computeSweep(optic)
+def assert_power(optic, ePos, powers_ref):
+    # opt = computeSweep({optic: 180 * 1064e-9/360})
+    opt = computeSweep(ePos)
     _, powers = getSweepPowers(opt, optic)
     rslt = [np.allclose(powers[key]['f0'], powers_ref[key]['f0'])
             for key in powers.keys()]
     return rslt
 
 
-def test_amps_XARM():
-    assert all(assert_amp('EX', data['powersXARM'][()]))
+def test_powers_XARM():
+    ePos = {'EX': 180 * 1064e-9/360}
+    assert all(assert_power('EX', ePos, data['powersXARM'][()]))
 
 
-def test_amps_IX():
-    assert all(assert_amp('IX', data['powersIX'][()]))
+def test_powers_IX():
+    ePos = {'IX': 180 * 1064e-9/360}
+    assert all(assert_power('IX', ePos, data['powersIX'][()]))
+
+
+def test_powers_XARM_DIFF():
+    ePos = {'EX': 180 * 1064e-9/360}
+    ePos['IX'] = ePos['EX']
+    assert all(assert_power('EX', ePos, data['powersXARM_DIFF'][()]))
+
+
+def test_powers_XARM_COMM():
+    ePos = {'EX': 180 * 1064e-9/360}
+    ePos['IX'] = -ePos['EX']
+    assert all(assert_power('EX', ePos, data['powersXARM_COMM'][()]))
