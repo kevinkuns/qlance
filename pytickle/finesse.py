@@ -791,3 +791,53 @@ class KatFR:
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
             phase2freq=phase2freq, **kwargs)
         return fig
+
+
+class KatSweep:
+    def __init__(self, kat):
+        self.kat = kat
+        self.sigs = dict.fromkeys(kat.detectors.keys())
+        self.poses = {}
+
+    def sweep(self, drives, spos, epos, npts, dof='pos', linlog='lin',
+              verbose=False):
+        kat = self.kat.deepcopy()
+        kat.verbose = verbose
+        kat.add(kcmd.variable('sweep', 1))
+        kat.parse('set sweepre sweep re')
+        kat.add(kcmd.xaxis(linlog, [spos, epos], 're', npts, comp='sweep'))
+
+        if isinstance(drives, str):
+            drives = {drives: 1}
+
+        for drive, coeff in drives.items():
+            csign = np.sign(coeff)
+            cabs = np.abs(coeff)
+            name = drive + '_sweep'
+            func = '({0}) * ({1}) * $sweepre'.format(csign, cabs)
+            kat.add(kcmd.func(name, func))
+            comp = get_drive_dof(kat, drive, dof, force=False)
+            comp.put(kat.commands[name].output)
+
+        kat.parse('yaxis re:im')
+        out = kat.run()
+
+        for probe in self.sigs.keys():
+            self.sigs[probe] = out[probe]
+
+        for drive, coeff in drives.items():
+            self.poses[drive] = coeff * out.x
+
+    def getSweepSignal(self, probeName, driveName, func=None):
+        sig = self.sigs[probeName]
+        if func:
+            if func == 'abs':
+                sig = np.abs(sig)
+            elif func == 're':
+                sig = np.real(sig)
+            elif func == 'im':
+                sig = np.imag(sig)
+            else:
+                raise ValueError('Unrecognized function ' + func)
+
+        return self.poses[driveName], sig
