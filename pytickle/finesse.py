@@ -813,12 +813,14 @@ class KatFR:
 
 
 class KatSweep:
-    def __init__(self, kat):
+    def __init__(self, kat, drives):
         self.kat = kat
+        self.drives = drives
         self.sigs = dict.fromkeys(kat.detectors.keys())
-        self.poses = {}
+        self.poses = dict.fromkeys(drives.keys())
+        self.poses[''] = None
 
-    def sweep(self, drives, spos, epos, npts, dof='pos', linlog='lin',
+    def sweep(self, spos, epos, npts, dof='pos', linlog='lin',
               verbose=False):
         kat = self.kat.deepcopy()
         kat.verbose = verbose
@@ -826,6 +828,7 @@ class KatSweep:
         kat.parse('set sweepre sweep re')
         kat.add(kcmd.xaxis(linlog, [spos, epos], 're', npts, comp='sweep'))
 
+        drives = self.drives
         if isinstance(drives, str):
             drives = {drives: 1}
 
@@ -846,6 +849,7 @@ class KatSweep:
 
         for drive, coeff in drives.items():
             self.poses[drive] = coeff * out.x
+        self.poses[''] = out.x
 
     def getSweepSignal(self, probeName, driveName, func=None):
         sig = self.sigs[probeName]
