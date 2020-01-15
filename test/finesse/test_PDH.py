@@ -57,16 +57,18 @@ class TestSweep:
     kat = katFP()
     fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=False)
     ePos = 5e-9 * 360/kat.lambda0
-    kat.add(kcom.xaxis('lin', [-ePos, ePos], kat.EX.phi, 1000))
-    kat.parse('yaxis abs')
-    out = kat.run()
+    # kat.add(kcom.xaxis('lin', [-ePos, ePos], kat.EX.phi, 1000))
+    # kat.parse('yaxis abs')
+    # out = kat.run()
+    katSweep = fin.KatSweep(kat, 'EX')
+    katSweep.sweep(-ePos, ePos, 1000)
 
     def test_sweepI(self):
-        sweepI = self.out['REFL_I']
+        _, sweepI = self.katSweep.getSweepSignal('REFL_I', 'EX')
         assert np.allclose(sweepI, data['sweepI'])
 
     def test_sweepQ(self):
-        sweepQ = self.out['REFL_Q']
+        _, sweepQ = self.katSweep.getSweepSignal('REFL_Q', 'EX')
         assert np.allclose(sweepQ, data['sweepQ'])
 
 
