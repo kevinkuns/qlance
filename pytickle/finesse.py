@@ -589,7 +589,8 @@ def showsigDC(basekat, verbose=False):
 class KatFR:
     def __init__(self, kat, all_drives=True):
         self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
-        self.kat = kat
+        self.kat = kat.deepcopy()
+        set_all_probe_response(self.kat, 'fr')
 
         # populate the list of drives and position detectors if necessary
         if all_drives:
@@ -815,7 +816,8 @@ class KatFR:
 
 class KatSweep:
     def __init__(self, kat, drives, dof='pos'):
-        self.kat = kat
+        self.kat = kat.deepcopy()
+        set_all_probe_response(self.kat, 'dc')
         self.drives = drives
         self.dof = dof
         self.sigs = dict.fromkeys(kat.detectors)

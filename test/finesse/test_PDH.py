@@ -78,7 +78,8 @@ class TestFreqRespSetProbe:
     fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=False)
     # for probe in ['REFL_DC', 'REFL_I', 'REFL_Q']:
     #     fin.set_probe_response(kat, probe, 'fr')
-    fin.set_all_probe_response(kat, 'fr')
+    # now this step is done automatically
+    # fin.set_all_probe_response(kat, 'fr')
     katFR = fin.KatFR(kat)
     katFR.tickle(1e-2, 1e4, 1000)
 
@@ -95,18 +96,21 @@ class TestSweepSetProbe:
 
     kat = katFP()
     fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=True)
+    # kat.add(kcom.xaxis('lin', [-ePos, ePos], kat.EX.phi, 1000))
+    # kat.parse('yaxis abs')
+    # out = kat.run()
     # for probe in ['REFL_DC', 'REFL_I', 'REFL_Q']:
     #     fin.set_probe_response(kat, probe, 'dc')
-    fin.set_all_probe_response(kat, 'dc')
+    # now this step is done automatically
+    # fin.set_all_probe_response(kat, 'dc')
     ePos = 5e-9 * 360/kat.lambda0
-    kat.add(kcom.xaxis('lin', [-ePos, ePos], kat.EX.phi, 1000))
-    kat.parse('yaxis abs')
-    out = kat.run()
+    katSweep = fin.KatSweep(kat, 'EX')
+    katSweep.sweep(-ePos, ePos, 1000)
 
     def test_sweepI(self):
-        sweepI = self.out['REFL_I']
+        _, sweepI = self.katSweep.getSweepSignal('REFL_I', 'EX')
         assert np.allclose(sweepI, data['sweepI'])
 
     def test_sweepQ(self):
-        sweepQ = self.out['REFL_Q']
+        _, sweepQ = self.katSweep.getSweepSignal('REFL_Q', 'EX')
         assert np.allclose(sweepQ, data['sweepQ'])
