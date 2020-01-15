@@ -29,12 +29,14 @@ def addMirror(
     bk = name + '_bk'
     fr_s = fr + '_s'
     bk_s = bk + '_s'
+
     if comp:
         kat.add(kcmp.mirror(
             name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
         kat.add(kcmp.mirror(
-            name + '_AR', bk_s, bk, R=0, L=Rar, phi=phi))
+            name + '_AR', bk_s, bk, R=Rar, L=0, phi=phi))
         kat.add(kcmp.space(name + '_sub', bk_s, fr_s, dh, Nmd))
+
     else:
         kat.add(kcmp.mirror(
             name, fr, bk, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
@@ -42,7 +44,7 @@ def addMirror(
 
 def addBeamSplitter(
         kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, Rar=0, Lmd=0, Nmd=1.45,
-        phi=0, comp=False):
+        phi=0, dh=0, comp=False):
     if Chr == 0:
         Rcx = None
         Rcy = None
@@ -55,9 +57,26 @@ def addBeamSplitter(
     frR = name + '_frR'
     bkT = name + '_bkT'
     bkO = name + '_bkO'
-    kat.add(kcmp.beamSplitter(
-        name, frI, frR, bkT, bkO, T=Thr, L=Lhr, alpha=aoi, phi=phi,
-        Rcx=Rcx, Rcy=Rcy))
+    bkT_s = bkT + '_s'
+    bkO_s = bkO + '_s'
+    frT_s = name + '_frT_s'
+    frO_s = name + '_frO_s'
+
+    if comp:
+        kat.add(kcmp.beamSplitter(
+            name, frI, frR, frT_s, frO_s, T=Thr, L=Lhr, alpha=aoi, phi=phi,
+            Rcx=Rcx, Rcy=Rcy))
+        kat.add(kcmp.mirror(
+            name + '_AR_T', bkT_s, bkT, R=Rar, L=0, phi=phi))
+        kat.add(kcmp.mirror(
+            name + '_AR_O', bkO_s, bkO, R=Rar, L=0, phi=phi))
+        kat.add(kcmp.space(name + '_subT', frT_s, bkT_s, dh, Nmd))
+        kat.add(kcmp.space(name + '_subO', frO_s, bkO_s, dh, Nmd))
+
+    else:
+        kat.add(kcmp.beamSplitter(
+            name, frI, frR, bkT, bkO, T=Thr, L=Lhr, alpha=aoi, phi=phi,
+            Rcx=Rcx, Rcy=Rcy))
 
 
 def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
