@@ -6,7 +6,7 @@ import pykat.commands as kcmd
 from . import controls as ctrl
 from . import plotting
 from .utils import (append_str_if_unique, add_conjugates,
-                    remove_conjugates, siPrefix)
+                    remove_conjugates, siPrefix, assertType)
 from numbers import Number
 import pandas as pd
 from tqdm import tqdm
@@ -814,15 +814,15 @@ class KatFR:
 
 
 class KatSweep:
-    def __init__(self, kat, drives):
+    def __init__(self, kat, drives, dof='pos'):
         self.kat = kat
         self.drives = drives
-        self.sigs = dict.fromkeys(kat.detectors.keys())
-        self.poses = dict.fromkeys(drives.keys())
+        self.dof = dof
+        self.sigs = dict.fromkeys(kat.detectors)
+        self.poses = dict.fromkeys(assertType(drives, dict))
         self.poses[''] = None
 
-    def sweep(self, spos, epos, npts, dof='pos', linlog='lin',
-              verbose=False):
+    def sweep(self, spos, epos, npts, linlog='lin', verbose=False):
         kat = self.kat.deepcopy()
         kat.verbose = verbose
         kat.add(kcmd.variable('sweep', 1))
@@ -839,7 +839,7 @@ class KatSweep:
             name = drive + '_sweep'
             func = '({0}) * ({1}) * $sweepre'.format(csign, cabs)
             kat.add(kcmd.func(name, func))
-            comp = get_drive_dof(kat, drive, dof, force=False)
+            comp = get_drive_dof(kat, drive, self.dof, force=False)
             comp.put(kat.commands[name].output)
 
         kat.parse('yaxis re:im')
@@ -892,4 +892,21 @@ class KatSweep:
         else:
             raise ValueError('Unrecognized option ' + minmax)
 
+        return pos, peak
+
+    def scan_to_precision(
+            self, probeName, p0, dp, prec, minmax, npts=400, func=None):
+        """
+        based off of pykat's scan_to_precision
+        """
+        pos = p0
+        while dp > prec:
+            self.sweep(pos - 1.5*dp, pos + 1.5*dp, npts)
+            try:
+                pos, peak = self.find_peak(probeName, '', minmax, func=func)
+            except ValueError as exc:
+                print(exc)
+                print('pos ' + str(pos))
+                print('dp ' + str(pos))
+            dp = self.poses[''][1] - self.poses[''][0]
         return pos, peak
