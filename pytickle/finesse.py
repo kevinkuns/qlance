@@ -11,6 +11,7 @@ from numbers import Number
 import pandas as pd
 from tqdm import tqdm
 from itertools import compress
+from pykat.external.peakdetect import peakdetect
 
 
 def addMirror(
@@ -864,3 +865,31 @@ class KatSweep:
                 raise ValueError('Unrecognized function ' + func)
 
         return self.poses[driveName], sig
+
+    def find_peak(self, probeName, driveName, minmax, func=None):
+        """
+        based off of pykat's find_peak
+        """
+        pos, sig = self.getSweepSignal(probeName, driveName, func=func)
+        maxima, minima = peakdetect(sig, pos, 1)
+
+        if minmax == 'min':
+            if len(minima) == 0:
+                raise ValueError('No minima were found')
+
+            minima = np.array(minima)
+            ind = np.argmin(minima[:, 1])
+            pos, peak = minima[ind]
+
+        elif minmax == 'max':
+            if len(maxima) == 0:
+                raise ValueError('No maxima were found')
+
+            maxima = np.array(maxima)
+            ind = np.argmax(maxima[:, 1])
+            pos, peak = maxima[ind]
+
+        else:
+            raise ValueError('Unrecognized option ' + minmax)
+
+        return pos, peak
