@@ -200,6 +200,34 @@ def addGouyReadout(kat, name, phaseA, dphaseB=90):
         name + '_B', bs_name + '_bkT', name + '_B', 0, gx=phaseB, gy=phaseB))
 
 
+def addModulator(kat, name, fmod, gmod, order, modtype, phase=0):
+    """Add a modulator to a finesse model
+
+    Adds a modulator with input node name_in and output node name_out
+
+    Inputs:
+      kat: the finesse model
+      name: name of the modulator
+      fmod: modulation frequency [Hz]
+      gmod: modulation depth
+      order: number of sidebands to model
+      modtype: type of modulation:
+        * 'pm' for phase modulation
+        * 'am' for amplitude modulation
+      phase: phase of modulation [deg] (Default: 0)
+
+    Example:
+      To add a phase modulator at 11 MHz with modulation depth 0.1 modeling
+      3 sidebands:
+        addModulator(kat, 'Modf1', 11e6, 0.1, 3, 'pm')
+      This will add the modulator named 'Modf1'; the input node is 'Modf1_in'
+      and the output noide is 'Modf1_out'
+    """
+    kat.add(kcmp.modulator(
+        name, name + '_in', name + '_out', fmod, gmod, order,
+        modulation_type=modtype, phase=phase))
+
+
 def set_probe_response(kat, name, resp):
     """Set whether a probe will be used to measure DC or frequency response
 
@@ -537,9 +565,7 @@ def add_lock(kat, name, probe, drive, gain, tol, offset=0, dof='pos'):
       offset: offset in the error point (Default: 0)
       dof: degree of freedom to drive (Default 'pos')
     """
-    # FIXME: add commands to lock block so that they can easily be removed
     # FIXME: add functionality for linear combinations of probes and drives
-    # FIXME: make KatSweep.sweep store locking control signals
     if probe not in kat.detectors.keys():
         raise ValueError('Probe {:s} does not exist'.format(probe))
 
@@ -862,6 +888,10 @@ class KatSweep:
         self.drives = drives
         self.dof = dof
         self.sigs = dict.fromkeys(kat.detectors)
+        self.lock_sigs = {}
+        for cmd in self.kat.commands.values():
+            if isinstance(cmd, kcmd.lock):
+                self.lock_sigs[cmd.name] = None
         self.poses = dict.fromkeys(assertType(drives, dict))
         self.poses[''] = None
 
@@ -890,6 +920,9 @@ class KatSweep:
 
         for probe in self.sigs.keys():
             self.sigs[probe] = out[probe]
+
+        for lock in self.lock_sigs.keys():
+            self.lock_sigs[lock] = out[lock]
 
         for drive, coeff in drives.items():
             self.poses[drive] = coeff * out.x
