@@ -555,6 +555,17 @@ def add_lock(kat, name, probe, drive, gain, tol, offset=0, dof='pos'):
     comp.put(kat.commands[lock_name].output)
 
 
+def remove_all_locks(kat):
+    """Remove all lock commands from a finesse model
+
+    Inputs:
+      kat: the finesse model
+    """
+    for cmd in kat.commands.values():
+        if isinstance(cmd, kcmd.lock):
+            cmd.remove()
+
+
 def showfDC(basekat, freqs, verbose=False):
     kat = basekat.deepcopy()
     if isinstance(freqs, Number):
