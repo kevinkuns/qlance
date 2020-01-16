@@ -1,5 +1,9 @@
-# pytickle
-PyTickle simulates optomechanical systems as well as control loops involving them. PyTickle started as a python wrapper for the Matlab [Optickle](https://github.com/Optickle/Optickle/tree/Optickle2) simulation but now supports [Finesse](https://git.ligo.org/finesse/pykat/tree/master) models as well.
+# PyTickle
+PyTickle is a python package that simulates optomechanical systems using the Optickle and/or Finesse packages. It adds functionality to these programs making them more user friendly and making it easier to compare the results. PyTickle also models control loops involving optomechanical plants defined by either Optickle or Finesse.
+
+* [Optickle](https://github.com/Optickle/Optickle/tree/Optickle2) is a Matlab-based optomechanical simulaton package. In order to use these simulations, PyTickle thus requires Matlab to be installed; however, the user only ever needs to use python while Matlab runs in the background.
+* [Finesse](http://www.gwoptics.org/finesse/) is a C-based optomechanical simulaton package that can also be run entirely in python.
+* Parts of the architecture of PyTickle's native control loop simulations are inspired by a [study of the advanced LIGO angular sensing and control system](https://iopscience.iop.org/article/10.1088/0264-9381/27/8/084026) and [lentickle](https://github.com/nicolassmith/lentickle), another Matlab package which is not needed to run PyTickle.
 
 ## Getting started
   1. Clone Optickle2 from [this](https://github.com/Optickle/Optickle/tree/Optickle2) repository. It is important to get Optickle2 and not Optickle.
