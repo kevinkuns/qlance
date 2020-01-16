@@ -217,15 +217,34 @@ def addModulator(kat, name, fmod, gmod, order, modtype, phase=0):
       phase: phase of modulation [deg] (Default: 0)
 
     Example:
-      To add a phase modulator at 11 MHz with modulation depth 0.1 modeling
-      3 sidebands:
         addModulator(kat, 'Modf1', 11e6, 0.1, 3, 'pm')
-      This will add the modulator named 'Modf1'; the input node is 'Modf1_in'
-      and the output noide is 'Modf1_out'
+      Adds the phase modulator named 'Modf1' at 11 MHz with modulation
+      depth 0.1. The the input node is 'Modf1_in' and the output noide is
+      'Modf1_out'. 3 sidebands are tracked in the model.
     """
     kat.add(kcmp.modulator(
         name, name + '_in', name + '_out', fmod, gmod, order,
         modulation_type=modtype, phase=phase))
+
+
+def addLaser(kat, name, P, f=0, phase=0):
+    """Add a laser to a finesse model
+
+    Adds a laser with output node name_out
+
+    Inputs:
+      kat: the finesse model
+      name: name of the laser
+      P: laser power [W]
+      f: frequency offset from the carrier [Hz] (Defualt: 0)
+      phase: phase of the laser [deg] (Defualt: 0)
+
+    Example:
+        addLaser(kat, 'Laser', Pin)
+      adds the laser named 'Laser' with input power Pin. The output node
+      is 'Laser_out'
+    """
+    kat.add(kcmd.laser(name, name + '_out', P=P, f=f, phase=phase))
 
 
 def set_probe_response(kat, name, resp):

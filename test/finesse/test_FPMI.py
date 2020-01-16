@@ -38,8 +38,9 @@ def katMI(dpx, dpb, aoib):
     fin.addMirror(kat, 'IY', Thr=Ti, Chr=1/Ri)
     fin.addBeamSplitter(kat, 'BS', aoi=aoib, phi=dpb)
 
-    kat.add(kcmp.laser('Laser', 'Laser_out', P=Pin))
+    # kat.add(kcmp.laser('Laser', 'Laser_out', P=Pin))
     # kat.add(kcmp.modulator('Mod', 'Mod_in', 'Mod_out', fmod, gmod, 5, 'pm'))
+    fin.addLaser(kat, 'Laser', Pin)
     fin.addModulator(kat, 'Mod', fmod, gmod, 5, 'pm')
     kat.add(kcmp.space('s_Laser_Mod', 'Laser_out', 'Mod_in', 0))
     kat.add(kcmp.space('s_Mod_BS', 'Mod_out', 'BS_frI', 1))
