@@ -209,7 +209,7 @@ def set_probe_response(kat, name, resp):
 
     Inputs:
       kat: the finesse model
-      name: name of the probe to setCavityBasis
+      name: name of the probe to set
       resp: type of response:
         'fr': frequency response
         'dc': DC response for sweeps and DC operating point
@@ -524,6 +524,37 @@ def setCavityBasis(kat, node_name1, node_name2):
     kat.add(kcmd.cavity(cav_name, mirr1, node1, mirr2, node2))
 
 
+def add_lock(kat, name, probe, drive, gain, tol, offset=0, dof='pos'):
+    """Add a lock to a finesse model
+
+    Inputs:
+      kat: the finesse model
+      name: name of the lock
+      probe: name of the probe used for the error signal
+      drive: name of the drive the error signal is fed back to
+      gain: gain of the lock
+      tol: tolerance (or accuracy) of the lock
+      offset: offset in the error point (Default: 0)
+      dof: degree of freedom to drive (Default 'pos')
+    """
+    # FIXME: add commands to lock block so that they can easily be removed
+    # FIXME: add functionality for linear combinations of probes and drives
+    # FIXME: make KatSweep.sweep store locking control signals
+    if probe not in kat.detectors.keys():
+        raise ValueError('Probe {:s} does not exist'.format(probe))
+
+    lock_name = name + '_lock'
+    err_sig = '${:s}_err'.format(name)
+    kat.parse('set {:s}_err0 {:s} re'.format(name, probe))
+    off_sign = np.sign(offset)
+    off_abs = np.abs(offset)
+    func = '${0}_err0 + ({1}) * ({2})'.format(name, off_sign, off_abs)
+    kat.add(kcmd.func(name + '_err', func))
+    kat.add(kcmd.lock(lock_name, err_sig, gain, tol))
+    comp = get_drive_dof(kat, drive, dof, force=False)
+    comp.put(kat.commands[lock_name].output)
+
+
 def showfDC(basekat, freqs, verbose=False):
     kat = basekat.deepcopy()
     if isinstance(freqs, Number):
@@ -555,7 +586,6 @@ def showfDC(basekat, freqs, verbose=False):
         for fi, freq in enumerate(freqs):
             power = np.abs(out['{:s}_f{:d}'.format(link, fi)])**2
             pow_str = '{:0.1f} {:s}W'.format(*siPrefix(power)[::-1])
-            space = kat.components[link]
             # key = '{:s} -> {:s}'.format(space.nodes[0].name,
             #                             space.nodes[1].name)
             fDC[link2key(link)].append(pow_str)
