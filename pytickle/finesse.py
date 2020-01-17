@@ -611,6 +611,12 @@ def remove_all_locks(kat):
             cmd.remove()
 
 
+def set_tunings(kat, tunings, dof='pos'):
+    for drive, pos in tunings.items():
+        comp = get_drive_dof(kat, drive, dof, force=False)
+        comp.value = pos
+
+
 def showfDC(basekat, freqs, verbose=False):
     kat = basekat.deepcopy()
     if isinstance(freqs, Number):
@@ -905,6 +911,8 @@ class KatSweep:
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'dc')
         self.drives = drives
+        if isinstance(self.drives, str):
+            self.drives = {self.drives: 1}
         self.dof = dof
         self.sigs = dict.fromkeys(kat.detectors)
         self.lock_sigs = {}
@@ -921,11 +929,11 @@ class KatSweep:
         kat.parse('set sweepre sweep re')
         kat.add(kcmd.xaxis(linlog, [spos, epos], 're', npts, comp='sweep'))
 
-        drives = self.drives
-        if isinstance(drives, str):
-            drives = {drives: 1}
+        # drives = self.drives
+        # if isinstance(drives, str):
+        #     drives = {drives: 1}
 
-        for drive, coeff in drives.items():
+        for drive, coeff in self.drives.items():
             csign = np.sign(coeff)
             cabs = np.abs(coeff)
             name = drive + '_sweep'
@@ -943,7 +951,7 @@ class KatSweep:
         for lock in self.lock_sigs.keys():
             self.lock_sigs[lock] = out[lock]
 
-        for drive, coeff in drives.items():
+        for drive, coeff in self.drives.items():
             self.poses[drive] = coeff * out.x
         self.poses[''] = out.x
 
@@ -1005,3 +1013,6 @@ class KatSweep:
                 print('dp ' + str(pos))
             dp = self.poses[''][1] - self.poses[''][0]
         return pos, peak
+
+    def get_tuning_dict(self, pos):
+        return {drive: pos * coeff for drive, coeff in self.drives.items()}
