@@ -907,7 +907,7 @@ class KatFR:
 
 
 class KatSweep:
-    def __init__(self, kat, drives, dof='pos'):
+    def __init__(self, kat, drives, dof='pos', relative=True):
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'dc')
         self.drives = drives
@@ -921,25 +921,33 @@ class KatSweep:
                 self.lock_sigs[cmd.name] = None
         self.poses = dict.fromkeys(assertType(drives, dict))
         self.poses[''] = None
+        self._relative = relative
+        self.offsets = dict.fromkeys(assertType(drives, dict))
 
-    def sweep(self, spos, epos, npts, linlog='lin', verbose=False):
+    def sweep(
+            self, spos, epos, npts, linlog='lin', verbose=False):
         kat = self.kat.deepcopy()
         kat.verbose = verbose
         kat.add(kcmd.variable('sweep', 1))
         kat.parse('set sweepre sweep re')
         kat.add(kcmd.xaxis(linlog, [spos, epos], 're', npts, comp='sweep'))
 
-        # drives = self.drives
-        # if isinstance(drives, str):
-        #     drives = {drives: 1}
-
         for drive, coeff in self.drives.items():
+            comp = get_drive_dof(kat, drive, self.dof, force=False)
+
+            if self._relative:
+                self.offsets[drive] = comp.value
+            else:
+                self.offsets[drive] = 0
+
             csign = np.sign(coeff)
             cabs = np.abs(coeff)
+            p0sign = np.sign(self.offsets[drive])
+            p0abs = np.abs(self.offsets[drive])
             name = drive + '_sweep'
-            func = '({0}) * ({1}) * $sweepre'.format(csign, cabs)
+            func = '({0}) * ({1}) * $sweepre + ({2}) * ({3})'.format(
+                csign, cabs, p0sign, p0abs)
             kat.add(kcmd.func(name, func))
-            comp = get_drive_dof(kat, drive, self.dof, force=False)
             comp.put(kat.commands[name].output)
 
         kat.parse('yaxis re:im')
@@ -952,7 +960,7 @@ class KatSweep:
             self.lock_sigs[lock] = out[lock]
 
         for drive, coeff in self.drives.items():
-            self.poses[drive] = coeff * out.x
+            self.poses[drive] = coeff * out.x + self.offsets[drive]
         self.poses[''] = out.x
 
     def getSweepSignal(self, probeName, driveName, func=None):
@@ -1015,4 +1023,6 @@ class KatSweep:
         return pos, peak
 
     def get_tuning_dict(self, pos):
-        return {drive: pos * coeff for drive, coeff in self.drives.items()}
+        tunings = {drive: pos * coeff + self.offsets[drive]
+                   for drive, coeff in self.drives.items()}
+        return tunings

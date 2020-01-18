@@ -147,7 +147,7 @@ def katSweep2(drives, spos, epos, dp=0, verbose=False):
     add_ads(kat, 'BSY', 'IY_bk')
     add_ads(kat, 'AS', 'AS_in')
 
-    kat = fin.KatSweep(kat, drives)
+    kat = fin.KatSweep(kat, drives, relative=False)
     kat.sweep(spos - dp, epos - dp, 1000)
     return kat
 
