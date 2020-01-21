@@ -1345,7 +1345,7 @@ class PyTickle:
           R: radius of curvature at the end of the link
           dpsi: accumulated Gouy phase along the link
         """
-        nLink = int(self._eval("opt.Nlink", 1))
+        nLink = int(self._eval(self.optName + ".Nlink", 1))
         sinks = [self._getSinkName(ii) for ii in range(1, nLink + 1)]
         sources = [self._getSourceName(ii) for ii in range(1, nLink + 1)]
         beam_properties = {}
@@ -1353,11 +1353,20 @@ class PyTickle:
             w, zR, z, w0, R, _ = self.getBeamProperties(*sink.split('<-'))
             dpsi = self.getGouyPhase(
                 source.split('->')[0], sink.split('<-')[0])
+
+            # get the carrier information
+            try:
+                ind = self._getSidebandInd(0)
+                w = w[ind]
+                w0 = w0[ind]
+            except IndexError:
+                pass
+
             beam_properties[source + ' --> ' + sink] = [
-                '{:0.2f} {:s}m'.format(*utils.siPrefix(w[0])[::-1]),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(w)[::-1]),
                 '{:0.2f} {:s}m'.format(*utils.siPrefix(zR)[::-1]),
                 '{:0.2f} {:s}m'.format(*utils.siPrefix(z)[::-1]),
-                '{:0.2f} {:s}m'.format(*utils.siPrefix(w0[0])[::-1]),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(w0)[::-1]),
                 '{:0.2f} {:s}m'.format(*utils.siPrefix(R)[::-1]),
                 '{:0.0f} deg'.format(dpsi)]
 
