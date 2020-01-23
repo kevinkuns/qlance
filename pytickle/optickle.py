@@ -642,7 +642,7 @@ class PyTickle:
         Inputs:
           name: Name of the mirror
           aoi: angle of incidence [deg] (Default: 0)
-          Chr: inverse radius of curvature (Default: 0)
+          Chr: inverse radius of curvature [1/m] (Default: 0)
           Thr: power transmisivity (Default: 0)
           Lhr: HR loss (Default: 0)
           Rar: AR reflectivity (Default: 0)
@@ -667,7 +667,7 @@ class PyTickle:
         Inputs:
           name: Name of the mirror
           aoi: angle of incidence [deg] (Default: 45)
-          Chr: inverse radius of curvature (Default: 0)
+          Chr: inverse radius of curvature [1/m] (Default: 0)
           Thr: power transmisivity (Default: 0.5)
           Lhr: HR loss (Default: 0)
           Rar: AR reflectivity (Default: 0)

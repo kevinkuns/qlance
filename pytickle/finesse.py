@@ -15,9 +15,28 @@ from pykat.external.peakdetect import peakdetect
 
 
 def addMirror(
-        kat, name, aoi=0, Chr=0, Thr=0, Lhr=0, Rar=0, Lmd=0, Nmd=1.45, phi=0,
+        kat, name, Chr=0, Thr=0, Lhr=0, Rar=0, Lmd=0, Nmd=1.45, phi=0,
         pitch=0, yaw=0, dh=0, comp=False):
-    # FIXME: deal with "mirrors" with non-zero aoi's correctly
+    """Add a mirror to a finesse model
+
+    Adds a mirror with nodes name_fr and name_bk
+
+    Inputs:
+      kat: the finesse model
+      name: name of the optic
+      Chr: inverse radius of curvature [1/m] (Default: 0)
+      Thr: power transmissivity (Defualt: 0)
+      Lhr: HR loss (Default: 0)
+      Rar: AR reflectivity (Defualt: 0)
+      Lmd: loss through one pass of the material (Default: 0)
+      Nmd: index of refraction of the material (Default: 1.45)
+      phi: microscopic tuning [deg] (Default: 0)
+      pitch: pitch tuning [deg] (Default: 0)
+      yaw: yaw tuning [deg] (Default: 0)
+      dh: optic thickness [m] (Default: 0)
+      comp: whether to use a real compound mirror (Default: False)
+    """
+    # FIXME: implement pitch and yaw
     if Chr == 0:
         Rcx = None
         Rcy = None
@@ -32,10 +51,15 @@ def addMirror(
     bk_s = bk + '_s'
 
     if comp:
+        # HR surface
         kat.add(kcmp.mirror(
             name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
+
+        # AR surface
         kat.add(kcmp.mirror(
             name + '_AR', bk_s, bk, R=Rar, L=0, phi=phi))
+
+        # connect the AR and HR surfaces
         kat.add(kcmp.space(name + '_sub', bk_s, fr_s, dh, Nmd))
 
     else:
@@ -46,6 +70,32 @@ def addMirror(
 def addBeamSplitter(
         kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, Rar=0, Lmd=0, Nmd=1.45,
         phi=0, dh=0, comp=False):
+    # FIXME: implement pitch and yaw
+    """Add a beamsplitter to a finesse model
+
+    Adds a beamsplitter with nodes
+      * name_frI: beam incident on the HR surface (i.e. towards PRM)
+      * name_frR: beam reflected from the HR surface (i.e. towards ITMY)
+      * name_bkT: beam transmitted through the AR surface (i.e. towards ITMX)
+      * name_bkO: open port on the AR surface (i.e. towards SRM)
+      * and pickoff beams name_piT, name_poT, name_piO, and name_poO
+
+    Inputs:
+      kat: the finesse model
+      name: name of the optic
+      aoi: angle of incidence [deg] (Default: 45)
+      Chr: inverse radius of curvature [1/m] (Default: 0)
+      Thr: power transmissivity (Defualt: 0.5)
+      Lhr: HR loss (Default: 0)
+      Rar: AR reflectivity (Defualt: 0)
+      Lmd: loss through one pass of the material (Default: 0)
+      Nmd: index of refraction of the material (Default: 1.45)
+      phi: microscopic tuning [deg] (Default: 0)
+      pitch: pitch tuning [deg] (Default: 0)
+      yaw: yaw tuning [deg] (Default: 0)
+      dh: optic thickness [m] (Default: 0)
+      comp: whether to use a real compound mirror (Default: False)
+    """
     if Chr == 0:
         Rcx = None
         Rcy = None
@@ -62,17 +112,37 @@ def addBeamSplitter(
     bkO_s = bkO + '_s'
     frT_s = name + '_frT_s'
     frO_s = name + '_frO_s'
+    poT = name + '_poT'
+    piT = name + '_piT'
+    poO = name + '_poO'
+    piO = name + '_piO'
 
     if comp:
+        # aoi of beam in the substrate
+        alpha_sub = np.arcsin(np.sin(aoi*np.pi/180)/Nmd) * 180/np.pi
+
+        # path length of the beam in the substrate
+        dl = dh / np.cos(alpha_sub)
+        alpha_sub *= 180/np.pi
+
+        # HR surface
         kat.add(kcmp.beamSplitter(
             name, frI, frR, frT_s, frO_s, T=Thr, L=Lhr, alpha=aoi, phi=phi,
             Rcx=Rcx, Rcy=Rcy))
-        kat.add(kcmp.mirror(
-            name + '_AR_T', bkT_s, bkT, R=Rar, L=0, phi=phi))
-        kat.add(kcmp.mirror(
-            name + '_AR_O', bkO_s, bkO, R=Rar, L=0, phi=phi))
-        kat.add(kcmp.space(name + '_subT', frT_s, bkT_s, dh, Nmd))
-        kat.add(kcmp.space(name + '_subO', frO_s, bkO_s, dh, Nmd))
+
+        # AR transmission
+        kat.add(kcmp.beamSplitter(
+            name + '_AR_T', bkT_s, poT, bkT, piT, R=Rar, L=0, alpha=alpha_sub,
+            phi=phi))
+
+        # AR open
+        kat.add(kcmp.beamSplitter(
+            name + '_AR_O', bkO_s, poO, bkO, piO, R=Rar, L=0, alpha=-alpha_sub,
+            phi=phi))
+
+        # connect the HR and AR surfaces
+        kat.add(kcmp.space(name + '_subT', frT_s, bkT_s, dl, Nmd))
+        kat.add(kcmp.space(name + '_subO', frO_s, bkO_s, dl, Nmd))
 
     else:
         kat.add(kcmp.beamSplitter(
@@ -529,7 +599,8 @@ def setCavityBasis(kat, node_name1, node_name2):
       To use the basis defined by the front surfaces of IX and EX
         setCavityBasis(kat, 'IX_fr', 'EX_fr')
       This is equivalent to
-        kat.add(kcmd.cavity('cav_IX_EX', kat.IX, kat.IX_fr, kat.EX, kat.EX_fr))
+        kat.add(kcmd.cavity(
+            'cav_IX_EX', kat.IX, kat.IX.IX_fr, kat.EX, kat.EX.EX_fr))
     """
     # Get the list of nodes in this model
     nodes = kat.nodes.getNodes()
