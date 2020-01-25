@@ -119,7 +119,7 @@ def addBeamSplitter(
 
     if comp:
         # aoi of beam in the substrate
-        alpha_sub = np.arcsin(np.sin(aoi*np.pi/180)/Nmd) * 180/np.pi
+        alpha_sub = np.arcsin(np.sin(aoi*np.pi/180)/Nmd)
 
         # path length of the beam in the substrate
         dl = dh / np.cos(alpha_sub)

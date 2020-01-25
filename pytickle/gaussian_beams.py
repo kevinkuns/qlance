@@ -130,7 +130,7 @@ class GaussianPropagation:
             prop = gp.propagateABCD('IX', 'BS', 'PR3', 'PR2', 'PR')
         """
         nopt = len(optics)  # optics not necessarily self.optics
-        tot_ABCD= np.identity(2)
+        tot_ABCD = np.identity(2)
         path_ABCD = np.zeros((nopt - 2, 2, 2))
         link_lens = np.zeros(nopt - 1)
         qq_opt = {optic: {} for optic in optics}
@@ -301,11 +301,13 @@ class GaussianPropagation:
         """
         self._eval("nlink = {:s}.getLinkNum({:s}, {:s});".format(
             self.opt.optName, str2mat(link_start), str2mat(link_end)))
-        self._eval("link = opt.link(nlink);")
-        self._eval(("optStart = {opt}.getOptic({opt}".format(opt=self.opt.optName)
-                    + ".getOpticName(link.snSource));"))
-        self._eval(("optEnd = {opt}.getOptic({opt}".format(opt=self.opt.optName)
-                    + ".getOpticName(link.snSink));"))
+        self._eval("link = {:s}.link(nlink);".format(self.opt.optName))
+        self._eval(
+            ("optStart = {opt}.getOptic({opt}".format(opt=self.opt.optName)
+             + ".getOpticName(link.snSource));"))
+        self._eval(
+            ("optEnd = {opt}.getOptic({opt}".format(opt=self.opt.optName)
+             + ".getOpticName(link.snSink));"))
         start_info = self._eval("optStart.getOutputName(link.portSource)", 1)
         end_info = self._eval("optEnd.getInputName(link.portSink)", 1)
         start_name, start_port = start_info.split('->')
