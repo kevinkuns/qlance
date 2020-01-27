@@ -1035,16 +1035,34 @@ class KatSweep:
         self.poses[''] = out.x
 
     def getSweepSignal(self, probeName, driveName, func=None):
+        """Get data on a sweep signal
+
+        Inputs:
+          probeName: name of the probe to return data from
+          driveName: name of the drive to sweep
+          func: if not None, function to apply to the sweep signal before
+            returning (Default: None)
+
+        Returns:
+          poses: the positions of the drive specified by driveName
+          sig: the signal from probe name at those locations with the function
+            func applied if applicable
+
+        Examples:
+          * To find the power in the reflected power from an FP cavity as the
+            end mirror is tuned
+              poses, power = kat.getSweepSignal('REFL_DC', 'EX')
+          * If an amplitude detector 'SRC_f1' probes the f1 sideband in the
+            SRC2 the amplitude of the (complex) signal as the SRM is tuned is
+            found by
+              poses, amp = kat.getSweepSignal('SRC_f1', 'SR', func=np.abs)
+            and the power is found by
+              poses, power = kat.getSweepSignal(
+                                 'SRC_f1', 'SR', func=lambda x: np.abs(x)**2)
+        """
         sig = self.sigs[probeName]
         if func:
-            if func == 'abs':
-                sig = np.abs(sig)
-            elif func == 're':
-                sig = np.real(sig)
-            elif func == 'im':
-                sig = np.imag(sig)
-            else:
-                raise ValueError('Unrecognized function ' + func)
+            sig = func(sig)
 
         return self.poses[driveName], sig
 
