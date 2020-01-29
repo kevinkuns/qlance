@@ -427,7 +427,7 @@ def get_drive_dof(kat, drive, dof, force=False):
     Returns:
       the component
     """
-    if dof not in ['pos', 'pitch', 'yaw', 'amp', 'freq']:
+    if dof not in ['pos', 'pitch', 'yaw', 'amp', 'freq', 'len']:
         raise ValueError('Unrecognized dof ' + dof)
 
     if force:
@@ -441,6 +441,8 @@ def get_drive_dof(kat, drive, dof, force=False):
             return kat.components[drive].P
         elif dof == 'freq':
             return kat.components[drive].f
+        elif dof == 'len':
+            return kat.components[drive].L
 
     else:
         if dof == 'pos':
@@ -453,6 +455,8 @@ def get_drive_dof(kat, drive, dof, force=False):
             return kat.components[drive].P
         elif dof == 'freq':
             return kat.components[drive].f
+        elif dof == 'len':
+            return kat.components[drive].L
 
 
 def has_dof(kat, drive, dof):
