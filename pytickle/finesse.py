@@ -317,6 +317,23 @@ def addLaser(kat, name, P, f=0, phase=0):
     kat.add(kcmd.laser(name, name + '_out', P=P, f=f, phase=phase))
 
 
+def addLens(kat, name, f):
+    """Add a lens to a finesse model
+
+    Adds a lens with nodes name_fr and name_bk
+
+    Inputs:
+      kat: the finesse model
+      name: name of the lens
+      f: focal length [m]
+
+    Example:
+        addLens(kat, 'IX_lens', 35e3)
+      adds a lens named 'IX_lens' with a 35 km focal length
+    """
+    kat.add(kcmd.lens(name, name + '_fr', name + '_bk', f=f))
+
+
 def set_probe_response(kat, name, resp):
     """Set whether a probe will be used to measure DC or frequency response
 
