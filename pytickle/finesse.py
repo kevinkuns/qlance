@@ -317,6 +317,61 @@ def addLaser(kat, name, P, f=0, phase=0):
     kat.add(kcmd.laser(name, name + '_out', P=P, f=f, phase=phase))
 
 
+def addIsolator(kat, name, r):
+    """Add an isolator to a finesse model
+
+    Adds an isolator to a finesse model. The input node is name_in and
+    the output node is name_out.
+
+    A Faraday isolator should be added with addFaradayIsolator instead
+
+    Inputs:
+      kat: the finesse model
+      name: name of the isolator
+      r: suppression factor in dB (i.e. 10**(-r/20))
+
+    Example:
+      To add an isolator named 'iso' with 20 dB of suppression
+        addIsolator(kat, 'iso', 20)
+      iso_in is the input node and iso_out is the output node
+    """
+    kat.add(kcmp.isolator(name, name + '_in', name + 'out', r))
+
+
+def addFaradayIsolator(kat, name):
+    """Add a Faraday isolator to a finesse model
+
+    Adds a Faraday isolator with the following nodes
+      * name_fr_in (input in the forward direction)
+      * name_fr_out (output in the forward direction)
+      * name_bk_in (input in the backward direction)
+      * name_bk_out (output in the backward direction)
+
+    Signals flow:
+      * from fr_in to fr_out
+      * from bk_in to fr_in
+      * from fr_out to bk_out
+      * from bk_out to bk_in
+
+    In the example of a Faraday isolator used to inject squeezed vacuum into
+    the dark port of an IFO the ports would be
+      * fr_in: beam exiting the IFO from the SRM incident on the Faraday
+      * fr_out: beam exiting the IFO from the Faraday going to the OMC
+      * bk_in: beam entering the IFO from the squeezer incident on the Faraday
+      * bk_out: open port where the unsqueezed vacuum incident on the Faraday
+          from the OMC exits
+
+    Inputs:
+      kat: the finesse model
+      name: name of the isolator
+    """
+    n1 = name + '_fr_in'
+    n2 = name + '_bk_in'
+    n3 = name + '_fr_out'
+    n4 = name + '_bk_out'
+    kat.add(kcmp.dbs(name, n1, n2, n3, n4))
+
+
 def addLens(kat, name, f):
     """Add a lens to a finesse model
 
