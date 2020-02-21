@@ -46,7 +46,7 @@ class TestFreqResp:
 
     opt = optFP('optFR')
     ff = np.logspace(-2, 4, 1000)
-    opt.tickle(ff, noise=False)
+    opt.tickle(ff)
 
     def test_tfI(self):
         tfI = self.opt.getTF('REFL_I', 'EX')
@@ -55,6 +55,18 @@ class TestFreqResp:
     def test_tfQ(self):
         tfQ = self.opt.getTF('REFL_Q', 'EX')
         assert np.allclose(tfQ, data['tfQ'])
+
+    def test_qnI(self):
+        qnI = self.opt.getQuantumNoise('REFL_I')
+        assert np.allclose(qnI, data['qnQ'])
+
+    def test_qnQ(self):
+        qnQ = self.opt.getQuantumNoise('REFL_Q')
+        assert np.allclose(qnQ, data['qnQ'])
+
+    def test_qnDC(self):
+        qnDC = self.opt.getQuantumNoise('REFL_DC')
+        assert np.allclose(qnDC, data['qnDC'])
 
 
 class TestSweep:

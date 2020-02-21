@@ -1,5 +1,7 @@
 """
 Unit tests for finesse PDH frequency response and sweeps
+
+ADD SHOT NOISE
 """
 
 import numpy as np
@@ -33,6 +35,10 @@ def katFP():
     kat.add(kcmp.space('s_Laser_Mod', 'Laser_out', 'Mod_in', 0))
     kat.add(kcmp.space('s_Mod_IX', 'Mod_out', 'IX_bk', 0))
 
+    fin.addReadout(kat, 'REFL', 'IX_bk', fmod, 0)
+    for det_name in kat.detectors.keys():
+        fin.monitorShotNoise(kat, det_name)
+
     kat.phase = 2
 
     return kat
@@ -41,7 +47,7 @@ def katFP():
 class TestFreqResp:
 
     kat = katFP()
-    fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0)
+    # fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0)
     katFR = fin.KatFR(kat)
     katFR.tickle(1e-2, 1e4, 1000)
 
@@ -53,11 +59,23 @@ class TestFreqResp:
         tfQ = self.katFR.getTF('REFL_Q', 'EX')
         assert np.allclose(tfQ, data['tfQ'])
 
+    def test_qnI(self):
+        qnI = self.katFR.getQuantumNoise('REFL_I')
+        assert np.allclose(qnI, data['qnQ'])
+
+    def test_qnQ(self):
+        qnQ = self.katFR.getQuantumNoise('REFL_Q')
+        assert np.allclose(qnQ, data['qnQ'])
+
+    def test_qnDC(self):
+        qnDC = self.katFR.getQuantumNoise('REFL_DC')
+        assert np.allclose(qnDC, data['qnDC'])
+
 
 class TestSweep:
 
     kat = katFP()
-    fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=False)
+    # fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=False)
     ePos = 5e-9 * 360/kat.lambda0
     # kat.add(kcom.xaxis('lin', [-ePos, ePos], kat.EX.phi, 1000))
     # kat.parse('yaxis abs')
@@ -77,7 +95,7 @@ class TestSweep:
 class TestFreqRespSetProbe:
 
     kat = katFP()
-    fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=False)
+    # fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=False)
     # for probe in ['REFL_DC', 'REFL_I', 'REFL_Q']:
     #     fin.set_probe_response(kat, probe, 'fr')
     # now this step is done automatically
@@ -97,7 +115,7 @@ class TestFreqRespSetProbe:
 class TestSweepSetProbe:
 
     kat = katFP()
-    fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=True)
+    # fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0, freqresp=True)
     # kat.add(kcom.xaxis('lin', [-ePos, ePos], kat.EX.phi, 1000))
     # kat.parse('yaxis abs')
     # out = kat.run()

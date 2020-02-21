@@ -1,5 +1,4 @@
 import numpy as np
-import pykat
 import pykat.components as kcmp
 import pykat.detectors as kdet
 import pykat.commands as kcmd
@@ -150,6 +149,50 @@ def addBeamSplitter(
             Rcx=Rcx, Rcy=Rcy))
 
 
+def _add_generic_probe(kat, name, node, freq, phase, probe_type, freqresp=True,
+                       alternate_beam=False):
+    """Add either a photodiode or shot noise detector to a finesse model
+
+    Inputs:
+      kat: the finesse model
+      name: name of the probe
+      node: node the probe probes
+      freq: demodulation frequency
+      phase: demodulation phase
+      probe_type: type of probe: pos, pitch, yaw, or shot
+      freqresp: if True, the probe is used for a frequency response
+        measurement (Default: True)
+      alternate_beam: if True, the alternate beam is probed (Default: False)
+    """
+    kwargs = {'alternate_beam': alternate_beam}
+
+    if probe_type == 'shot':
+        # det = kdet.qshot
+        det = kdet.qnoised
+    elif probe_type == 'pos':
+        det = kdet.pd
+        kwargs['pdtype'] = None
+    elif probe_type == 'pitch':
+        det = kdet.pd
+        kwargs['pdtype'] = 'y-split'
+    elif probe_type == 'yaw':
+        det = kdet.pd
+        kwargs['pdtype'] = 'x-split'
+    else:
+        raise ValueError('Unrecognized probe type ' + probe_type)
+
+    if freq:
+        kwargs.update({'f1': freq, 'phase1': phase})
+        if freqresp:
+            kwargs['f2'] = 1
+        kat.add(det(name, 1 + freqresp, node, **kwargs))
+
+    else:
+        if freqresp:
+            kwargs['f1'] = 1
+        kat.add(det(name, 0 + freqresp, node, **kwargs))
+
+
 def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
              dof='pos'):
     """Add a probe to a finesse model
@@ -169,30 +212,16 @@ def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
       addProbe(kat, 'REFL_DC', 'REFL_in', 0, 0)
       addProbe(kat, 'REFL_Q', 'REFL_in', fmod, 90)
     """
-    if dof == 'pos':
-        pdtype = None
-    elif dof == 'pitch':
-        pdtype = 'y-split'
-    elif dof == 'yaw':
-        pdtype = 'x-split'
-    else:
+    if dof not in ['pos', 'pitch', 'yaw']:
         raise ValueError('Unrecognized dof ' + dof)
-    kwargs = {'pdtype': pdtype, 'alternate_beam': alternate_beam}
 
-    if freq:
-        kwargs.update({'f1': freq, 'phase1': phase})
-        if freqresp:
-            kwargs['f2'] = 1
-        kat.add(kdet.pd(name, 1 + freqresp, node, **kwargs))
-
-    else:
-        if freqresp:
-            kwargs['f1'] = 1
-        kat.add(kdet.pd(name, 0 + freqresp, node, **kwargs))
+    _add_generic_probe(kat, name, node, freq, phase, dof, freqresp=freqresp,
+                       alternate_beam=alternate_beam)
 
 
-def addReadout(kat, name, node, freqs, phases, freqresp=True, alternate_beam=False,
-               dof='pos', fnames=None):
+def addReadout(
+        kat, name, node, freqs, phases, freqresp=True, alternate_beam=False,
+        dof='pos', fnames=None):
     """Add RF and DC probes to a detection port
 
     Inputs:
@@ -268,6 +297,30 @@ def addGouyReadout(kat, name, phaseA, dphaseB=90):
         name + '_A', bs_name + '_frR', name + '_A', 0, gx=phaseA, gy=phaseA))
     kat.add(kcmp.space(
         name + '_B', bs_name + '_bkT', name + '_B', 0, gx=phaseB, gy=phaseB))
+
+
+def monitorShotNoise(kat, probe):
+    """Compute the shot noise of a photodiode
+
+    Adds a qshot detector to a finesse model named 'probe_shot'
+
+    Inputs:
+      kat: the finesse model
+      probe: probe name to compute shot noise for
+
+    Examples:
+      To compute the shot noise for the probe REFL_DC:
+        monitorShotNoise(kat, 'REFL_DC')
+      this adds the qshot detector 'REFL_DC_shot'
+    """
+    det = kat.detectors[probe]
+    if not isinstance(det, kdet.pd):
+        raise ValueError(probe + ' is not a photodiode')
+
+    node, freq, phase, _, alternate_beam = _get_probe_info(det)
+    _add_generic_probe(
+        kat, probe + '_shot', node, freq, phase, 'shot',
+        alternate_beam=alternate_beam)
 
 
 def addModulator(kat, name, fmod, gmod, order, modtype, phase=0):
@@ -389,6 +442,58 @@ def addLens(kat, name, f):
     kat.add(kcmd.lens(name, name + '_fr', name + '_bk', f=f))
 
 
+def _get_probe_info(det):
+    """Get some information about a detector
+
+    Input:
+      det: the finesse detector instance
+
+    Returns:
+      name: detector name
+      freq: demodulation frequency [Hz]
+      phase: demodulation phase [deg]
+      probe_type: type of probe: pos, pitch, yaw, or shot
+      alternate_beam: whether the probe is probing the alternate beam
+    """
+    if isinstance(det, kdet.qnoised):
+        probe_type = 'shot'
+    else:
+        if det.pdtype is None:
+            probe_type = 'pos'
+        elif det.pdtype == 'y-split':
+            probe_type = 'pitch'
+        elif det.pdtype == 'x-split':
+            probe_type = 'yaw'
+        else:
+            raise ValueError('Unrecognized pdtype ' + det.pdtype)
+
+    if det.num_demods == 0:
+        # DC probe for DC response
+        freq = 0
+        phase = 0
+
+    elif det.num_demods == 1:
+        phase = det.phase1.value
+        if phase is None:
+            # DC probe for freq response
+            freq = 0
+            phase = 0
+
+        else:
+            # RF probe for DC response
+            freq = det.f1.value
+
+    elif det.num_demods == 2:
+        # RF probe for freq response
+        freq = det.f1.value
+        phase = det.phase1.value
+
+    else:
+        raise ValueError('Too many demodulations {:d}'.format(det.num_demods))
+
+    return det.node.name, freq, phase, probe_type, det.alternate_beam
+
+
 def set_probe_response(kat, name, resp):
     """Set whether a probe will be used to measure DC or frequency response
 
@@ -422,48 +527,14 @@ def set_probe_response(kat, name, resp):
 
     # get the original parameters
     det = kat.detectors[name]
-    node = det.node.name
-    kwargs['alternate_beam'] = det.alternate_beam
-
-    if det.pdtype is None:
-        kwargs['dof'] = 'pos'
-    elif det.pdtype == 'y-split':
-        kwargs['dof'] = 'pitch'
-    elif det.pdtype == 'x-split':
-        kwargs['dof'] = 'yaw'
-    else:
-        raise ValueError('Unrecognized pdtype ' + det.pdtype)
-
-    # figure out what kind of detector it was originally
-    if det.num_demods == 0:
-        # DC probe for DC response
-        freq = 0
-        phase = 0
-
-    elif det.num_demods == 1:
-        phase = det.phase1.value
-        if phase is None:
-            # DC probe for freq response
-            freq = 0
-            phase = 0
-
-        else:
-            # RF probe for DC response
-            freq = det.f1.value
-
-    elif det.num_demods == 2:
-        # RF probe for freq response
-        freq = det.f1.value
-        phase = det.phase1.value
-
-    else:
-        raise ValueError('Too many demodulations {:d}'.format(det.num_demods))
+    node, freq, phase, probe_type, alternate_beam = _get_probe_info(det)
+    kwargs['alternate_beam'] = alternate_beam
 
     # Remove the old probe
     det.remove()
 
     # Add the new one
-    addProbe(kat, name, node, freq, phase, **kwargs)
+    _add_generic_probe(kat, name, node, freq, phase, probe_type, **kwargs)
 
 
 def set_all_probe_response(kat, resp):
@@ -1020,8 +1091,12 @@ class KatFR:
 
         return self.mechmod[dof][out_det][drive_in]
 
-    def getQuantumNoise(self, probeName, dof):
+    def getQuantumNoise(self, probeName, dof='pos'):
         qnoise = list(self.freqresp[dof][probeName + '_shot'].values())[0]
+        if dof == 'pos':
+            # if this was computed from a position TF convert back to W/rtHz
+            # 2*np.pi is correct here, not 360
+            qnoise *= self.kat.lambda0 / (2*np.pi)
         if np.any(np.iscomplex(qnoise)):
             print('Warning: some quantum noise spectra are complex')
         return np.real(qnoise)
@@ -1129,7 +1204,7 @@ class KatSweep:
             end mirror is tuned
               poses, power = kat.getSweepSignal('REFL_DC', 'EX')
           * If an amplitude detector 'SRC_f1' probes the f1 sideband in the
-            SRC2 the amplitude of the (complex) signal as the SRM is tuned is
+            SRC, the amplitude of the (complex) signal as the SRM is tuned is
             found by
               poses, amp = kat.getSweepSignal('SRC_f1', 'SR', func=np.abs)
             and the power is found by
