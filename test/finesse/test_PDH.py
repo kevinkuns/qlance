@@ -1,7 +1,5 @@
 """
 Unit tests for finesse PDH frequency response and sweeps
-
-ADD SHOT NOISE
 """
 
 import numpy as np
