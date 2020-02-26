@@ -154,7 +154,7 @@ def catfilt(*args):
     return Filter(newFilt)
 
 
-def compute_margins(ff, tf):
+def compute_phase_margin(ff, tf):
     """Compute the UGF and phase margin of an OLTF
 
     Inputs:
@@ -169,6 +169,29 @@ def compute_margins(ff, tf):
     ugf = ff[ind]
     pm = np.angle(tf[ind], True)
     return ugf, pm
+
+
+def compute_stability_margin(ff, tf):
+    """Compute the stability margin and frequency of maximum stability
+
+    Computes the stability margin s is defined as the shortest distance to the
+    critical point of the OLTF G = 1. If M is the maximum of the loop supresion
+    function 1/(1 - G) then s = 1/M.
+
+    Inputs:
+      ff: the frequency vector [Hz]
+      tf: the loop suppression (or stability function) i.e. 1/(1 - G)
+        where
+
+    Returns:
+      fms: the frequency at where the loop is most sensitive [Hz]
+      sm: the stability margin
+    """
+    tf = np.abs(tf)
+    ind = np.argmax(tf)
+    fms = ff[ind]
+    sm = 1/np.max(tf)
+    return fms, sm
 
 
 class DegreeOfFreedom:
@@ -217,6 +240,7 @@ class Filter:
     Attributes:
       filt: the filter function
     """
+
     def __init__(self, *args, **kwargs):
         if 'Hz' in kwargs:
             if kwargs['Hz']:
@@ -335,7 +359,7 @@ class ControlSystem:
         self.oltf = {tp: self.computeOLTF(tp)
                      for tp in ['err', 'ctrl', 'comp', 'drive', 'sens']}
         self.cltf = {sig: self.computeCLTF(oltf)
-                      for sig, oltf in self.oltf.items()}
+                     for sig, oltf in self.oltf.items()}
         if drive2bsm:
             self.computeBeamSpotMotion()
 
@@ -639,16 +663,23 @@ class ControlSystem:
 
     def compute_margins(self, dof_to, dof_from, tstpnt):
         oltf = self.getOLTF(dof_to, dof_from, tstpnt)
-        return compute_margins(self.opt.ff, oltf)
+        cltf = self.getCLTF(dof_to, dof_from, tstpnt)
+        ugf, pm = compute_phase_margin(self.opt.ff, oltf)
+        fms, sm = compute_stability_margin(self.opt.ff, cltf)
+        return ugf, pm, fms, sm
 
     def print_margins(self, tstpnt):
         margins = {}
         for dof in self.dofs.keys():
-            ugf, pm = self.compute_margins(dof, dof, tstpnt)
+            ugf, pm, fms, sm = self.compute_margins(dof, dof, tstpnt)
             margins[dof] = ['{:0.2f} {:s}Hz'.format(*siPrefix(ugf)[::-1]),
-                            '{:0.2f} deg'.format(pm)]
+                            '{:0.2f} deg'.format(pm),
+                            '{:0.2f} {:s}Hz'.format(*siPrefix(fms)[::-1]),
+                            '{:0.2f}'.format(sm)]
 
-        margins = pd.DataFrame(margins, index=['UGF', 'phase margin']).T
+        margins = pd.DataFrame(
+            margins,
+            index=['UGF', 'phase margin', 'max sensitivity', 'stability margin']).T
         with pd.option_context('display.max_rows', None,
                                'display.max_columns', None):
             display(margins)
@@ -700,7 +731,8 @@ class ControlSystem:
                 if tp_from == 'drive':
                     loopTF = cltf_or_unity('drive')
                 else:
-                    loopTF = self.getTF('', 'drive', '', tp_from, closed=closed)
+                    loopTF = self.getTF(
+                        '', 'drive', '', tp_from, closed=closed)
 
                 # for pos, apply mechanical modification
                 if tp_to == 'pos':
