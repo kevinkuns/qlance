@@ -6,6 +6,7 @@ from .utils import assertType, siPrefix, append_str_if_unique
 from functools import partial
 from numbers import Number
 from itertools import cycle, zip_longest
+import matplotlib.pyplot as plt
 from . import plotting
 
 
@@ -804,42 +805,15 @@ class ControlSystem:
             totalPSD += powTF[to_ind] * noiseASD**2
         return np.sqrt(totalPSD)
 
-    def getSensingNoise(self, dof, probe, asd=None, sig='err'):
-        """Compute the sensing noise from a probe to a DOF
-
-        Inputs:
-          dof: DOF name
-          probe: probe name
-          asd: Noise ASD to use. If None (Default) noise is calculated
-            from the Optickle model
-          sig: which signal to compute the TF for:
-            1) 'err': error signal (Default)
-            2) 'ctrl': control signal
-
-        Returns:
-          sensNoise: the sensing noise
-            [W/rtHz] if sig='err'
-            [m/rtHz] if sig='ctrl'
-        """
-        if sig not in ['err', 'ctrl']:
-            raise ValueError('The signal must be either err or ctrl')
-
-        cltf = self.cltf[sig]
-        if sig == 'err':
-            noiseTF = np.einsum('ijf,jk->ikf', cltf, self.inMat)
-        elif sig == 'ctrl':
-            noiseTF = np.einsum('ijf,jkf,kl->ilf', cltf, self.ctrlMat,
-                                self.inMat)
-
-        if asd is None:
-            qnoise = self.opt.getQuantumNoise(probe)
-        else:
-            qnoise = asd
-
-        dof_ind = list(self.dofs.keys()).index(dof)
-        probe_ind = self.probes.index(probe)
-        sensNoise = np.abs(noiseTF[dof_ind, probe_ind, :]) * qnoise
-        return sensNoise
+    def plotNyquist(self, dof_to, dof_from, tstpnt):
+        oltf = self.getOLTF(dof_to, dof_from, tstpnt)
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='polar')
+        ax.plot(np.angle(oltf), np.abs(oltf))
+        npts = len(oltf)
+        ax.plot(np.linspace(0, 2*np.pi, npts), np.ones(npts))
+        ax.set_ylim(0, 3)
+        return fig
 
     def _getIndex(self, name, tstpnt):
         if tstpnt in ['err', 'ctrl', 'cal', 'cal']:
