@@ -5,9 +5,8 @@ This is copied almost exactly from the optPolSag.m example from Optickle
 in order to test pytickle
 """
 
-from __future__ import division
 import numpy as np
-import pytickle as pyt
+import pytickle.optickle as pyt
 import scipy.constants as scc
 
 

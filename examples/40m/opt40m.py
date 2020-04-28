@@ -2,9 +2,8 @@
 Create a 40m Optickle model.
 '''
 
-from __future__ import division
 import numpy as np
-import pytickle as pyt
+import pytickle.optickle as pyt
 
 
 def opt40m(eng, opt, par, phi=0, zeta=0, Pin=1):
