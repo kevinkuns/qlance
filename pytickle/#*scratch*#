@@ -1,0 +1,37 @@
+Locking X arm
+-3.79687499999998e-05 716673.54322425
+Locking Y arm
+-3.79687499999998e-05 716622.376472478
+Locking MICH
+-0.00110109374999999 7.84480863471691e-05
+Locking PRCL
+0.00650531249999996 5252.49755876449
+Locking SRCL
+90.00306984375 9.50255376438856e-05
+
+
+(0.00650531249999996, 5252.4974961609)
+(89.989138125, 0.00018080689365942328)
+
+{'ITMX': -0.00110109374999999,
+ 'ETMX': -0.00110109374999999,
+ 'ITMY': 0.00110109374999999,
+ 'ETMY': 0.00110109374999999,
+ 'PRM': 0.00650531249999996,
+'SRM': 90.00306984375}
+
+
+Note that while the discussion above focussed on the case where the tertiary mass is a supermassive BH at 100 AU away from the innert binary, the results are the same if it
+
+This search can also be applied to the search for exoplanets around WD binaries as suggested by
+
+Detecting such phase modulations can also
+
+Furthermore, this method can be applied to the search for exoplanets around WD binaries, as suggested by, since an exoplanet in such a system acts as the tertiary body modulating the WD binary's phase.
+
+Similarly, such a modulation may also be applied to search for exoplanets around WD binaries as suggested by  Refs.~\cite{Seto2008, Tamanini2019}. 
+
+
+We defer the analysis of the effects of higher order post-Newtownian corrections and the time-varying effects of TianGO/LISA's orbits discussed in Appendix A is to future studies
+
+The time-dependent effects of the TianGO or LISA orbits discussed in Appendix, and the effects of higher order post-Newtonian corrections to the waveform are deffered to future studies.

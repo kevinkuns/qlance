@@ -698,8 +698,13 @@ class PyTickle:
           BS: if True, adds the PBS as a BeamSplitter
             if False, adds it as a mirror (default: False)
         """
-        Thr = [[transS, self.lambda0, 1],
-               [1 - reflP, self.lambda0, 0]]
+        try:
+            lambda0 = self.lambda0[0]
+        except IndexError:
+            lambda0 = self.lambda0
+        Thr = [[transS, lambda0, 1],
+               [1 - reflP, lambda0, 0]]
+
         if BS:
             self.addBeamSplitter(name, aoi, Chr, Thr, Lhr, Rar, Lmd, Nmd)
         else:
