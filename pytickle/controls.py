@@ -195,6 +195,41 @@ def compute_stability_margin(ff, tf):
     return fms, sm
 
 
+def plotNyquist(oltf, rmax=3):
+    """Make a Nyquist plot
+
+    Inputs:
+      oltf: the open loop transfer function
+      rmax: maximum radius for the plot (Default: 3)
+
+    Returns:
+      fig: the figure
+    """
+    npts = len(oltf)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='polar')
+    rr = np.abs(oltf)
+    ph = np.angle(oltf)
+    ax.plot(ph, rr, 'C0-')
+    ax.plot(-ph, rr, 'C0-')
+    ax.set_ylim(0, rmax)
+    ax.plot(np.linspace(0, 2*np.pi, npts), np.ones(npts), c='C1')
+
+    # plot the arrows
+    # find the index of the halfway point of one branch of the curve
+    ind = np.argmin(np.abs(rr - min(np.max(rr), rmax)/2))
+    # using ax.arrow sometimes looks funky with polar plots
+    ax.annotate(
+        '', xy=(ph[ind + 1], rr[ind + 1]), xytext=(ph[ind], rr[ind]),
+        arrowprops=dict(fc='C0', ec='C0'))
+    ax.annotate(
+        '', xy=(-ph[ind], rr[ind]), xytext=(-ph[ind + 1], rr[ind + 1]),
+        arrowprops=dict(fc='C0', ec='C0'))
+
+    return fig
+
+
 class DegreeOfFreedom:
     def __init__(self, name, probes, drives, dofType='pos'):
         self.name = name
@@ -634,7 +669,7 @@ class ControlSystem:
         Inputs:
           dof_to: output DOF
           dof_from: input DOF
-          tstpnt: which test pont to compute the TF for:
+          tstpnt: which test point to compute the TF for
         """
         oltf = self.oltf[tstpnt]
         if dof_from:
@@ -805,15 +840,23 @@ class ControlSystem:
             totalPSD += powTF[to_ind] * noiseASD**2
         return np.sqrt(totalPSD)
 
-    def plotNyquist(self, dof_to, dof_from, tstpnt):
+    def plotNyquist(self, dof_to, dof_from, tstpnt, rmax=3):
+        """Make a Nyquist plot
+
+        Inputs:
+          dof_to: output DOF
+          dof_from: input DOF
+          tstpnt: which test point to compute the TF for
+          rmax: maximum radius for the plot (Default: 3)
+        """
         oltf = self.getOLTF(dof_to, dof_from, tstpnt)
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='polar')
-        ax.plot(np.angle(oltf), np.abs(oltf))
-        npts = len(oltf)
-        ax.plot(np.linspace(0, 2*np.pi, npts), np.ones(npts))
-        ax.set_ylim(0, 3)
-        return fig
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection='polar')
+        # ax.plot(np.angle(oltf), np.abs(oltf))
+        # npts = len(oltf)
+        # ax.plot(np.linspace(0, 2*np.pi, npts), np.ones(npts))
+        # ax.set_ylim(0, 3)
+        return plotNyquist(oltf, rmax=rmax)
 
     def _getIndex(self, name, tstpnt):
         if tstpnt in ['err', 'ctrl', 'cal', 'cal']:
