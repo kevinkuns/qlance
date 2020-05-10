@@ -146,13 +146,34 @@ def catfilt(*args):
     Returns:
       newFilt: a Filter instance which is the product of the inputs
     """
-    def newFilt(ss):
-        out = 1
-        for filt in args:
-            out *= filt.filt(ss)
-        return out
+    # check if any of the filters have not been defined with zpk
+    zpk_defined = True
+    for filt in args:
+        if filt._ps is None:
+            zpk_defined = False
+            break
 
-    return Filter(newFilt)
+    # if all filters have zpk, define a new one combining this information
+    if zpk_defined:
+        zs = []
+        ps = []
+        k = 1
+        for filt in args:
+            zf, pf, kf = filt.get_zpk(Hz=False)
+            zs.extend(assertArr(zf))
+            ps.extend(assertArr(pf))
+            k *= kf
+        return Filter(zs, ps, k, Hz=False)
+
+    # otherwise just make a new function
+    else:
+        def newFilt(ss):
+            out = 1
+            for filt in args:
+                out *= filt._filt(ss)
+            return out
+
+        return Filter(newFilt)
 
 
 def compute_phase_margin(ff, tf):
@@ -270,11 +291,8 @@ class Filter:
         2) Giving the zeros, poles, and gain
         3) Giving the zeros, poles, and gain at a specific frequency
       Hz: If True, the zeros and poles are in the frequency domain and in Hz
-        If False, the zeros and poles are in the s-domain and in rad/s
-        (Default: True)
-
-    Attributes:
-      filt: the filter function
+          If False, the zeros and poles are in the s-domain and in rad/s
+          (Default: True)
     """
 
     def __init__(self, *args, **kwargs):
@@ -287,9 +305,12 @@ class Filter:
             a = -2*np.pi
 
         if len(args) == 1:
-            self.filt = args[0]
-            if not callable(self.filt):
+            if not callable(args[0]):
                 raise ValueError('One argument filters should be functions')
+            self._filt = args[0]
+            self._zs = None
+            self._ps = None
+            self._k = None
 
         elif len(args) == 3:
             zs = a*np.array(args[0])
@@ -298,7 +319,10 @@ class Filter:
             if not isinstance(k, Number):
                 raise ValueError('The gain should be a scalar')
 
-            self.filt = partial(zpk, zs, ps, k)
+            self._filt = partial(zpk, zs, ps, k)
+            self._zs = zs
+            self._ps = ps
+            self._k = k
 
         elif len(args) == 4:
             zs = a*np.array(args[0])
@@ -310,7 +334,10 @@ class Filter:
                     'The gain and reference frequency should be scalars')
 
             k = g / np.abs(zpk(zs, ps, 1, s0))
-            self.filt = partial(zpk, zs, ps, k)
+            self._filt = partial(zpk, zs, ps, k)
+            self._zs = zs
+            self._ps = ps
+            self._k = k
 
         else:
             msg = 'Incorrect number of arguments. Input can be either\n' \
@@ -322,8 +349,35 @@ class Filter:
             raise ValueError(msg)
 
     def computeFilter(self, ff):
+        """Compute the filter
+
+        Inputs:
+          ff: frequency vector at which to compute the filter [Hz]
+        """
         ss = 2j*np.pi*ff
-        return self.filt(ss)
+        return self._filt(ss)
+
+    def get_zpk(self, Hz=False):
+        """Get the zeros, poles, and gain of this filter
+
+        A ValueError is raised if the filter was defined as a function instead
+        of giving zeros, poles, and gain.
+
+        Inputs:
+          Hz: If True, the zeros and poles are in the frequency domain and in Hz
+              If False, the zeros and poles are in the s-domain and in rad/s
+              (Default: False)
+
+        Returns:
+          zs: the zeros
+          ps: the poles
+          k: the gain
+        """
+        if self._ps is None:
+            raise ValueError(
+                'This filter was not defined with zeros, poles, and a gain')
+        a = (-2*np.pi)**Hz
+        return self._zs/a, self._ps/a, self._k
 
     def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
         """Plot the filter
@@ -480,7 +534,7 @@ class ControlSystem:
         for (dof_to, dof_from, filt) in self.filters:
             toInd = list(self.dofs.keys()).index(dof_to)
             fromInd = list(self.dofs.keys()).index(dof_from)
-            ctrlMat[toInd, fromInd, :] = filt.filt(self.ss)
+            ctrlMat[toInd, fromInd, :] = filt._filt(self.ss)
         return ctrlMat
 
     def computeCompensator(self):
