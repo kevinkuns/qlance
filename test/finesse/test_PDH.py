@@ -24,14 +24,12 @@ def katFP():
 
     fin.addMirror(kat, 'EX', Thr=0)
     fin.addMirror(kat, 'IX', Thr=Ti)
-    kat.add(kcmp.space('s_IX_EX', 'IX_fr', 'EX_fr', Lcav))
+    fin.addSpace(kat, 'IX_fr', 'EX_fr', Lcav)
 
-    # kat.add(kcmp.laser('Laser', 'Laser_out', P=Pin))
-    # kat.add(kcmp.modulator('Mod', 'Mod_in', 'Mod_out', fmod, gmod, 5, 'pm'))
     fin.addLaser(kat, 'Laser', Pin)
     fin.addModulator(kat, 'Mod', fmod, gmod, 5, 'pm')
-    kat.add(kcmp.space('s_Laser_Mod', 'Laser_out', 'Mod_in', 0))
-    kat.add(kcmp.space('s_Mod_IX', 'Mod_out', 'IX_bk', 0))
+    fin.addSpace(kat, 'Laser_out', 'Mod_in', 0)
+    fin.addSpace(kat, 'Mod_out', 'IX_bk', 0)
 
     fin.addReadout(kat, 'REFL', 'IX_bk', fmod, 0)
     for det_name in kat.detectors.keys():

@@ -55,8 +55,9 @@ def addMirror(
             name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
 
         # AR surface
+        # FIXME: this treats AR as loss instead of reflection
         kat.add(kcmp.mirror(
-            name + '_AR', bk_s, bk, R=Rar, L=0, phi=phi))
+            name + '_AR', bk_s, bk, R=0, L=Rar, phi=phi))
 
         # connect the AR and HR surfaces
         kat.add(kcmp.space(name + '_sub', bk_s, fr_s, dh, Nmd))
@@ -69,7 +70,7 @@ def addMirror(
 def addBeamSplitter(
         kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, Rar=0, Lmd=0, Nmd=1.45,
         phi=0, dh=0, comp=False):
-    # FIXME: implement pitch and yaw
+
     """Add a beamsplitter to a finesse model
 
     Adds a beamsplitter with nodes
@@ -78,7 +79,6 @@ def addBeamSplitter(
       * name_bkT: beam transmitted through the AR surface (i.e. towards ITMX)
       * name_bkO: open port on the AR surface (i.e. towards SRM)
       * and pickoff beams name_piT, name_poT, name_piO, and name_poO
-
     Inputs:
       kat: the finesse model
       name: name of the optic
@@ -95,6 +95,7 @@ def addBeamSplitter(
       dh: optic thickness [m] (Default: 0)
       comp: whether to use a real compound mirror (Default: False)
     """
+    # FIXME: implement pitch and yaw
     if Chr == 0:
         Rcx = None
         Rcy = None
@@ -131,12 +132,12 @@ def addBeamSplitter(
 
         # AR transmission
         kat.add(kcmp.beamSplitter(
-            name + '_AR_T', bkT_s, poT, bkT, piT, R=Rar, L=0, alpha=alpha_sub,
+            name + '_AR_T', bkT_s, poT, bkT, piT, R=0, L=Rar, alpha=alpha_sub,
             phi=phi))
 
         # AR open
         kat.add(kcmp.beamSplitter(
-            name + '_AR_O', bkO_s, poO, bkO, piO, R=Rar, L=0, alpha=-alpha_sub,
+            name + '_AR_O', bkO_s, poO, bkO, piO, R=0, L=Rar, alpha=alpha_sub,
             phi=phi))
 
         # connect the HR and AR surfaces
@@ -147,6 +148,65 @@ def addBeamSplitter(
         kat.add(kcmp.beamSplitter(
             name, frI, frR, bkT, bkO, T=Thr, L=Lhr, alpha=aoi, phi=phi,
             Rcx=Rcx, Rcy=Rcy))
+
+
+def addSpace(kat, node1, node2, length, n=1, new_comp=None):
+    """Add a space to a finesse model
+
+    Adds a space between two components named 's_comp1_comp2'
+
+    Inputs:
+      kat: the finesse model
+      node1: name of the first node the space is connected to
+      node2: name of the second node the space is connected to
+      length: length of the space [m]
+      n: index of refraction of the space (Default: 1)
+      new_comp: If not None, the name of a new component to connect the space to
+        This is a rarely used command that allows the addition of a space
+        to a component that doesn't exist yet and can usually be avoided by
+        reorganizing the model. (Defualt: None)
+
+    Examples:
+      * If two mirrors were added with
+          addMirror(kat, 'EX')
+          addMirror(kat, 'IX')
+      then
+          addSpace(kat, 'IX_fr', 'EX_fr', 4e3)
+      adds a 4 km space called 's_IX_EX' between the front faces of the
+      mirrors 'IX' and 'EX'
+
+      * Using
+          addSpace(kat, 'BS_bkO', 'AS_in', 10, new_comp='AS')
+        adds a 10 m space called 's_BS_AS' between a beamsplitter and an empty
+        node 'AS_in'. Probes can later be connected to the 'AS_in' port.
+    """
+    nodes = kat.nodes.getNodes()
+
+    def get_comp_name(node_name):
+        """Get the name of the component a node is attached to
+        """
+        try:
+            node = nodes[node_name]
+        except KeyError:
+            raise ValueError(node_name + ' is not a node in the model')
+
+        comps = np.array(node.components)
+        inds = None != comps
+        # number of components this node is connected to
+        ncmp = np.count_nonzero(inds)
+        if ncmp != 1:
+            raise ValueError(
+                'The node {:s} is connected to {:d}'.format(ncmp, node_name)
+                + ' components but should only be connected to one')
+        return comps[inds][0].name
+
+    opt1 = get_comp_name(node1)
+    if new_comp is None:
+        opt2 = get_comp_name(node2)
+    else:
+        opt2 = new_comp
+    name = 's_{:s}_{:s}'.format(opt1, opt2)
+    kat.add(kcmp.space(name, node1, node2, length, n))
 
 
 def _add_generic_probe(kat, name, node, freq, phase, probe_type, freqresp=True,
@@ -1147,7 +1207,7 @@ class KatSweep:
         self.offsets = dict.fromkeys(assertType(drives, dict))
 
     def sweep(
-            self, spos, epos, npts, linlog='lin', verbose=False):
+            self, spos, epos, npts, linlog='lin', verbose=False, debug=False):
         kat = self.kat.deepcopy()
         kat.verbose = verbose
         kat.add(kcmd.variable('sweep', 1))
@@ -1173,6 +1233,8 @@ class KatSweep:
             comp.put(kat.commands[name].output)
 
         kat.parse('yaxis re:im')
+        if debug:
+            return kat
         out = kat.run()
 
         for probe in self.sigs.keys():

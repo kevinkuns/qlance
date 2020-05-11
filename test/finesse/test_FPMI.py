@@ -38,22 +38,20 @@ def katMI(dpx, dpb, aoib):
     fin.addMirror(kat, 'IY', Thr=Ti, Chr=1/Ri)
     fin.addBeamSplitter(kat, 'BS', aoi=aoib, phi=dpb)
 
-    # kat.add(kcmp.laser('Laser', 'Laser_out', P=Pin))
-    # kat.add(kcmp.modulator('Mod', 'Mod_in', 'Mod_out', fmod, gmod, 5, 'pm'))
     fin.addLaser(kat, 'Laser', Pin)
     fin.addModulator(kat, 'Mod', fmod, gmod, 5, 'pm')
-    kat.add(kcmp.space('s_Laser_Mod', 'Laser_out', 'Mod_in', 0))
-    kat.add(kcmp.space('s_Mod_BS', 'Mod_out', 'BS_frI', 1))
+    fin.addSpace(kat, 'Laser_out', 'Mod_in', 0)
+    fin.addSpace(kat, 'Mod_out', 'BS_frI', 1)
 
-    kat.add(kcmp.space('s_BS_IX', 'BS_bkT', 'IX_bk', lx))
-    kat.add(kcmp.space('s_IX_EX', 'IX_fr', 'EX_fr', Lcav))
+    fin.addSpace(kat, 'BS_bkT', 'IX_bk', lx)
+    fin.addSpace(kat, 'IX_fr', 'EX_fr', Lcav)
     fin.setCavityBasis(kat, 'IX_fr', 'EX_fr')
 
-    kat.add(kcmp.space('s_BS_IY', 'BS_frR', 'IY_bk', ly))
-    kat.add(kcmp.space('s_IY_EY', 'IY_fr', 'EY_fr', Lcav))
+    fin.addSpace(kat, 'BS_frR', 'IY_bk', ly)
+    fin.addSpace(kat, 'IY_fr', 'EY_fr', Lcav)
     fin.setCavityBasis(kat, 'IY_fr', 'EY_fr')
 
-    kat.add(kcmp.space('s_BS_AS', 'BS_bkO', 'AS_in', 1))
+    fin.addSpace(kat, 'BS_bkO', 'AS_in', 1, new_comp='AS')
 
     kat.phase = 2
 
