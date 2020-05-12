@@ -8,10 +8,15 @@ PyTickle is a python package that simulates optomechanical systems using the Opt
 * State space representations of the optomechanical plants are found through an interface with [IIRrational](https://lee-mcculler.docs.ligo.org/iirrational/) and can be converted to Matlab-like systems from the python [control systems](https://python-control.readthedocs.io/en/0.8.3/index.html) package which allow for more sophisticated design techniques.
 
 ## Getting started
-  1. Clone Optickle2 from [this](https://github.com/Optickle/Optickle/tree/Optickle2) repository. It is important to get Optickle2 and not Optickle.
-  1. Install the python Matlab engine as described [here](https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html)
-  1. Clone this repository
-  1. Optionally, set the variable `OPTICKLE_PATH` to the path to the Optickle2 directory.
+  1. Clone this repository.
+  
+  2. If you want to use Optickle simulations
+     1. Clone Optickle2 from [this](https://github.com/Optickle/Optickle/tree/Optickle2) repository. It is important to get Optickle2 and not Optickle.
+     2. Install the python Matlab engine as described [here](https://github.com/kevinkuns/pytickle/blob/master/documentation/matlab_engine.md)
+     3. Optionally, set the variable `OPTICKLE_PATH` to the path to the Optickle2 directory.
+    
+  3. If you want to use Finesse simulations, install Finesse and pykat as described [here](https://git.ligo.org/finesse/pykat#installation).
+  4. If you want to find state space representations of the optomechanical plants, install IIRrational as described [here](https://lee-mcculler.docs.ligo.org/iirrational/install.html#install).
   
 ## Basic usage
 
