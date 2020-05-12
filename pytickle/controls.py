@@ -402,7 +402,7 @@ class Filter:
           ss: a python control state space representation of the filter
         """
         zs, ps, k = self.get_zpk(Hz=False)
-        return pyctrl.ss(*zpk2ss(zs, ps, k))
+        return pyctrl.ss(*zpk2ss(assertArr(zs), assertArr(ps), k))
 
     def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
         """Plot the filter
