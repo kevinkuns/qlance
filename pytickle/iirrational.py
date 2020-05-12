@@ -23,7 +23,6 @@ class PlantFit(ctrl.Filter):
         self.data = data
         snr = 1e5 * np.ones_like(ff)
         self._fit = data2filter(data=data, F_Hz=ff, SNR=snr, *args, **kwargs)
-        # self.choose()
 
     def _set_zpk(self, zs, ps, k, Hz=False):
         """Set the zpk of the underlying filter

@@ -10,6 +10,8 @@ from .utils import assertType, siPrefix, append_str_if_unique
 from functools import partial
 from numbers import Number
 from itertools import cycle, zip_longest
+import control as pyctrl
+from scipy.signal import zpk2ss
 import matplotlib.pyplot as plt
 from . import plotting
 
@@ -392,6 +394,15 @@ class Filter:
 
         else:
             return self._zs/a, self._ps/a, self._k
+
+    def get_state_space(self):
+        """Get a state space representation of this filter
+
+        Returns:
+          ss: a python control state space representation of the filter
+        """
+        zs, ps, k = self.get_zpk(Hz=False)
+        return pyctrl.ss(*zpk2ss(zs, ps, k))
 
     def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
         """Plot the filter

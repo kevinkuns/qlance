@@ -22,6 +22,12 @@ def check_filter_equality(filt1, filt2):
     return np.all(check_zpk_equality(zpk1, zpk2))
 
 
+def get_ss_tf(ss, ff):
+    mag, ph, _ = ss.freqresp(2*np.pi*ff)
+    tf = mag.squeeze() * np.exp(1j * ph.squeeze())
+    return tf
+
+
 class TestFilters:
 
     z1 = np.array([1, 2 + 3j, 2 - 3j])
@@ -90,3 +96,21 @@ class TestFilters:
     def test_gain(self):
         mag = np.abs(self.filt4.computeFilter(self.f4))
         assert np.isclose(mag, self.g4)
+
+    def test_ss1(self):
+        ss = self.filt1a.get_state_space()
+        data1 = self.filt1a.computeFilter(self.ff)
+        data2 = get_ss_tf(ss, self.ff)
+        assert np.allclose(data1, data2)
+
+    def test_ss2(self):
+        ss = self.filt2a.get_state_space()
+        data1 = self.filt2a.computeFilter(self.ff)
+        data2 = get_ss_tf(ss, self.ff)
+        assert np.allclose(data1, data2)
+
+    def test_ss3(self):
+        ss = self.filt3a.get_state_space()
+        data1 = self.filt3a.computeFilter(self.ff)
+        data2 = get_ss_tf(ss, self.ff)
+        assert np.allclose(data1, data2)
