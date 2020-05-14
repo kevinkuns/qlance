@@ -4,6 +4,7 @@ Unit tests for control systems
 
 import numpy as np
 import pytickle.controls as ctrl
+import scipy.signal as sig
 import pytest
 
 
@@ -20,12 +21,6 @@ def check_filter_equality(filt1, filt2):
     zpk1 = filt1.get_zpk()
     zpk2 = filt2.get_zpk()
     return np.all(check_zpk_equality(zpk1, zpk2))
-
-
-def get_ss_tf(ss, ff):
-    mag, ph, _ = ss.freqresp(2*np.pi*ff)
-    tf = mag.squeeze() * np.exp(1j * ph.squeeze())
-    return tf
 
 
 class TestFilters:
@@ -100,17 +95,17 @@ class TestFilters:
     def test_ss1(self):
         ss = self.filt1a.get_state_space()
         data1 = self.filt1a.computeFilter(self.ff)
-        data2 = get_ss_tf(ss, self.ff)
+        _, data2 = sig.freqresp(ss, 2*np.pi*self.ff)
         assert np.allclose(data1, data2)
 
     def test_ss2(self):
         ss = self.filt2a.get_state_space()
         data1 = self.filt2a.computeFilter(self.ff)
-        data2 = get_ss_tf(ss, self.ff)
+        _, data2 = sig.freqresp(ss, 2*np.pi*self.ff)
         assert np.allclose(data1, data2)
 
     def test_ss3(self):
         ss = self.filt3a.get_state_space()
         data1 = self.filt3a.computeFilter(self.ff)
-        data2 = get_ss_tf(ss, self.ff)
+        _, data2 = sig.freqresp(ss, 2*np.pi*self.ff)
         assert np.allclose(data1, data2)
