@@ -1,3 +1,7 @@
+"""
+Provides code for calling Finesse from within PyTickle
+"""
+
 import numpy as np
 import pykat.components as kcmp
 import pykat.detectors as kdet
@@ -269,8 +273,11 @@ def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
       dof: which DOF is probed: pos, pitch, or yaw (Default: pos)
 
     Examples:
-      addProbe(kat, 'REFL_DC', 'REFL_in', 0, 0)
-      addProbe(kat, 'REFL_Q', 'REFL_in', fmod, 90)
+      * addProbe(kat, 'REFL_DC', 'REFL_in', 0, 0)
+      adds the DC probe 'REFL_DC' to the node 'REFL_in'
+      * addProbe(kat, 'REFL_Q', 'REFL_in', fmod, 90, dof='pitch')
+      adds the RF probe 'REFL_Q' demodulated at fmod with phase 90
+      to sense pitch motion
     """
     if dof not in ['pos', 'pitch', 'yaw']:
         raise ValueError('Unrecognized dof ' + dof)
@@ -300,13 +307,13 @@ def addReadout(
     Examples:
       * addReadout(kat, 'REFL', 'REFL_in', f1, 0)
       adds the probes 'REFL_DC', 'REFL_I', and 'REFL_Q' at demod frequency
-      f1 and phases 0 and 90 to the node REFL_in
+      f1 and phases 0 and 90 to the node 'REFL_in'
 
       * addReadout(kat, 'POP', 'POP_in', [11e6, 55e6], [0, 30],
                     fnames=['11', '55'])
       adds the probes POP_DC, POP_I11, POP_Q11, POP_I55, and POP_Q55 at
-      demod frequency 11 MHz w/ phases 0 and 90 and at demod phase 55 MHz and
-      phases 30 and 120 to the node POP_in
+      demod frequency 11 MHz w/ phases 0 and 90 and at demod frequency 55 MHz
+      w/ phases 30 and 120 to the node POP_in
     """
     # Get demod frequencies and phases
     if isinstance(freqs, Number):
@@ -381,6 +388,36 @@ def monitorShotNoise(kat, probe):
     _add_generic_probe(
         kat, probe + '_shot', node, freq, phase, 'shot',
         alternate_beam=alternate_beam)
+
+
+def monitorMotion(kat, name, dof='pos'):
+    """Monitor the motion of an optic
+
+    Adds a motion detector to a finesse model named 'name_dof'
+
+    Inputs:
+      kat: the finesse model
+      name: name of the optic
+      dof: what type of motion to measured: pos, pitch, or yaw (Default: pos)
+
+    Examples:
+      * To monitor the mechanical response of the mirror 'EX':
+          monitorMotion(kat, 'EX')
+        this adds the xd detector 'EX_pos'
+      * To monitor the mechanical pitch response of 'IX':
+          monitorMotion(kat, 'IX', 'pitch')
+        this adds the xd detector 'IX_pitch'
+    """
+    if dof == 'pos':
+        mtype = 'z'
+    elif dof == 'pitch':
+        mtype = 'ry'
+    elif dof == 'yaw':
+        mtype = 'rx'
+    else:
+        raise ValueError('Unrecognized dof ' + dof)
+
+    kat.add(kdet.xd(name + '_' + dof, name, mtype))
 
 
 def addModulator(kat, name, fmod, gmod, order, modtype, phase=0):
