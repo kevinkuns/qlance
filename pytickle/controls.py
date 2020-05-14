@@ -423,7 +423,7 @@ class ControlSystem:
         self.filters = []
         self.probes = []
         self.drives = []
-        self.respFilts = []
+        self.actFilts = []
         self.compFilts = []
         self.plant = None
         self.ctrlMat = None
@@ -432,7 +432,7 @@ class ControlSystem:
         self.inMat = None
         self.outMat = None
         self.compMat = None
-        self.respMat = None
+        self.actMat = None
         self.mMech = None
         self.drive2bsm = None
         self.outComp = None
@@ -466,13 +466,12 @@ class ControlSystem:
         self.plant = self.computePlant()
         self.ctrlMat = self.computeController()
         self.compMat = self.computeCompensator()
-        self.respMat = self.computeResponse()
+        self.actMat = self.computeResponse()
         if mechmod:
             self.mMech = self.computeMechMod()
-        # self.respMat = np.einsum('ijf,jkf->ikf', self.mMech, response)
         self.outComp = np.einsum('ijf,jk->ikf', self.compMat, self.outMat)
         self.oltf = {tp: self.computeOLTF(tp)
-                     for tp in ['err', 'ctrl', 'comp', 'drive', 'sens']}
+                     for tp in ['err', 'ctrl', 'act', 'drive', 'sens']}
         self.cltf = {sig: self.computeCLTF(oltf)
                      for sig, oltf in self.oltf.items()}
         if drive2bsm:
@@ -580,15 +579,15 @@ class ControlSystem:
         nff = len(self.ss)
         ndrives = len(self.drives)
         ones = np.ones(nff)
-        respMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
-        respdrives = [rf[0] for rf in self.respFilts]
+        actMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
+        actdrives = [rf[0] for rf in self.actFilts]
         for di, drive in enumerate(self.drives):
             try:
-                ind = respdrives.index(drive)
-                respMat[di, di, :] = self.respFilts[ind][-1]._filt(self.ss)
+                ind = actdrives.index(drive)
+                actMat[di, di, :] = self.actFilts[ind][-1]._filt(self.ss)
             except ValueError:
-                respMat[di, di, :] = ones
-        return respMat
+                actMat[di, di, :] = ones
+        return actMat
 
     def computeMechMod(self):
         nDrives = len(self.drives)
@@ -647,12 +646,12 @@ class ControlSystem:
             oltf = self.getTF('', 'drive', '', 'sens', closed=False)
             oltf = multiplyMat(oltf, self.plant)
 
-        elif tstpnt == 'comp':
-            oltf = self.getTF('', 'comp', '', 'drive', closed=False)
-            oltf = multiplyMat(oltf, self.respMat)
+        elif tstpnt == 'act':
+            oltf = self.getTF('', 'act', '', 'drive', closed=False)
+            oltf = multiplyMat(oltf, self.actMat)
 
         elif tstpnt == 'ctrl':
-            oltf = self.getTF('', 'ctrl', '', 'comp', closed=False)
+            oltf = self.getTF('', 'ctrl', '', 'act', closed=False)
             oltf = multiplyMat(oltf, self.outComp)
 
         return oltf
@@ -701,15 +700,15 @@ class ControlSystem:
 
     def setResponse(self, drive, driveType, *args):
         drive += '.' + driveType
-        if drive in [rf[0] for rf in self.respFilts]:
+        if drive in [rf[0] for rf in self.actFilts]:
             raise ValueError(
                 'A response is already set for drive {:s}'.format(drive))
 
         if len(args) == 1 and isinstance(args[0], Filter):
-            self.respFilts.append((drive, args[0]))
+            self.actFilts.append((drive, args[0]))
 
         else:
-            self.respFilts.append((drive, Filter(*args)))
+            self.actFilts.append((drive, Filter(*args)))
 
     def getFilter(self, dof_to, dof_from):
         """Get the filter between two DOFs
@@ -816,8 +815,8 @@ class ControlSystem:
 
         # test points and their matrices in cyclic order for computing TFs
         # around the main loop
-        tstpnts = ['err', 'sens', 'drive', 'comp', 'ctrl']
-        mats = [self.inMat, self.plant, self.respMat, self.outComp,
+        tstpnts = ['err', 'sens', 'drive', 'act', 'ctrl']
+        mats = [self.inMat, self.plant, self.actMat, self.outComp,
                 self.ctrlMat]
 
         # Main loop if the input test point is not a calibration test point
@@ -938,9 +937,9 @@ class ControlSystem:
         return plotNyquist(oltf, rmax=rmax)
 
     def _getIndex(self, name, tstpnt):
-        if tstpnt in ['err', 'ctrl', 'cal', 'cal']:
+        if tstpnt in ['err', 'ctrl', 'cal']:
             ind = list(self.dofs.keys()).index(name)
-        elif tstpnt in ['comp', 'drive', 'pos', 'spot']:
+        elif tstpnt in ['act', 'drive', 'pos', 'spot']:
             ind = self.drives.index(name)
         elif tstpnt == 'sens':
             ind = self.probes.index(name)
