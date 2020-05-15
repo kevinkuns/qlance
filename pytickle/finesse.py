@@ -1212,7 +1212,7 @@ class KatFR:
                 pass
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
-               dof='pos', dB=False, phase2freq=False, **kwargs):
+               dof='pos', **kwargs):
         """Plot a transfer function.
 
         See documentation for plotTF in plotting
@@ -1220,8 +1220,19 @@ class KatFR:
         ff = self.ff
         tf = self.getTF(probeName, driveNames, dof=dof)
         fig = plotting.plotTF(
-            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
-            phase2freq=phase2freq, **kwargs)
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
+        return fig
+
+    def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
+                   dof='pos', **kwargs):
+        """Plot a mechanical transfer function
+
+        See documentation for plotTF in plotting
+        """
+        ff = self.ff
+        tf = self.getMechTF(outDrives, inDrives, dof=dof)
+        fig = plotting.plotTF(
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig
 
 

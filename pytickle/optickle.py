@@ -1,5 +1,5 @@
 '''
-Provides code for calling Optickle from within python
+Provides code for calling Optickle from within PyTickle
 '''
 
 import numpy as np
@@ -405,7 +405,7 @@ class PyTickle:
         return qnoise
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
-               dof='pos', optOnly=False, dB=False, phase2freq=False, **kwargs):
+               dof='pos', optOnly=False, **kwargs):
         """Plot a transfer function.
 
         See documentation for plotTF in plotting
@@ -413,24 +413,31 @@ class PyTickle:
         ff = self.ff
         tf = self.getTF(probeName, driveNames, dof=dof, optOnly=optOnly)
         fig = plotting.plotTF(
-            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, dB=dB,
-            phase2freq=phase2freq, **kwargs)
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig
 
-    def plotQuantumASD(self, probeName, driveNames, Larm=None, mass=None,
-                       **kwargs):
+    def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
+                   dof='pos', **kwargs):
+        """Plot a mechanical transfer function
+
+        See documentation for plotTF in plotting
+        """
+        ff = self.ff
+        tf = self.getMechTF(outDrives, inDrives, dof=dof)
+        fig = plotting.plotTF(
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
+        return fig
+
+    def plotQuantumASD(self, probeName, driveNames, **kwargs):
         """Plot the quantum ASD of a probe
 
         Plots the ASD of a probe referenced the the transfer function for
-        some signal, such as DARM. Optionally plots the SQL.
+        some signal, such as DARM.
 
         Inputs:
           probeName: name of the probe
           driveNames: names of the drives from which the TF to refer the
             noise to
-          Larm: If not None (default), divide by the arm length to convert
-            displacement noise to strain noise
-          mass: If not None (default) plots the SQL with the given mass [kg]
           **kwargs: extra keyword arguments to pass to the plot
         """
         ff = self.ff
@@ -438,19 +445,8 @@ class PyTickle:
         noiseASD = np.abs(self.getQuantumNoise(probeName)/tf)
 
         fig = plt.figure()
-        if Larm is None:
-            fig.gca().set_ylabel(
-                r'Displacement $[\mathrm{m}/\mathrm{Hz}^{1/2}]$')
-            Larm = 1
-        else:
-            fig.gca().set_ylabel(
-                r'Strain $[1/\mathrm{Hz}^{1/2}]$')
-        fig.gca().loglog(ff, noiseASD/Larm, **kwargs)
-
-        if mass:
-            hSQL = np.sqrt(8*scc.hbar/(mass*(2*np.pi*ff)**2))
-            fig.gca().loglog(ff, hSQL/Larm, 'k--', label='SQL', alpha=0.7)
-            fig.gca().legend()
+        fig.gca().loglog(ff, noiseASD, **kwargs)
+        fig.gca().set_ylabel('Noise')
 
         fig.gca().set_xlim([min(ff), max(ff)])
         fig.gca().set_xlabel('Frequency [Hz]')
