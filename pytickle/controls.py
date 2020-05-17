@@ -927,21 +927,28 @@ class ControlSystem:
           rmax: maximum radius for the plot (Default: 3)
         """
         oltf = self.getOLTF(dof_to, dof_from, tstpnt)
-        # fig = plt.figure()
-        # ax = fig.add_subplot(111, projection='polar')
-        # ax.plot(np.angle(oltf), np.abs(oltf))
-        # npts = len(oltf)
-        # ax.plot(np.linspace(0, 2*np.pi, npts), np.ones(npts))
-        # ax.set_ylim(0, 3)
         return plotNyquist(oltf, rmax=rmax)
 
     def _getIndex(self, name, tstpnt):
+        """Get the index of a degree of freedom
+
+        Inputs:
+          name: name of the degree of freedom
+          tstpnt: type of dof
+        """
         if tstpnt in ['err', 'ctrl', 'cal']:
-            ind = list(self.dofs.keys()).index(name)
+           sig_list = list(self.dofs.keys())
         elif tstpnt in ['act', 'drive', 'pos', 'spot']:
-            ind = self.drives.index(name)
+            sig_list = self.drives
         elif tstpnt == 'sens':
-            ind = self.probes.index(name)
+            sig_list = self.probes
         else:
             raise ValueError('Unrecognized test point ' + tstpnt)
+
+        try:
+            ind = sig_list.index(name)
+        except KeyError:
+            raise ValueError(
+                '{:s} is not a {:s} test point'.format(name, tstpnt))
+
         return ind
