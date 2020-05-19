@@ -62,7 +62,7 @@ SOFT = {'IX': r, 'EX': 1}
 fmin = 1e-1
 fmax = 30
 npts = 1000
-katTF.tickle(fmin, fmax, npts, dof='pitch')
+katTF.run(fmin, fmax, npts, dof='pitch')
 
 
 def test_REFLI_HARD():

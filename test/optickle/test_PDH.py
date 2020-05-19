@@ -46,7 +46,7 @@ class TestFreqResp:
 
     opt = optFP('optFR')
     ff = np.logspace(-2, 4, 1000)
-    opt.tickle(ff)
+    opt.run(ff)
 
     def test_tfI(self):
         tfI = self.opt.getTF('REFL_I', 'EX')

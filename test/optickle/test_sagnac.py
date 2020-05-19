@@ -20,9 +20,9 @@ opt = optSagnac.optSagnac(eng, 'opt')
 opt00 = optSagnac.optSagnac(eng, 'opt00', 0, 6, 10)
 opt45 = optSagnac.optSagnac(eng, 'opt45', 45, 6, 10)
 
-opt.tickle(ff, noise=False)
-opt00.tickle(ff)
-opt45.tickle(ff)
+opt.run(ff, noise=False)
+opt00.run(ff)
+opt45.run(ff)
 
 tfCARM = opt.getTF('REFL_I', CARM)
 tfDARM = opt.getTF('AS_DIFF', DARM)

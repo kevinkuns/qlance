@@ -1028,7 +1028,7 @@ class KatFR:
 
         self.ff = None
 
-    def tickle(self, fmin, fmax, npts, dof='pos', linlog='log', rtype='both',
+    def run(self, fmin, fmax, npts, dof='pos', linlog='log', rtype='both',
                verbose=1):
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)

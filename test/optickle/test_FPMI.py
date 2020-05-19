@@ -60,7 +60,7 @@ class TestFreqResp:
 
     opt = optMI('optFR')
     ff = np.logspace(0, 4, 400)
-    opt.tickle(ff, noise=False)
+    opt.run(ff, noise=False)
 
     def test_tfQ_EM(self):
         tfQ_EM = self.opt.getTF('AS_Q', {'EX': 0.5, 'EY': -0.5})
@@ -93,7 +93,7 @@ class TestSchnupp:
         optAsy.setLinkLength('BS', 'IY', lyy[ii])
         optAsy.setLinkLength('IY', 'BS', lyy[ii])
 
-        optAsy.tickle(1, noise=False)
+        optAsy.run(1, noise=False)
         powf0[ii] = optAsy.getDCpower('BS', 'AS', 0)
         powfu[ii] = optAsy.getDCpower('BS', 'AS', fmod)
         powfl[ii] = optAsy.getDCpower('BS', 'AS', -fmod)

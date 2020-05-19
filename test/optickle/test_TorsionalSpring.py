@@ -67,7 +67,7 @@ fmin = 1e-1
 fmax = 30
 npts = 1000
 ff = np.logspace(np.log10(fmin), np.log10(fmax), npts)
-opt.tickle(ff, dof='pitch', noise=False)
+opt.run(ff, dof='pitch', noise=False)
 
 
 def test_REFLI_HARD():

@@ -463,7 +463,7 @@ class ControlSystem:
             self.opt = opt
             self.ss = 2j*np.pi*opt.ff
 
-    def tickle(self, drive2bsm=False, mechmod=True):
+    def run(self, drive2bsm=False, mechmod=True):
         """Compute the control system dynamics
 
         Inputs:
@@ -739,15 +739,6 @@ class ControlSystem:
         else:
             return self.filters[inds.nonzero()[0][0]][-1]
 
-    def plotFilter(self, dof_to, dof_from, mag_ax=None, phase_ax=None, dB=False,
-                   **kwargs):
-        """Plot a filter function
-
-        See documentation for plotFilter in Filter class
-        """
-        filt = self.getFilter(dof_to, dof_from)
-        return filt.plotFilter(self.opt.ff, mag_ax, phase_ax, dB, **kwargs)
-
     def getOLTF(self, sig_to, sig_from, tstpnt):
         """Compute an OLTF
 
@@ -934,8 +925,8 @@ class ControlSystem:
             totalPSD += powTF[from_ind] * noiseASD**2
         return np.sqrt(totalPSD)
 
-    def getTotalNoiseFrom(self, sig_to, dof_from, tp_from, noiseASDs):
-        ampTF = self.getTF('', sig_to, dof_from, tp_from)
+    def getTotalNoiseFrom(self, sig_to, sig_from, tp_from, noiseASDs):
+        ampTF = self.getTF('', sig_to, sig_from, tp_from)
         powTF = np.abs(ampTF)**2
         totalPSD = np.zeros(powTF.shape[-1])
         for dof_to, noiseASD in noiseASDs.items():

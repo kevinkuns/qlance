@@ -23,7 +23,7 @@ eng.eval("probesCE_homo(opt, par, 1);", nargout=0)
 opt.loadMatModel()
 
 ff = np.logspace(np.log10(3), np.log10(7e3), 300)
-opt.tickle(ff)
+opt.run(ff)
 
 DARM = {'EX': 1, 'EY': -1}
 MICH = {'BS': 1, 'SR': 1/np.sqrt(2), 'PR': -1/np.sqrt(2)}
@@ -62,7 +62,7 @@ cs.addFilter('DARM', 'MICH', ctrl.catfilt(filtMICH_FF, filtMICH))
 
 cs.setPyTicklePlant(opt)
 
-cs.tickle()
+cs.run()
 
 dofs = cs.dofs.keys()
 

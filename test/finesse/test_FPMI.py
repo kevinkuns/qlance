@@ -63,7 +63,7 @@ class TestFreqResp:
     kat = katMI(90, 0, 45)
     fin.addReadout(kat, 'AS', 'AS_in', fmod, 0)
     katTF = fin.KatFR(kat)
-    katTF.tickle(1, 1e4, 400)
+    katTF.run(1, 1e4, 400)
 
     def test_tfQ_EM(self):
         tfQ_EM = self.katTF.getTF('AS_Q', {'EX': 0.5, 'EY': -0.5})

@@ -108,7 +108,7 @@ class PyTickle:
         # FIXME: add polarization
         self._updateNames()
 
-    def tickle(self, ff=None, noise=True, dof='pos'):
+    def run(self, ff=None, noise=True, dof='pos'):
         """Compute the optomechanical response and quantum noise
 
         Computes the optomechanical response and quantum noise of this model

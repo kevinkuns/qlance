@@ -45,7 +45,7 @@ class TestFreqResp:
     kat = katFP()
     # fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0)
     katFR = fin.KatFR(kat)
-    katFR.tickle(1e-2, 1e4, 1000)
+    katFR.run(1e-2, 1e4, 1000)
 
     def test_tfI(self):
         tfI = self.katFR.getTF('REFL_I', 'EX')
@@ -97,7 +97,7 @@ class TestFreqRespSetProbe:
     # now this step is done automatically
     # fin.set_all_probe_response(kat, 'fr')
     katFR = fin.KatFR(kat)
-    katFR.tickle(1e-2, 1e4, 1000)
+    katFR.run(1e-2, 1e4, 1000)
 
     def test_tfI(self):
         tfI = self.katFR.getTF('REFL_I', 'EX')
