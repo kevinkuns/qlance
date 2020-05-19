@@ -257,6 +257,19 @@ def plotNyquist(oltf, rmax=3):
 
 
 class DegreeOfFreedom:
+    """A generic degree of freedom
+
+    Inputs:
+      name: name of the DOF
+      probes: the probes used to sense the DOF (a dict or single string)
+      drives: the drives defining the DOF (a dict or single string)
+      dofType: type of DOF: pos, pitch, or yaw (Default: pos)
+
+    Example:
+      For DARM where L = Lx - Ly and it is sensed by AS_DIFF
+        DegreeOfFreedom('DARM', 'AS_DIFF', {'EX.pos': 1, 'EY.pos': -1})
+    """
+
     def __init__(self, name, probes, drives, dofType='pos'):
         self.name = name
         self.probes = assertType(probes, dict).copy()
@@ -398,7 +411,7 @@ class Filter:
         """Get a state space representation of this filter
 
         Returns:
-          ss: a python control state space representation of the filter
+          ss: a scipy.signal state space representation of the filter
         """
         zs, ps, k = self.get_zpk(Hz=False)
         return sig.StateSpace(*sig.zpk2ss(assertArr(zs), assertArr(ps), k))
@@ -415,6 +428,8 @@ class Filter:
 
 
 class ControlSystem:
+    """A class for a general MIMO control system
+    """
     def __init__(self):
         self.opt = None
         self.ss = None
@@ -460,21 +475,21 @@ class ControlSystem:
         Note: The spot test point cannot be used if drive2bsm is False
         and the pos test point cannot be used if mechmod is False
         """
-        self.inMat = self.computeInputMatrix()
-        self.outMat = self.computeOutputMatrix()
-        self.plant = self.computePlant()
-        self.ctrlMat = self.computeController()
-        self.compMat = self.computeCompensator()
-        self.actMat = self.computeResponse()
+        self.inMat = self._computeInputMatrix()
+        self.outMat = self._computeOutputMatrix()
+        self.plant = self._computePlant()
+        self.ctrlMat = self._computeController()
+        self.compMat = self._computeCompensator()
+        self.actMat = self._computeResponse()
         if mechmod:
-            self.mMech = self.computeMechMod()
+            self.mMech = self._computeMechMod()
         self.outComp = np.einsum('ijf,jk->ikf', self.compMat, self.outMat)
-        self.oltf = {tp: self.computeOLTF(tp)
+        self.oltf = {tp: self._computeOLTF(tp)
                      for tp in ['err', 'ctrl', 'act', 'drive', 'sens']}
-        self.cltf = {sig: self.computeCLTF(oltf)
+        self.cltf = {sig: self._computeCLTF(oltf)
                      for sig, oltf in self.oltf.items()}
         if drive2bsm:
-            self.computeBeamSpotMotion()
+            self._computeBeamSpotMotion()
 
     def addDOF(self, name, probes, drives, dofType='pos'):
         """Add a degree of freedom to the model
@@ -497,7 +512,7 @@ class ControlSystem:
         append_str_if_unique(self.probes, dof.probes)
         append_str_if_unique(self.drives, dof.drives)
 
-    def computePlant(self):
+    def _computePlant(self):
         """Compute the PyTickle plant from drives to probes
 
         Returns:
@@ -518,7 +533,7 @@ class ControlSystem:
                 plant[pi, di, :] = tf
         return plant
 
-    def computeInputMatrix(self):
+    def _computeInputMatrix(self):
         """Compute the input matrix from probes to DOFs
 
         Returns:
@@ -531,7 +546,7 @@ class ControlSystem:
             sensMat[di, :] = dof.probes2dof(self.probes)
         return sensMat
 
-    def computeOutputMatrix(self):
+    def _computeOutputMatrix(self):
         """Compute the actuation matrix from DOFs to drives
 
         Returns:
@@ -544,7 +559,7 @@ class ControlSystem:
             actMat[:, di] = dof.dofs2drives(self.drives)
         return actMat
 
-    def computeController(self):
+    def _computeController(self):
         """Compute the control matrix from DOFs to DOFs
 
         Returns:
@@ -560,7 +575,7 @@ class ControlSystem:
             ctrlMat[toInd, fromInd, :] = filt._filt(self.ss)
         return ctrlMat
 
-    def computeCompensator(self):
+    def _computeCompensator(self):
         nff = len(self.ss)
         ndrives = len(self.drives)
         ones = np.ones(nff)
@@ -574,7 +589,7 @@ class ControlSystem:
                 compMat[di, di, :] = ones
         return compMat
 
-    def computeResponse(self):
+    def _computeResponse(self):
         nff = len(self.ss)
         ndrives = len(self.drives)
         ones = np.ones(nff)
@@ -588,7 +603,7 @@ class ControlSystem:
                 actMat[di, di, :] = ones
         return actMat
 
-    def computeMechMod(self):
+    def _computeMechMod(self):
         nDrives = len(self.drives)
         nff = len(self.opt.ff)
         mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
@@ -608,7 +623,7 @@ class ControlSystem:
                     driveToName, driveFromName, dofToType)
         return mMech
 
-    def computeBeamSpotMotion(self):
+    def _computeBeamSpotMotion(self):
         nDrives = len(self.drives)
         nff = len(self.opt.ff)
         drive2bsm = np.zeros((nDrives, nDrives, nff), dtype=complex)
@@ -625,13 +640,11 @@ class ControlSystem:
 
         self.drive2bsm = drive2bsm
 
-    def computeOLTF(self, tstpnt):
-        """Compute the OLTF from DOFs to DOFs
+    def _computeOLTF(self, tstpnt):
+        """Compute the OLTF
 
         Inputs:
-          sig: which signal to compute the TF for:
-            1) 'err': error signal (Default)
-            2) 'ctrl': control signal
+          tstpnt: the test point
         """
         if tstpnt == 'err':
             oltf = self.getTF('', 'err', '', 'ctrl', closed=False)
@@ -655,13 +668,8 @@ class ControlSystem:
 
         return oltf
 
-    def computeCLTF(self, oltf):
-        """Compute the CLTF from DOFs to DOFs
-
-        Inputs:
-          sig: which signal to compute the TF for:
-            1) 'err': error signal (Default)
-            2) 'ctrl': control signal
+    def _computeCLTF(self, oltf):
+        """Compute the CLTF from an OLTF
         """
         cltf = np.zeros_like(oltf)
         nDOF = cltf.shape[0]
@@ -669,45 +677,45 @@ class ControlSystem:
             cltf[:, :, fi] = inv(np.identity(nDOF) - oltf[:, :, fi])
         return cltf
 
-    def addFilter(self, dof_to, dof_from, *args):
+    def addFilter(self, dof_to, dof_from, filt):
         """Add a filter between two DOFs to the controller
 
         Inputs:
           dof_to: output DOF
           dof_from: input DOF
-          *args: Filter instance or arguments used to define a Filter instance
+          filt: Filter instance for the filter
         """
-        if len(args) == 1 and isinstance(args[0], Filter):
-            # args is already a Filter instance
-            self.filters.append((dof_to, dof_from, args[0]))
+        self.filters.append((dof_to, dof_from, filt))
 
-        else:
-            # args defines a new Filter
-            self.filters.append((dof_to, dof_from, Filter(*args)))
+    def addCompensator(self, drive, driveType, filt):
+        """Add a compensation filter
 
-    def addCompensator(self, drive, driveType, *args):
+        Inputs:
+          drive: which drive to compensate
+          driveType: type of drive (pos, pitch, or yaw)
+          filt: Filter instance for the filter
+        """
         drive += '.' + driveType
         if drive in [cf[0] for cf in self.compFilts]:
             raise ValueError(
                 'A compensator is already set for drive {:s}'.format(drive))
 
-        if len(args) == 1 and isinstance(args[0], Filter):
-            self.compFilts.append((drive, args[0]))
+        self.compFilts.append((drive, filt))
 
-        else:
-            self.compFilts.append((drive, Filter(*args)))
+    def setActuator(self, drive, driveType, filt):
+        """Set the actuation plant for a drive
 
-    def setResponse(self, drive, driveType, *args):
+        Inputs:
+          drive: which drive to actuate
+          driveType: type of drive (pos, pitch, or yaw)
+          filt: Filter instance for the plant
+        """
         drive += '.' + driveType
         if drive in [rf[0] for rf in self.actFilts]:
             raise ValueError(
                 'A response is already set for drive {:s}'.format(drive))
 
-        if len(args) == 1 and isinstance(args[0], Filter):
-            self.actFilts.append((drive, args[0]))
-
-        else:
-            self.actFilts.append((drive, Filter(*args)))
+        self.actFilts.append((drive, filt))
 
     def getFilter(self, dof_to, dof_from):
         """Get the filter between two DOFs
@@ -740,48 +748,66 @@ class ControlSystem:
         filt = self.getFilter(dof_to, dof_from)
         return filt.plotFilter(self.opt.ff, mag_ax, phase_ax, dB, **kwargs)
 
-    def getOLTF(self, dof_to, dof_from, tstpnt):
-        """Compute the OLTF from DOFs to DOFs
+    def getOLTF(self, sig_to, sig_from, tstpnt):
+        """Compute an OLTF
 
         Inputs:
-          dof_to: output DOF
-          dof_from: input DOF
+          sig_to: output signal
+          sig_from: input signal
           tstpnt: which test point to compute the TF for
         """
         oltf = self.oltf[tstpnt]
-        if dof_from:
-            from_ind = self._getIndex(dof_from, tstpnt)
+        if sig_from:
+            from_ind = self._getIndex(sig_from, tstpnt)
             oltf = oltf[:, from_ind]
-        if dof_to:
-            to_ind = self._getIndex(dof_to, tstpnt)
+        if sig_to:
+            to_ind = self._getIndex(sig_to, tstpnt)
             oltf = oltf[to_ind]
         return oltf
 
-    def getCLTF(self, dof_to, dof_from, tstpnt):
-        """Compute the CLTF from DOFs to DOFs
+    def getCLTF(self, sig_to, sig_from, tstpnt):
+        """Compute a CLTF
 
         Inputs:
-          dof_to: output DOF
-          dof_from: input DOF
-          tstpnt: which test point to compute the TF for:
+          sig_to: output signal
+          sig_from: input signal
+          tstpnt: which test point to compute the TF for
         """
         cltf = self.cltf[tstpnt]
-        if dof_from:
-            from_ind = self._getIndex(dof_from, tstpnt)
+        if sig_from:
+            from_ind = self._getIndex(sig_from, tstpnt)
             cltf = cltf[:, from_ind]
-        if dof_to:
-            to_ind = self._getIndex(dof_to, tstpnt)
+        if sig_to:
+            to_ind = self._getIndex(sig_to, tstpnt)
             cltf = cltf[to_ind]
         return cltf
 
-    def compute_margins(self, dof_to, dof_from, tstpnt):
-        oltf = self.getOLTF(dof_to, dof_from, tstpnt)
-        cltf = self.getCLTF(dof_to, dof_from, tstpnt)
+    def compute_margins(self, sig_to, sig_from, tstpnt):
+        """Compute stability margins for a loop
+
+        Inputs:
+          sig_to: output signal
+          sig_from: input signal
+          tstpnt: test point
+
+        Returns:
+          ugf: UGF of the loop [Hz]
+          pm: phase margin [deg]
+          fms: frequency of maximum sensitivity [Hz]
+          sm: stability margin
+        """
+        oltf = self.getOLTF(sig_to, sig_from, tstpnt)
+        cltf = self.getCLTF(sig_to, sig_from, tstpnt)
         ugf, pm = compute_phase_margin(self.opt.ff, oltf)
         fms, sm = compute_stability_margin(self.opt.ff, cltf)
         return ugf, pm, fms, sm
 
     def print_margins(self, tstpnt):
+        """Print the stability margins for all loops
+
+        Input:
+          tstpnt: test point
+        """
         margins = {}
         for dof in self.dofs.keys():
             ugf, pm, fms, sm = self.compute_margins(dof, dof, tstpnt)
@@ -797,11 +823,11 @@ class ControlSystem:
                                'display.max_columns', None):
             display(margins)
 
-    def getTF(self, dof_to, tp_to, dof_from, tp_from, closed=True):
+    def getTF(self, sig_to, tp_to, sig_from, tp_from, closed=True):
         """Get a transfer function between two test points in a loop
 
-        If dof_to is the empty string '', the vector to all dofs is returned
-        If dof_from is the empty string '', the vector of all dofs is returned
+        If sig_to is the empty string '', the vector to all signals is returned
+        If sig_from is the empty string '', the vector of all signals is returned
         """
         def cltf_or_unity(tp_to):
             """Returns the CLTF if a closed loop TF is necessary and the identity
@@ -870,21 +896,21 @@ class ControlSystem:
             raise ValueError('Unrecognized test point from ' + tp_from)
 
         # Reduce size of returned TF if necessary
-        if dof_from:
-            from_ind = self._getIndex(dof_from, tp_from)
+        if sig_from:
+            from_ind = self._getIndex(sig_from, tp_from)
             tf = tf[:, from_ind]
 
-        if dof_to:
-            to_ind = self._getIndex(dof_to, tp_to)
+        if sig_to:
+            to_ind = self._getIndex(sig_to, tp_to)
             tf = tf[to_ind]
 
         return tf
 
-    def getTotalNoiseTo(self, dof_to, tp_to, tp_from, noiseASDs, closed=True):
+    def getTotalNoiseTo(self, sig_to, tp_to, tp_from, noiseASDs, closed=True):
         """Compute the total noise at a test point due to multiple sources
 
         Inputs:
-          dof_to: the output DOF
+          sig_to: the output signal
           tp_to: the output test point
           tp_from: the input test point
           noiseASDs: a dictionary of noise ASDs with keys the name of the
@@ -895,10 +921,10 @@ class ControlSystem:
         """
         if tp_to == 'cal':
             ampTF = inv(self.outMat)
-            to_ind = self._getIndex(dof_to, 'cal')
+            to_ind = self._getIndex(sig_to, 'cal')
             ampTF = ampTF[to_ind]
         else:
-            ampTF = self.getTF(dof_to, tp_to, '', tp_from, closed=closed)
+            ampTF = self.getTF(sig_to, tp_to, '', tp_from, closed=closed)
         if len(ampTF.shape) == 1:
             ampTF = np.einsum('i,j->ij', ampTF, np.ones_like(self.opt.ff))
         powTF = np.abs(ampTF)**2
@@ -917,24 +943,24 @@ class ControlSystem:
             totalPSD += powTF[to_ind] * noiseASD**2
         return np.sqrt(totalPSD)
 
-    def plotNyquist(self, dof_to, dof_from, tstpnt, rmax=3):
+    def plotNyquist(self, sig_to, sig_from, tstpnt, rmax=3):
         """Make a Nyquist plot
 
         Inputs:
-          dof_to: output DOF
-          dof_from: input DOF
+          sig_to: output signal
+          sig_from: input signal
           tstpnt: which test point to compute the TF for
           rmax: maximum radius for the plot (Default: 3)
         """
-        oltf = self.getOLTF(dof_to, dof_from, tstpnt)
+        oltf = self.getOLTF(sig_to, sig_from, tstpnt)
         return plotNyquist(oltf, rmax=rmax)
 
     def _getIndex(self, name, tstpnt):
-        """Get the index of a degree of freedom
+        """Get the index of a signal
 
         Inputs:
-          name: name of the degree of freedom
-          tstpnt: type of dof
+          name: name of the signal
+          tstpnt: type of test point
         """
         if tstpnt in ['err', 'ctrl', 'cal']:
            sig_list = list(self.dofs.keys())
@@ -947,7 +973,7 @@ class ControlSystem:
 
         try:
             ind = sig_list.index(name)
-        except KeyError:
+        except ValueError:
             raise ValueError(
                 '{:s} is not a {:s} test point'.format(name, tstpnt))
 

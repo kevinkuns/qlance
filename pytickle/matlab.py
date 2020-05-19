@@ -1,3 +1,8 @@
+"""
+Code for interfacing with matlab from within python
+"""
+
+
 import numpy as np
 import matlab
 from numbers import Number
