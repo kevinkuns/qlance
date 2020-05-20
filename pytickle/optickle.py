@@ -202,12 +202,12 @@ class PyTickle:
         self.sigDC_sweep = mat2py(self.eng.workspace['sigDC'])
         self.fDC_sweep = mat2py(self.eng.workspace['fDC'])
 
-    def getTF(self, probeNames, driveNames, dof='pos', optOnly=False):
+    def getTF(self, probes, drives, dof='pos', optOnly=False):
         """Compute a transfer function
 
         Inputs:
-          probeName: name of the probes at which the TF is calculated
-          driveNames: names of the drives from which the TF is calculated
+          probes: name of the probes at which the TF is calculated
+          drives: names of the drives from which the TF is calculated
           dof: degree of freedom of the drives (Default: pos)
           optOnly: if True, only return the optical TF with no mechanics
             (Default: False)
@@ -266,26 +266,26 @@ class PyTickle:
         elif dof == 'yaw':
             tfData = tfData['yaw']
 
-        if isinstance(driveNames, str):
-            driveNames = {driveNames: 1}
+        if isinstance(drives, str):
+            drives = {drives: 1}
 
-        if isinstance(probeNames, str):
-            probeNames = {probeNames: 1}
+        if isinstance(probes, str):
+            probes = {probes: 1}
 
         # loop through the drives and probes to compute the TF
-        for probeName, probeCoeff in probeNames.items():
+        for probe, pc in probes.items():
             # get the probe index
-            probeNum = self.probes.index(probeName)
+            probeNum = self.probes.index(probe)
 
-            for driveName, drivePos in driveNames.items():
+            for drive, drive_pos in drives.items():
                 # get the drive index
-                driveNum = self._getDriveIndex(driveName, dof)
+                driveNum = self._getDriveIndex(drive, dof)
 
                 # add the contribution from this drive
                 try:
-                    tf += probeCoeff * drivePos * tfData[probeNum, driveNum]
+                    tf += pc * drive_pos * tfData[probeNum, driveNum]
                 except IndexError:
-                    tf += probeCoeff * drivePos * tfData[driveNum]
+                    tf += pc * drive_pos * tfData[driveNum]
 
         return tf
 
@@ -370,7 +370,14 @@ class PyTickle:
         bsm = w/Pdc * tf
         return bsm
 
-    def getMechMod(self, driveOutName, driveInName, dof='pos'):
+    def getMechMod(self, drive_out, drive_in, dof='pos'):
+        """Get the radiation pressure modifications to drives
+
+        Inputs:
+          drive_out: name of the output drive
+          drive_in: name of the input drive
+          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+        """
         if dof not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
 
@@ -387,8 +394,8 @@ class PyTickle:
                   + 'calculating a transfer function.'
             raise RuntimeError(msg)
 
-        driveInNum = self._getDriveIndex(driveInName, dof)
-        driveOutNum = self._getDriveIndex(driveOutName, dof)
+        driveInNum = self._getDriveIndex(drive_in, dof)
+        driveOutNum = self._getDriveIndex(drive_out, dof)
 
         return mMech[driveOutNum, driveInNum]
 

@@ -994,6 +994,15 @@ def showsigDC(basekat, verbose=False):
 
 
 class KatFR:
+    """Frequency response of Finesse models
+
+    Inputs:
+      kat: the finesse model
+      all_drives: If True the response to all drives in the model are
+        computed. If False specify which drives to use with addDrives.
+        Models with many drives may be slow when computing the response
+        for all of them. (Default: True)
+    """
     def __init__(self, kat, all_drives=True):
         self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
         self.kat = kat.deepcopy()
@@ -1030,6 +1039,24 @@ class KatFR:
 
     def run(self, fmin, fmax, npts, dof='pos', linlog='log', rtype='both',
                verbose=1):
+        """Compute the frequency response
+
+        Inputs:
+          fmin: minimum frequency [Hz]
+          fmax: maximum frequency [Hz]
+          npts: number of frequency points to compute
+          dof: which degree of freedom to compute (Default: pos)
+          linlog: if 'log' the frequency vector is log spaced
+            if 'lin' the vector is linearly spaced (Default 'log')
+          rtype: what response type to calculate (Default: 'both')
+            'opt': compute the optomechanical plant
+            'mech': compute the radiation pressure modifications to drives
+            'both': calculate both
+          verbose: verbosity (Default: 1)
+            0: no information is printed
+            1: a progress bar of each drive is printed
+            2: show the finesse simulation progress bars as well
+        """
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
 
@@ -1111,6 +1138,29 @@ class KatFR:
         self.ff = out.x
 
     def getTF(self, probes, drives, dof='pos'):
+        """Compute a transfer function
+
+        Inputs:
+          probes: name of the probes at which the TF is calculated
+          drives: names of the drives from which the TF is calculated
+          dof: degree of freedom of the drives (Default: pos)
+
+        Returns:
+          tf: the transfer function
+            * In units of [W/m] if drive is an optic with dof pos
+            * In units of [W/rad] if drive is an optic with dof pitch or yaw
+
+        Examples:
+          * If only a single drive is used, the drive name can be a string.
+              tf = katFR.getTF('REFL', 'EX')
+
+          * If multiple drives are used, the drive names should be a dict.
+            To compute the DARM transfer function to the AS_DIFF homodyne PD
+              DARM = {'EX': 1/2, 'EY': -1/2}
+              tf = katFR.getTF('AS_DIFF', DARM)
+            [Note: Since DARM is defined as Lx - Ly, to get 1 m of DARM
+            requires 0.5 m of both Lx and Ly]
+        """
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
 
@@ -1179,6 +1229,13 @@ class KatFR:
         return tf
 
     def getMechMod(self, drive_out, drive_in, dof='pos'):
+        """Get the radiation pressure modifications to drives
+
+        Inputs:
+          drive_out: name of the output drive
+          drive_in: name of the input drive
+          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+        """
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
 
@@ -1189,6 +1246,10 @@ class KatFR:
         return self.mechmod[dof][out_det][drive_in]
 
     def getQuantumNoise(self, probeName, dof='pos'):
+        """Compute the quantum noise at a probe
+
+        Returns the quantum noise at a given probe in [W/rtHz]
+        """
         qnoise = list(self.freqresp[dof][probeName + '_shot'].values())[0]
         if dof == 'pos':
             # if this was computed from a position TF convert back to W/rtHz
@@ -1199,9 +1260,21 @@ class KatFR:
         return np.real(qnoise)
 
     def addDrives(self, drives):
+        """Add drives to the list of drives to compute
+
+        Examples:
+          katFR.addDrives('EX')
+          katFR.addDrives(['IY', 'EY'])
+        """
         append_str_if_unique(self.drives, drives)
 
     def removeDrives(self, drives):
+        """Remove drives from the list to compute
+
+        Examples:
+          katFR.removeDrives('EX')
+          katFR.removeDrives(['IY', 'EY'])
+        """
         if isinstance(drives, str):
             drives = [drives]
 
