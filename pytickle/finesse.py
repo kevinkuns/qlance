@@ -1008,24 +1008,25 @@ class KatFR:
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'fr')
 
-        # populate the list of drives and position detectors if necessary
+        # populate the list of drives if necessary
         if all_drives:
             comps = (kcmp.mirror, kcmp.beamSplitter, kcmp.laser)
             self.drives = [
                 name for name, comp in kat.components.items()
                 if isinstance(comp, comps)]
 
-            self.pos_detectors = [name for name, det in kat.detectors.items()
-                                  if isinstance(det, kdet.xd)]
         else:
             self.drives = []
-            self.pos_detectors = []
 
         # populate the list of probes
         self.probes = [name for name, det in kat.detectors.items()
                        if isinstance(det, (kdet.pd, kdet.hd))]
         self.amp_detectors = [name for name, det in kat.detectors.items()
                               if isinstance(det, kdet.ad)]
+
+        # populate the list of position detectors
+        self.pos_detectors = [name for name, det in kat.detectors.items()
+                              if isinstance(det, kdet.xd)]
 
         # initialize response dictionaries
         self.freqresp = {dof: {probe: {} for probe in self.probes}
@@ -1310,6 +1311,24 @@ class KatFR:
 
 
 class KatSweep:
+    """Sweep drives in a Finesse model
+
+    Inputs:
+      kat: the finesse model
+      drives: which drives to sweep
+      dof: degree of freedom to sweep (Default: pos)
+      relative: if True drives are swept around the operating point instead
+        of the absolute value of the drive. (Default: True)
+
+    Examples:
+      Suppose the drive 'EX' is set at a tuning of 90, then
+        katSweep1 = KatSweep(kat, 'EX')
+        katSweep1.sweep(-10, 10, 100)
+      will compute the DC response for tunings from 80 to 100 deg and
+        katSweep2 = KatSweep(kat, 'EX', relative=False)
+        katSweep2.sweep(-10, 10, 100)
+      will compute the DC response for tunings from -10 to 10 deg.
+    """
     def __init__(self, kat, drives, dof='pos', relative=True):
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'dc')
@@ -1329,6 +1348,16 @@ class KatSweep:
 
     def sweep(
             self, spos, epos, npts, linlog='lin', verbose=False, debug=False):
+        """Compute a sweep
+
+        Inputs:
+          spos: the start position of the drive
+          epos: the end position of the drive
+          npts: number of points to compute
+          linlog: if 'lin' the sweep positions are linearly spaced
+            if 'log' sweep positions are log spaced (Default 'lin')
+          verbose: if True show the finesse progress bar (Default: False)
+        """
         kat = self.kat.deepcopy()
         kat.verbose = verbose
         kat.add(kcmd.variable('sweep', 1))
