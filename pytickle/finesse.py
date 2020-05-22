@@ -1252,10 +1252,14 @@ class KatFR:
         Returns the quantum noise at a given probe in [W/rtHz]
         """
         qnoise = list(self.freqresp[dof][probeName + '_shot'].values())[0]
+        # without copying multiple calls will reduce noise
+        qnoise = qnoise.copy()
+
         if dof == 'pos':
             # if this was computed from a position TF convert back to W/rtHz
             # 2*np.pi is correct here, not 360
             qnoise *= self.kat.lambda0 / (2*np.pi)
+
         if np.any(np.iscomplex(qnoise)):
             print('Warning: some quantum noise spectra are complex')
         return np.real(qnoise)
