@@ -14,6 +14,7 @@ from numbers import Number
 import pandas as pd
 from tqdm import tqdm
 from itertools import compress
+import matplotlib.pyplot as plt
 from pykat.external.peakdetect import peakdetect
 
 
@@ -439,7 +440,7 @@ def addModulator(kat, name, fmod, gmod, order, modtype, phase=0):
     Example:
         addModulator(kat, 'Modf1', 11e6, 0.1, 3, 'pm')
       Adds the phase modulator named 'Modf1' at 11 MHz with modulation
-      depth 0.1. The the input node is 'Modf1_in' and the output noide is
+      depth 0.1. The the input node is 'Modf1_in' and the output node is
       'Modf1_out'. 3 sidebands are tracked in the model.
     """
     kat.add(kcmp.modulator(
@@ -1312,6 +1313,45 @@ class KatFR:
         fig = plotting.plotTF(
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig
+
+    def plotQuantumASD(self, probeName, driveNames, fig=None, **kwargs):
+        """Plot the quantum ASD of a probe
+
+        Plots the ASD of a probe referenced the the transfer function for
+        some signal, such as DARM.
+
+        Inputs:
+          probeName: name of the probe
+          driveNames: names of the drives from which the TF to refer the
+            noise to
+          fig: if not None, an existing figure to plot the noise on
+            (Default: None)
+          **kwargs: extra keyword arguments to pass to the plot
+        """
+        ff = self.ff
+        if driveNames:
+            tf = self.getTF(probeName, driveNames)
+            noiseASD = np.abs(self.getQuantumNoise(probeName)/tf)
+        else:
+            noiseASD = np.abs(self.getQuantumNoise(probeName))
+
+        if fig is None:
+            newFig = True
+            fig = plt.figure()
+        else:
+            newFig = False
+
+        fig.gca().loglog(ff, noiseASD, **kwargs)
+        fig.gca().set_ylabel('Noise')
+        fig.gca().set_xlim([min(ff), max(ff)])
+        fig.gca().set_xlabel('Frequency [Hz]')
+        fig.gca().xaxis.grid(True, which='both', alpha=0.5)
+        fig.gca().xaxis.grid(alpha=0.25, which='minor')
+        fig.gca().yaxis.grid(True, which='both', alpha=0.5)
+        fig.gca().yaxis.grid(alpha=0.25, which='minor')
+
+        if newFig:
+            return fig
 
 
 class KatSweep:

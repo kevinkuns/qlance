@@ -435,7 +435,7 @@ class PyTickle:
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig
 
-    def plotQuantumASD(self, probeName, driveNames, **kwargs):
+    def plotQuantumASD(self, probeName, driveNames, fig=None, **kwargs):
         """Plot the quantum ASD of a probe
 
         Plots the ASD of a probe referenced the the transfer function for
@@ -445,16 +445,25 @@ class PyTickle:
           probeName: name of the probe
           driveNames: names of the drives from which the TF to refer the
             noise to
+          fig: if not None, an existing figure to plot the noise on
+            (Default: None)
           **kwargs: extra keyword arguments to pass to the plot
         """
         ff = self.ff
-        tf = self.getTF(probeName, driveNames)
-        noiseASD = np.abs(self.getQuantumNoise(probeName)/tf)
+        if driveNames:
+            tf = self.getTF(probeName, driveNames)
+            noiseASD = np.abs(self.getQuantumNoise(probeName)/tf)
+        else:
+            noiseASD = np.abs(self.getQuantumNoise(probeName))
 
-        fig = plt.figure()
+        if fig is None:
+            newFig = True
+            fig = plt.figure()
+        else:
+            newFig = False
+
         fig.gca().loglog(ff, noiseASD, **kwargs)
         fig.gca().set_ylabel('Noise')
-
         fig.gca().set_xlim([min(ff), max(ff)])
         fig.gca().set_xlabel('Frequency [Hz]')
         fig.gca().xaxis.grid(True, which='both', alpha=0.5)
@@ -462,7 +471,8 @@ class PyTickle:
         fig.gca().yaxis.grid(True, which='both', alpha=0.5)
         fig.gca().yaxis.grid(alpha=0.25, which='minor')
 
-        return fig
+        if newFig:
+            return fig
 
     def plotErrSig(self, probeName, driveName, quad=False, ax=None):
         if self.sigDC_sweep is None:
