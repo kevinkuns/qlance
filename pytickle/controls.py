@@ -305,12 +305,19 @@ class Filter:
 
     Inputs:
       The filter can be specified in one of two ways:
-        1) Giving a callable function
+        1) Giving a callable function that is the s-domain filter
         2) Giving the zeros, poles, and gain
         3) Giving the zeros, poles, and gain at a specific frequency
       Hz: If True, the zeros and poles are in the frequency domain and in Hz
           If False, the zeros and poles are in the s-domain and in rad/s
           (Default: True)
+
+      Examples:
+        All of the following define the same single pole low-pass filter with
+        1 Hz corner frequency:
+          Filter([], 1, 1)
+          Filter([], -2*np.pi, 1, Hz=False)
+          Filter(lambda s: 1/(s + 2*np.pi))
     """
 
     def __init__(self, *args, **kwargs):
@@ -905,7 +912,7 @@ class ControlSystem:
           tp_to: the output test point
           tp_from: the input test point
           noiseASDs: a dictionary of noise ASDs with keys the name of the
-            dofs from and values the ASDs [u/rtHz]
+            signal from and values the ASDs [u/rtHz]
 
         Returns:
           totalASD: the total ASD [u/rtHz]
@@ -925,14 +932,15 @@ class ControlSystem:
             totalPSD += powTF[from_ind] * noiseASD**2
         return np.sqrt(totalPSD)
 
-    def getTotalNoiseFrom(self, sig_to, sig_from, tp_from, noiseASDs):
-        ampTF = self.getTF('', sig_to, sig_from, tp_from)
-        powTF = np.abs(ampTF)**2
-        totalPSD = np.zeros(powTF.shape[-1])
-        for dof_to, noiseASD in noiseASDs.items():
-            to_ind = self._getIndex(dof_to, sig_to)
-            totalPSD += powTF[to_ind] * noiseASD**2
-        return np.sqrt(totalPSD)
+    # FIXME:
+    # def getTotalNoiseFrom(self, sig_to, sig_from, tp_from, noiseASDs):
+    #     ampTF = self.getTF('', sig_to, sig_from, tp_from)
+    #     powTF = np.abs(ampTF)**2
+    #     totalPSD = np.zeros(powTF.shape[-1])
+    #     for dof_to, noiseASD in noiseASDs.items():
+    #         to_ind = self._getIndex(dof_to, sig_to)
+    #         totalPSD += powTF[to_ind] * noiseASD**2
+    #     return np.sqrt(totalPSD)
 
     def plotNyquist(self, sig_to, sig_from, tstpnt, rmax=3):
         """Make a Nyquist plot

@@ -3,6 +3,7 @@ Miscellaneous noise functions
 """
 
 import numpy as np
+from scipy.integrate import cumtrapz
 
 
 def resamplePSD(ffOld, ffNew, Sold):
@@ -140,6 +141,7 @@ def computeRMS(ff, asd):
     Returns:
         rms: the cumulative RMS [A]
     """
-    dS = np.flip(asd**2 * ff)
-    rms = np.flip(np.sqrt(np.cumsum(dS)))
+    rms2 = -cumtrapz(np.flip(asd**2), np.flip(ff))
+    rms = np.sqrt(np.flip(rms2))
+    rms = np.concatenate(([rms[0]], rms))
     return rms
