@@ -370,7 +370,7 @@ def addGouyReadout(kat, name, phaseA, dphaseB=90):
 def monitorShotNoise(kat, probe):
     """Compute the shot noise of a photodiode
 
-    Adds a qshot detector to a finesse model named 'probe_shot'
+    Adds a qnoised detector to a finesse model named 'probe_shot'
 
     Inputs:
       kat: the finesse model
@@ -385,10 +385,28 @@ def monitorShotNoise(kat, probe):
     if not isinstance(det, kdet.pd):
         raise ValueError(probe + ' is not a photodiode')
 
-    node, freq, phase, _, alternate_beam = _get_probe_info(det)
-    _add_generic_probe(
-        kat, probe + '_shot', node, freq, phase, 'shot',
-        alternate_beam=alternate_beam)
+    name = probe + '_shot'
+    if name in kat.detectors.keys():
+        print(probe + ' already has a shot noise detector. Skipping.')
+
+    else:
+        node, freq, phase, _, alternate_beam = _get_probe_info(det)
+        _add_generic_probe(
+            kat, probe + '_shot', node, freq, phase, 'shot',
+            alternate_beam=alternate_beam)
+
+
+def monitorAllShotNoise(kat):
+    """Compute the shot noise for all photodiodes in a model
+
+    Inputs:
+      kat: the finesse model
+    """
+    for det in kat.detectors.values():
+        is_pd = isinstance(det, kdet.pd)
+        is_shot = isinstance(det, (kdet.qnoised, kdet.qshot))
+        if is_pd and not is_shot:
+            monitorShotNoise(kat, det.name)
 
 
 def monitorMotion(kat, name, dof='pos'):
