@@ -4,7 +4,7 @@
 
 Here is a detailed overview of the architecture of the control systems for reference. The Optickle and Finesse examples for controlling a Fabry Perot Michelson interferometer ([available here](../examples/FPMI/)) show a detailed example and explain the optomechanical plant and related test points in more detail.
 
-![Control Loop](documentation/control_loop.svg)
+![Control Loop](control_loop.svg)
 
 <p>&nbsp;</p>
 
