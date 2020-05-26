@@ -2,7 +2,7 @@
 
 *__Note: the PyTickle convention is that control signals are directly summed into the error point without an explicit minus sign.__ Loops thus go unstable when open-loop transfer functions (OLTFs) are +1 and the Nyquist criteria requires the Nyquist contour to circle the point +1 clockwise the same number of times as there are right half plane poles in the OLTF.*
 
-Here is a detailed overview of the architecture of the control systems for reference. The Optickle and Finesse examples for controlling a Fabry Perot Michelson interferometer ([available here](https://github.com/kevinkuns/pytickle/tree/master/examples/FPMI)) show a detailed example and explain the optomechanical plant and related test points in more detail.
+Here is a detailed overview of the architecture of the control systems for reference. The Optickle and Finesse examples for controlling a Fabry Perot Michelson interferometer ([available here](../examples/FPMI/)) show a detailed example and explain the optomechanical plant and related test points in more detail.
 
 ![Control Loop](documentation/control_loop.svg)
 
