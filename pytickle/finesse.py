@@ -39,6 +39,16 @@ def addMirror(
       yaw: yaw tuning [deg] (Default: 0)
       dh: optic thickness [m] (Default: 0)
       comp: whether to use a real compound mirror (Default: False)
+
+    Examples:
+      * add a perfectly reflecting mirror named 'EX' with a ROC of 36 km
+          addMirror(kat, 'EX', Chr=1/36e3)
+        The node at the front is 'EX_fr' and the node at the back is 'EX_bk'.
+        Note that the ROC is +36 km no matter how this mirror is used.
+
+      * add a real mirror with 1% transmissivity and 20 ppm HR loss
+          addMirror(kat, 'IX', Thr=0.01, Lhr=20e-6, comp=True)
+        The node at the front is 'IY_fr' and the node at the back is 'IY_bk'
     """
     # FIXME: implement pitch and yaw
     if Chr == 0:
@@ -54,6 +64,7 @@ def addMirror(
     fr_s = fr + '_s'
     bk_s = bk + '_s'
 
+    # FIXME: raise errors for incompatible options
     if comp:
         # HR surface
         kat.add(kcmp.mirror(
@@ -83,7 +94,9 @@ def addBeamSplitter(
       * name_frR: beam reflected from the HR surface (i.e. towards ITMY)
       * name_bkT: beam transmitted through the AR surface (i.e. towards ITMX)
       * name_bkO: open port on the AR surface (i.e. towards SRM)
-      * and pickoff beams name_piT, name_poT, name_piO, and name_poO
+      * and pickoff beams name_piT, name_poT, name_piO, and name_poO if it's
+        a real compound mirror
+
     Inputs:
       kat: the finesse model
       name: name of the optic
@@ -99,6 +112,11 @@ def addBeamSplitter(
       yaw: yaw tuning [deg] (Default: 0)
       dh: optic thickness [m] (Default: 0)
       comp: whether to use a real compound mirror (Default: False)
+
+    Example:
+      add a real 60/40 BS at a 30 deg aoi
+        addBeamSplitter(kat, 'BS', Thr=0.6, aoi=30, comp=True)
+      The nodes are 'BS_frI', 'BS_frR', 'BS_bkT', and 'BS_bkO'
     """
     # FIXME: implement pitch and yaw
     if Chr == 0:
@@ -122,6 +140,7 @@ def addBeamSplitter(
     poO = name + '_poO'
     piO = name + '_piO'
 
+    # FIXME: raise errors for incompatible options
     if comp:
         # aoi of beam in the substrate
         alpha_sub = np.arcsin(np.sin(aoi*np.pi/180)/Nmd)
@@ -1490,6 +1509,33 @@ class KatSweep:
             sig = func(sig)
 
         return self.poses[driveName], sig
+
+    def plotSweepSignal(
+            self, probeName, driveName, func=None, fig=None, **kwargs):
+        """Plot the signal from sweeping drives
+
+        Inputs:
+          probeName: name of the probe
+          driveName: name of the drives
+          func: if not None, function to apply to the sweep signal before
+            returning; see getSweepSignal (Default: None)
+          fig: if not None, an existing figure to plot the signal on
+            (Default: None)
+          **kwargs: extra keyword arguments to pass to the plot
+        """
+        if fig is None:
+            newFig = True
+            fig = plt.figure()
+        else:
+            newFig = False
+        ax = fig.gca()
+
+        poses, sig = self.getSweepSignal(probeName, driveName, func=func)
+        ax.plot(poses, sig, **kwargs)
+        ax.set_xlim(poses[0], poses[-1])
+        ax.grid(True, alpha=0.5)
+        if newFig:
+            return fig
 
     def find_peak(self, probeName, driveName, minmax, func=None):
         """

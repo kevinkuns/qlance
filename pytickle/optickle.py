@@ -474,34 +474,29 @@ class PyTickle:
         if newFig:
             return fig
 
-    def plotErrSig(self, probeName, driveName, quad=False, ax=None):
-        if self.sigDC_sweep is None:
-            raise ValueError(
-                'Must run sweepLinear before plotting an error signal')
-        if quad:
-            probeNames = [probeName + '_I', probeName + '_Q']
-        else:
-            probeNames = [probeName]
-        driveNum = self.drives.index(driveName)
-        poses = self.poses[driveNum, :]
-        if ax is None:
+    def plotSweepSignal(self, probeName, driveName, fig=None, **kwargs):
+        """Plot the signal from sweeping drives
+
+        Inputs:
+          probeName: name of the probe
+          driveName: name of the drives
+          fig: if not None, an existing figure to plot the signal on
+            (Default: None)
+          **kwargs: extra keyword arguments to pass to the plot
+        """
+        if fig is None:
+            newFig = True
             fig = plt.figure()
-            ax = fig.gca()
-        # fig = plt.figure()
-        for probeName in probeNames:
-            probeNum = self.probes.index(probeName)
-            sigDC = self.sigDC_[probeNum, :]
-            ax.plot(poses, sigDC, label=probeName)
-        # ax.plot(poses, np.zeros(len(poses)), 'C7--', alpha=0.5)
-        ax.xaxis.grid(True, which='major', alpha=0.4)
-        ax.yaxis.grid(True, which='major', alpha=0.4)
-        # ax.axvline(0, color='C7', linestyle='--', alpha=0.5)
-        ax.set_xlabel('drive position [m]')
-        ax.set_ylabel('probe power [W]')
-        ax.set_title('Sweeping ' + driveName)
-        ax.legend()
-        ax.set_xlim([min(poses), max(poses)])
-        # return fig
+        else:
+            newFig = False
+        ax = fig.gca()
+
+        poses, sig = self.getSweepSignal(probeName, driveName)
+        ax.plot(poses, sig, **kwargs)
+        ax.set_xlim(poses[0], poses[-1])
+        ax.grid(True, alpha=0.5)
+        if newFig:
+            return fig
 
     def getSweepPower(self, driveName, linkStart, linkEnd, fRF=0,
                       lambda0=1064e-9):
