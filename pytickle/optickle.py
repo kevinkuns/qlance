@@ -4,20 +4,18 @@ Provides code for calling Optickle from within PyTickle
 
 import numpy as np
 import matlab
-import matplotlib.pyplot as plt
+from . import plant
 import scipy.constants as scc
 from numbers import Number
 from collections import OrderedDict
 import pandas as pd
-# from . import plotting
-from . import plotting
 from . import controls as ctrl
 from . import utils
 from .matlab import mat2py, py2mat, str2mat, addOpticklePath
 from .gaussian_beams import beam_properties_from_q
 
 
-class PyTickle:
+class PyTickle(plant.OpticklePlant):
     """A class for an Optickle model
 
     Inputs:
@@ -38,6 +36,7 @@ class PyTickle:
     """
 
     def __init__(self, eng, optName, vRF=0, lambda0=1064e-9, pol='S'):
+        plant.OpticklePlant.__init__(self)
         # convert RF and polarization information
         if isinstance(vRF, Number):
             vRF = np.array([vRF])
@@ -202,134 +201,6 @@ class PyTickle:
         self.sigDC_sweep = mat2py(self.eng.workspace['sigDC'])
         self.fDC_sweep = mat2py(self.eng.workspace['fDC'])
 
-    def getTF(self, probes, drives, dof='pos', optOnly=False):
-        """Compute a transfer function
-
-        Inputs:
-          probes: name of the probes at which the TF is calculated
-          drives: names of the drives from which the TF is calculated
-          dof: degree of freedom of the drives (Default: pos)
-          optOnly: if True, only return the optical TF with no mechanics
-            (Default: False)
-
-        Returns:
-          tf: the transfer function
-            * In units of [W/m] if drive is an optic with dof pos
-            * In units of [W/rad] if drive is an optic with dof pitch or yaw
-            * In units of [W/rad] if drive is a PM modulator with dof drive
-            * In units of [W/RAM] if drive is an AM modulator with dof drive
-            * In units of [W/rad] if drive is an RF modulator with dof phase
-            * In units of [W/RAM] if drive is an RF modulator with dof amp
-              modulation of an RF modulator.
-
-        Note: To convert [W/RAM] to [W/RIN], divide by 2 since RIN = 2*RAM
-
-        Examples:
-          * If only a single drive is used, the drive name can be a string.
-            To compute the phase transfer function in reflection from a FP
-            cavity
-              tf = opt.getTF('REFL', 'PM', 'drive')
-
-          * If multiple drives are used, the drive names should be a dict.
-            To compute the DARM transfer function to the AS_DIFF homodyne PD
-              DARM = {'EX': 1/2, 'EY': -1/2}
-              tf = opt.getTF('AS_DIFF', DARM)
-            [Note: Since DARM is defined as Lx - Ly, to get 1 m of DARM
-            requires 0.5 m of both Lx and Ly]
-        """
-        if dof not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
-            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
-
-        # figure out the shape of the TF
-        if isinstance(self.ff, Number):
-            # TF is at a single frequency
-            tf = 0
-        else:
-            # TF is for a frequency vector
-            tf = np.zeros(len(self.ff), dtype='complex')
-
-        if optOnly:
-            tfData = self.mOpt
-        else:
-            tfData = self.sigAC
-
-        if tfData is None:
-            msg = 'Must run tickle for the appropriate DOF before ' \
-                  + 'calculating a transfer function.'
-            raise RuntimeError(msg)
-
-        # figure out which raw output matrix to use
-        if dof in ['pos', 'drive', 'amp', 'phase']:
-            tfData = tfData['pos']
-        elif dof == 'pitch':
-            tfData = tfData['pitch']
-        elif dof == 'yaw':
-            tfData = tfData['yaw']
-
-        if isinstance(drives, str):
-            drives = {drives: 1}
-
-        if isinstance(probes, str):
-            probes = {probes: 1}
-
-        # loop through the drives and probes to compute the TF
-        for probe, pc in probes.items():
-            # get the probe index
-            probeNum = self.probes.index(probe)
-
-            for drive, drive_pos in drives.items():
-                # get the drive index
-                driveNum = self._getDriveIndex(drive, dof)
-
-                # add the contribution from this drive
-                try:
-                    tf += pc * drive_pos * tfData[probeNum, driveNum]
-                except IndexError:
-                    tf += pc * drive_pos * tfData[driveNum]
-
-        return tf
-
-    def getMechTF(self, outDrives, inDrives, dof='pos'):
-        """Compute a mechanical transfer function
-
-        Inputs:
-          outDrives: name of the output drives
-          inDrives: name of the input drives
-          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
-
-        Returns:
-          tf: the transfer function
-            * In units of [m/N] for position
-            * In units of [rad/(N m)] for pitch and yaw
-        """
-        if dof not in ['pos', 'pitch', 'yaw']:
-            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
-
-        # figure out the shape of the TF
-        if isinstance(self.ff, Number):
-            # TF is at a single frequency
-            tf = 0
-        else:
-            # TF is for a frequency vector
-            tf = np.zeros(len(self.ff), dtype='complex')
-
-        if isinstance(outDrives, str):
-            outDrives = {outDrives: 1}
-
-        if isinstance(inDrives, str):
-            inDrives = {inDrives: 1}
-
-        # loop through drives to compute the TF
-        for inDrive, c_in in inDrives.items():
-            # get the default mechanical plant of the optic being driven
-            plant = ctrl.Filter(*self.extract_zpk(inDrive, dof), Hz=False)
-
-            for outDrive, c_out in outDrives.items():
-                mmech = self.getMechMod(outDrive, inDrive, dof=dof)
-                tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
-
-        return tf
-
     def computeBeamSpotMotion(self, opticName, driveName, dof):
         """Compute the beam spot motion on one optic due to angular motion of another
 
@@ -369,279 +240,6 @@ class PyTickle:
         # convert to spot motion [m/rad]
         bsm = w/Pdc * tf
         return bsm
-
-    def getMechMod(self, drive_out, drive_in, dof='pos'):
-        """Get the radiation pressure modifications to drives
-
-        Inputs:
-          drive_out: name of the output drive
-          drive_in: name of the input drive
-          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
-        """
-        if dof not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
-            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
-
-        # figure out which raw output matrix to use
-        if dof in ['pos', 'drive', 'amp', 'phase']:
-            mMech = self.mMech['pos']
-        elif dof == 'pitch':
-            mMech = self.mMech['pitch']
-        elif dof == 'yaw':
-            mMech = self.mMech['yaw']
-
-        if mMech is None:
-            msg = 'Must run tickle for the appropriate DOF before ' \
-                  + 'calculating a transfer function.'
-            raise RuntimeError(msg)
-
-        driveInNum = self._getDriveIndex(drive_in, dof)
-        driveOutNum = self._getDriveIndex(drive_out, dof)
-
-        return mMech[driveOutNum, driveInNum]
-
-    def getQuantumNoise(self, probeName, dof='pos'):
-        """Compute the quantum noise at a probe
-
-        Returns the quantum noise at a given probe in [W/rtHz]
-        """
-        probeNum = self.probes.index(probeName)
-        try:
-            qnoise = self.noiseAC[dof][probeNum, :]
-        except IndexError:
-            qnoise = self.noiseAC[dof][probeNum]
-        return qnoise
-
-    def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
-               dof='pos', optOnly=False, **kwargs):
-        """Plot a transfer function.
-
-        See documentation for plotTF in plotting
-        """
-        ff = self.ff
-        tf = self.getTF(probeName, driveNames, dof=dof, optOnly=optOnly)
-        fig = plotting.plotTF(
-            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
-        return fig
-
-    def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
-                   dof='pos', **kwargs):
-        """Plot a mechanical transfer function
-
-        See documentation for plotTF in plotting
-        """
-        ff = self.ff
-        tf = self.getMechTF(outDrives, inDrives, dof=dof)
-        fig = plotting.plotTF(
-            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
-        return fig
-
-    def plotQuantumASD(self, probeName, driveNames, fig=None, **kwargs):
-        """Plot the quantum ASD of a probe
-
-        Plots the ASD of a probe referenced the the transfer function for
-        some signal, such as DARM.
-
-        Inputs:
-          probeName: name of the probe
-          driveNames: names of the drives from which the TF to refer the
-            noise to
-          fig: if not None, an existing figure to plot the noise on
-            (Default: None)
-          **kwargs: extra keyword arguments to pass to the plot
-        """
-        ff = self.ff
-        if driveNames:
-            tf = self.getTF(probeName, driveNames)
-            noiseASD = np.abs(self.getQuantumNoise(probeName)/tf)
-        else:
-            noiseASD = np.abs(self.getQuantumNoise(probeName))
-
-        if fig is None:
-            newFig = True
-            fig = plt.figure()
-        else:
-            newFig = False
-
-        fig.gca().loglog(ff, noiseASD, **kwargs)
-        fig.gca().set_ylabel('Noise')
-        fig.gca().set_xlim([min(ff), max(ff)])
-        fig.gca().set_xlabel('Frequency [Hz]')
-        fig.gca().xaxis.grid(True, which='both', alpha=0.5)
-        fig.gca().xaxis.grid(alpha=0.25, which='minor')
-        fig.gca().yaxis.grid(True, which='both', alpha=0.5)
-        fig.gca().yaxis.grid(alpha=0.25, which='minor')
-
-        if newFig:
-            return fig
-
-    def plotSweepSignal(self, probeName, driveName, fig=None, **kwargs):
-        """Plot the signal from sweeping drives
-
-        Inputs:
-          probeName: name of the probe
-          driveName: name of the drives
-          fig: if not None, an existing figure to plot the signal on
-            (Default: None)
-          **kwargs: extra keyword arguments to pass to the plot
-        """
-        if fig is None:
-            newFig = True
-            fig = plt.figure()
-        else:
-            newFig = False
-        ax = fig.gca()
-
-        poses, sig = self.getSweepSignal(probeName, driveName)
-        ax.plot(poses, sig, **kwargs)
-        ax.set_xlim(poses[0], poses[-1])
-        ax.grid(True, alpha=0.5)
-        if newFig:
-            return fig
-
-    def getSweepPower(self, driveName, linkStart, linkEnd, fRF=0,
-                      lambda0=1064e-9):
-        """Get the power along a link between two optics as a drive is swept
-
-        Inputs:
-          linkStart: name of the start of the link
-          linkEnd: name of the end of the link
-          fRF: frequency of the sideband power to return [Hz]
-            (Default: 0, i.e. the carrier)
-          lambda0: wavelength of the sideband power to return [m]
-            (Default: 1064e-9)
-
-        Returns:
-          poses: the drive positions
-          power: the power at those positions [W]
-        """
-        if self.fDC_sweep is None:
-            raise ValueError(
-                'Must run sweepLinear before calculating sweep power')
-
-        # find the link and the drive
-        linkNum = self._getLinkNum(linkStart, linkEnd)
-        driveNum = self._getDriveIndex(driveName, 'pos')
-
-        poses = self.poses[driveNum, :]
-        if self.vRF.size == 1:
-            power = np.abs(self.fDC_sweep[linkNum, :])**2
-        else:
-            nRF = self._getSidebandInd(fRF, lambda0)
-            power = np.abs(self.fDC_sweep[linkNum, nRF, :])**2
-
-        return poses, power
-
-    def getSweepSignal(self, probeName, driveName):
-        """Compute the signals as a drive is swept
-
-        Inputs:
-          probeName: name of the probe
-          driveName: name of the drive
-
-        Returns:
-          poses: the positions of the drive
-          sig: signal power at those positions [W]
-        """
-        probeNum = self.probes.index(probeName)
-        driveNum = self._getDriveIndex(driveName, 'pos')
-
-        poses = self.poses[driveNum, :]
-        try:
-            sig = self.sigDC_sweep[probeNum, :]
-        except IndexError:
-            sig = self.sigDC_sweep
-
-        return poses, sig
-
-    def getSigDC(self, probeName):
-        """Get the DC power on a probe
-
-        Inputs:
-          probeName: the probe name
-
-        Returns:
-          power: the DC power on the probe [W]
-        """
-        probeNum = self.probes.index(probeName)
-        return self.sigDC_tickle[probeNum]
-
-    def getDCpower(self, linkStart, linkEnd, fRF=0, lambda0=1064e-9):
-        """Get the DC power along a link
-
-        Inputs:
-          linkStart: name of the start of the link
-          linkEnd: name of the end of the link
-          fRF: frequency of the sideband power to return [Hz]
-            (Default: 0, i.e. the carrier)
-          lambda0: wavelength of the sideband power to return [m]
-            (Default: 1064e-9)
-
-        Returns:
-          power: the DC power [W]
-        """
-        if self.fDC is None:
-            raise ValueError(
-                'Must run tickle before getting the DC power levels.')
-
-        linkNum = self._getLinkNum(linkStart, linkEnd)
-        if self.vRF.size == 1:
-            power = np.abs(self.fDC[linkNum])**2
-        else:
-            nRF = self._getSidebandInd(fRF, lambda0)
-            power = np.abs(self.fDC[linkNum, nRF])**2
-
-        return power
-
-    def showfDC(self):
-        """Print the DC power at each link in the model
-        """
-        pad2 = 7
-        nLink = int(self.eng.eval(self.optName + ".Nlink;"))
-        links = []
-        for ii in range(nLink):
-            sourceName = self._getSourceName(ii + 1)
-            sinkName = self._getSinkName(ii + 1)
-            links.append(sourceName + ' --> ' + sinkName)
-        pad = max([len(link) for link in links])
-        l1 = pad
-        try:
-            nRF = len(self.vRF)
-        except TypeError:
-            nRF = 1
-        l2 = (pad2 + 3)*nRF
-        print('{:<{l1}s}|'.format('Link', l1=l1) + utils.printHeader(
-            self.vRF, pad2 - 1))
-        for li, link in enumerate(links):
-            line = '{:{pad}s}|'.format(link, pad=pad)
-            if nRF == 1:
-                line += utils.printLine([self.fDC[li]], pad2)
-            else:
-                line += utils.printLine(self.fDC[li, :], pad2)
-            if li % 5 == 0:
-                print('{:_<{length}}'.format('', length=int(l1 + l2 + 1)))
-            print(line)
-
-    def showsigDC(self):
-        """Print the DC power at each probe
-        """
-        pad1 = max([len('Probe '),
-                    max([len(probe) for probe in self.probes])])
-        pad2 = 10
-        print('{:<{pad1}s}| {:<{pad2}s}|'.format(
-            'Probe', 'Power', pad1=pad1, pad2=pad2))
-        print('{:_<{length}}'.format('', length=int(pad1 + pad2 + 3)))
-        if isinstance(self.probes, str):
-            probes = [self.probes]
-        else:
-            probes = self.probes
-        for pi, probe in enumerate(probes):
-            try:
-                pref, num = utils.siPrefix(self.sigDC_tickle[pi])
-            except IndexError:
-                pref, num = utils.siPrefix(self.sigDC_tickle)
-            pad3 = pad2 - len(pref) - 2
-            print('{:{pad1}s}| {:{pad3}.1f} {:s}W|'.format(
-                probe, num, pref, pad1=pad1, pad3=pad3))
 
     def addMirror(self, name, aoi=0, Chr=0, Thr=0, Lhr=0,
                   Rar=0, Lmd=0, Nmd=1.45):
@@ -1048,6 +646,59 @@ class PyTickle:
         cmd = self.optName + ".setMechTF(" + str2mat(name) + ", tf, nDOF);"
         self._eval(cmd, nargout=0)
 
+    def getMechTF(self, outDrives, inDrives, dof='pos'):
+        """Compute a mechanical transfer function
+
+        Inputs:
+          outDrives: name of the output drives
+          inDrives: name of the input drives
+          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+
+        Returns:
+          tf: the transfer function
+            * In units of [m/N] for position
+            * In units of [rad/(N m)] for pitch and yaw
+        """
+        if dof not in ['pos', 'pitch', 'yaw']:
+            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+
+        # figure out the shape of the TF
+        if isinstance(self.ff, Number):
+            # TF is at a single frequency
+            tf = 0
+        else:
+            # TF is for a frequency vector
+            tf = np.zeros(len(self.ff), dtype='complex')
+
+        if isinstance(outDrives, str):
+            outDrives = {outDrives: 1}
+
+        if isinstance(inDrives, str):
+            inDrives = {inDrives: 1}
+
+        # loop through drives to compute the TF
+        for inDrive, c_in in inDrives.items():
+            # get the default mechanical plant of the optic being driven
+            plant = ctrl.Filter(*self.extract_zpk(inDrive, dof), Hz=False)
+
+            for outDrive, c_out in outDrives.items():
+                mmech = self.getMechMod(outDrive, inDrive, dof=dof)
+                tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
+
+        return tf
+
+    def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
+                   dof='pos', **kwargs):
+        """Plot a mechanical transfer function
+
+        See documentation for plotTF in plotting
+        """
+        ff = self.ff
+        tf = self.getMechTF(outDrives, inDrives, dof=dof)
+        fig = plotting.plotTF(
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
+        return fig
+
     def extract_zpk(self, name, dof='pos'):
         """Get the mechanical transfer function of an optic
 
@@ -1443,14 +1094,150 @@ class PyTickle:
 
         return abcd
 
-    def _getDriveIndex(self, name, dof):
-        """Find the drive index of a given drive and degree of freedom
+    def getSweepPower(self, driveName, linkStart, linkEnd, fRF=0,
+                      lambda0=1064e-9):
+        """Get the power along a link between two optics as a drive is swept
+
+        Inputs:
+          linkStart: name of the start of the link
+          linkEnd: name of the end of the link
+          fRF: frequency of the sideband power to return [Hz]
+            (Default: 0, i.e. the carrier)
+          lambda0: wavelength of the sideband power to return [m]
+            (Default: 1064e-9)
+
+        Returns:
+          poses: the drive positions
+          power: the power at those positions [W]
         """
-        if dof in ['pos', 'pitch', 'yaw']:
-            driveNum = self.drives.index(name + '.pos')
-        elif dof in ['drive', 'amp', 'phase']:
-            driveNum = self.drives.index('{:s}.{:s}'.format(name, dof))
-        return driveNum
+        if self.fDC_sweep is None:
+            raise ValueError(
+                'Must run sweepLinear before calculating sweep power')
+
+        # find the link and the drive
+        linkNum = self._getLinkNum(linkStart, linkEnd)
+        driveNum = self._getDriveIndex(driveName, 'pos')
+
+        poses = self.poses[driveNum, :]
+        if self.vRF.size == 1:
+            power = np.abs(self.fDC_sweep[linkNum, :])**2
+        else:
+            nRF = self._getSidebandInd(fRF, lambda0)
+            power = np.abs(self.fDC_sweep[linkNum, nRF, :])**2
+
+        return poses, power
+
+    def getSweepSignal(self, probeName, driveName):
+        """Compute the signals as a drive is swept
+
+        Inputs:
+          probeName: name of the probe
+          driveName: name of the drive
+
+        Returns:
+          poses: the positions of the drive
+          sig: signal power at those positions [W]
+        """
+        probeNum = self.probes.index(probeName)
+        driveNum = self._getDriveIndex(driveName, 'pos')
+
+        poses = self.poses[driveNum, :]
+        try:
+            sig = self.sigDC_sweep[probeNum, :]
+        except IndexError:
+            sig = self.sigDC_sweep
+
+        return poses, sig
+
+    def getSigDC(self, probeName):
+        """Get the DC power on a probe
+
+        Inputs:
+          probeName: the probe name
+
+        Returns:
+          power: the DC power on the probe [W]
+        """
+        probeNum = self.probes.index(probeName)
+        return self.sigDC_tickle[probeNum]
+
+    def getDCpower(self, linkStart, linkEnd, fRF=0, lambda0=1064e-9):
+        """Get the DC power along a link
+
+        Inputs:
+          linkStart: name of the start of the link
+          linkEnd: name of the end of the link
+          fRF: frequency of the sideband power to return [Hz]
+            (Default: 0, i.e. the carrier)
+          lambda0: wavelength of the sideband power to return [m]
+            (Default: 1064e-9)
+
+        Returns:
+          power: the DC power [W]
+        """
+        if self.fDC is None:
+            raise ValueError(
+                'Must run tickle before getting the DC power levels.')
+
+        linkNum = self._getLinkNum(linkStart, linkEnd)
+        if self.vRF.size == 1:
+            power = np.abs(self.fDC[linkNum])**2
+        else:
+            nRF = self._getSidebandInd(fRF, lambda0)
+            power = np.abs(self.fDC[linkNum, nRF])**2
+
+        return power
+
+    def showfDC(self):
+        """Print the DC power at each link in the model
+        """
+        pad2 = 7
+        nLink = int(self.eng.eval(self.optName + ".Nlink;"))
+        links = []
+        for ii in range(nLink):
+            sourceName = self._getSourceName(ii + 1)
+            sinkName = self._getSinkName(ii + 1)
+            links.append(sourceName + ' --> ' + sinkName)
+        pad = max([len(link) for link in links])
+        l1 = pad
+        try:
+            nRF = len(self.vRF)
+        except TypeError:
+            nRF = 1
+        l2 = (pad2 + 3)*nRF
+        print('{:<{l1}s}|'.format('Link', l1=l1) + utils.printHeader(
+            self.vRF, pad2 - 1))
+        for li, link in enumerate(links):
+            line = '{:{pad}s}|'.format(link, pad=pad)
+            if nRF == 1:
+                line += utils.printLine([self.fDC[li]], pad2)
+            else:
+                line += utils.printLine(self.fDC[li, :], pad2)
+            if li % 5 == 0:
+                print('{:_<{length}}'.format('', length=int(l1 + l2 + 1)))
+            print(line)
+
+    def showsigDC(self):
+        """Print the DC power at each probe
+        """
+        pad1 = max([len('Probe '),
+                    max([len(probe) for probe in self.probes])])
+        pad2 = 10
+        print('{:<{pad1}s}| {:<{pad2}s}|'.format(
+            'Probe', 'Power', pad1=pad1, pad2=pad2))
+        print('{:_<{length}}'.format('', length=int(pad1 + pad2 + 3)))
+        if isinstance(self.probes, str):
+            probes = [self.probes]
+        else:
+            probes = self.probes
+        for pi, probe in enumerate(probes):
+            try:
+                pref, num = utils.siPrefix(self.sigDC_tickle[pi])
+            except IndexError:
+                pref, num = utils.siPrefix(self.sigDC_tickle)
+            pad3 = pad2 - len(pref) - 2
+            print('{:{pad1}s}| {:{pad3}.1f} {:s}W|'.format(
+                probe, num, pref, pad1=pad1, pad3=pad3))
 
     def _getSourceName(self, linkNum):
         """Find the name of the optic that is the source for a link
@@ -1509,67 +1296,6 @@ class PyTickle:
         """
         self.probes = self._eval(self.optName + ".getProbeName", 1)
         self.drives = self._eval(self.optName + ".getDriveNames", 1)
-
-    def _pol2opt(self, pol):
-        """Convert S and P polarizations to 1s and 0s for Optickle
-        """
-        if pol == 'S':
-            nPol = 1
-        elif pol == 'P':
-            nPol = 0
-        else:
-            raise ValueError('Unrecognized polarization ' + str(pol)
-                             + '. Use \'S\' or \'P\'')
-        return nPol
-
-    def _dof2opt(self, dof):
-        """Convert degrees of freedom to 1s, 2s, and 3s for Optickle
-        """
-        if dof == 'pos':
-            nDOF = 1
-        elif dof == 'pitch':
-            nDOF = 2
-        elif dof == 'yaw':
-            nDOF = 3
-        else:
-            raise ValueError('Unrecognized degree of freedom ' + str(dof)
-                             + '. Choose \'pos\', \'pitch\', or \'yaw\'.')
-
-        return nDOF
-
-    def _getSidebandInd(self, freq, lambda0=1064e-9, ftol=1, wltol=1e-10):
-        """Find the index of an RF sideband frequency
-
-        Inputs:
-          freq: the frequency of the desired sideband
-          lambda0: wavelength of desired sideband [m] (Default: 1064 nm)
-          ftol: tolerance of the difference between freq and the RF sideband
-            of the model [Hz] (Default: 1 Hz)
-          wltol: tolerance of the difference between lambda0 and the RF
-            sideband wavelength of the model [m] (Default: 100 pm)
-
-        Returns:
-          nRF: the index of the RF sideband
-        """
-        # FIXME: add support for multiple polarizations
-        ind = np.nonzero(np.logical_and(
-            np.isclose(self.vRF, freq, atol=ftol),
-            np.isclose(self.lambda0, lambda0, atol=wltol)))[0]
-
-        if len(ind) == 0:
-            msg = 'There are no sidebands with frequency '
-            msg += '{:0.0f} {:s}Hz'.format(
-                *utils.siPrefix(freq)[::-1])
-            raise ValueError(msg)
-
-        elif len(ind) > 1:
-            msg = 'There are {:d} sidebands with '.format(len(ind))
-            msg += 'frequency {:0.0f} {:s}Hz'.format(
-                *utils.siPrefix(freq)[::-1])
-            raise ValueError(msg)
-
-        else:
-            return int(ind)
 
     def _eval(self, cmd, nargout=0):
         """Evaluate a matlab command using the pytickle model's engine
