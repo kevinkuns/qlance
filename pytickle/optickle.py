@@ -5,14 +5,11 @@ Provides code for calling Optickle from within PyTickle
 import numpy as np
 import matlab
 from . import plant
-import scipy.constants as scc
 from numbers import Number
 from collections import OrderedDict
 import pandas as pd
-from . import controls as ctrl
 from . import utils
 from .matlab import mat2py, py2mat, str2mat, addOpticklePath
-from .gaussian_beams import beam_properties_from_q
 
 
 class PyTickle(plant.OpticklePlant):
@@ -62,29 +59,6 @@ class PyTickle(plant.OpticklePlant):
         self.lambda0 = mat2py(self.eng.eval(self.optName + ".lambda"))
         self.vRF = mat2py(self._eval(self.optName + ".vFrf", 1))
         self.pol = np.array(pol)
-        self.nRF = OrderedDict()
-        for ri, fRF in enumerate(vRF):
-            pref, num = utils.siPrefix(round(fRF))
-            if num == 0:
-                key = 'DC'
-            else:
-                key = str(int(round(num))) + ' ' + pref + 'Hz'
-            self.nRF[key] = ri
-
-        self.probes = []
-        self.drives = []
-
-        self.ff = None
-        self.fDC = None
-        self.sigAC = {}
-        self.sigDC_tickle = None
-        self.mMech = {}
-        self.mOpt = {}
-        self.noiseAC = {}
-        self.poses = None
-        self.sigDC_sweep = None
-        self.fDC_sweep = None
-        self.qq = None
 
         # Track whether the probe basis has been rotated.
         # If it has, do not let any more probes be added
@@ -159,6 +133,13 @@ class PyTickle(plant.OpticklePlant):
                 self.noiseAC[dof] = mat2py(
                     self.eng.workspace['noiseAC'])
 
+            # get the mechanical plants
+            self.mech_plants[dof] = dict()
+            for drive in self.drives:
+                drive_name = drive.split('.')[0]
+                zs, ps, k = self.extract_zpk(drive_name, dof=dof)
+                self.mech_plants[dof][drive_name] = dict(zs=zs, ps=ps, k=k)
+
         # get the field basis if the dof is pitch or yaw
         if dof in ['pitch', 'yaw']:
             self.qq = mat2py(
@@ -200,46 +181,6 @@ class PyTickle(plant.OpticklePlant):
         self.poses = mat2py(self.eng.workspace['poses'])
         self.sigDC_sweep = mat2py(self.eng.workspace['sigDC'])
         self.fDC_sweep = mat2py(self.eng.workspace['fDC'])
-
-    def computeBeamSpotMotion(self, opticName, driveName, dof):
-        """Compute the beam spot motion on one optic due to angular motion of another
-
-        The beam spot motion must have been monitored by calling monitorBeamSpotMotion
-        before tickling the model.
-
-        Inputs:
-          opticName: name of the optic to compute the BSM on
-          driveName: drive name of the optic from which to compute the BSM from
-          dof: degree of freedom of the optic driving the BSM
-
-        Returns:
-          bsm: the beam spot motion [m/rad]
-
-        Example:
-          To compute the beam spot motion on the front of EX due to pitch
-          motion of IX
-            opt.monitorBeamSpotMotion('EX', 'fr')
-            bsm = opt.computeBeamSpotMotion('EX', 'IX', 'pitch')
-        """
-        # figure out monitoring probe information
-        probeName = opticName + '_DC'
-        probe_info = self._eval(
-            "opt.getSinkName(opt.getFieldProbed('{:s}'))".format(probeName), 1)
-        spotPort = probe_info.split('<-')[-1]
-
-        # get TF to monitoring probe power [W/rad]
-        tf = self.getTF(probeName, driveName, dof)
-
-        # DC power on the monitoring probe
-        Pdc = self.getSigDC(probeName)
-
-        # get the beam size on the optic
-        w, _, _, _, _, _ = self.getBeamProperties(opticName, spotPort)
-        w = np.abs(w[self.vRF == 0])
-
-        # convert to spot motion [m/rad]
-        bsm = w/Pdc * tf
-        return bsm
 
     def addMirror(self, name, aoi=0, Chr=0, Thr=0, Lhr=0,
                   Rar=0, Lmd=0, Nmd=1.45):
@@ -646,59 +587,6 @@ class PyTickle(plant.OpticklePlant):
         cmd = self.optName + ".setMechTF(" + str2mat(name) + ", tf, nDOF);"
         self._eval(cmd, nargout=0)
 
-    def getMechTF(self, outDrives, inDrives, dof='pos'):
-        """Compute a mechanical transfer function
-
-        Inputs:
-          outDrives: name of the output drives
-          inDrives: name of the input drives
-          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
-
-        Returns:
-          tf: the transfer function
-            * In units of [m/N] for position
-            * In units of [rad/(N m)] for pitch and yaw
-        """
-        if dof not in ['pos', 'pitch', 'yaw']:
-            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
-
-        # figure out the shape of the TF
-        if isinstance(self.ff, Number):
-            # TF is at a single frequency
-            tf = 0
-        else:
-            # TF is for a frequency vector
-            tf = np.zeros(len(self.ff), dtype='complex')
-
-        if isinstance(outDrives, str):
-            outDrives = {outDrives: 1}
-
-        if isinstance(inDrives, str):
-            inDrives = {inDrives: 1}
-
-        # loop through drives to compute the TF
-        for inDrive, c_in in inDrives.items():
-            # get the default mechanical plant of the optic being driven
-            plant = ctrl.Filter(*self.extract_zpk(inDrive, dof), Hz=False)
-
-            for outDrive, c_out in outDrives.items():
-                mmech = self.getMechMod(outDrive, inDrive, dof=dof)
-                tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
-
-        return tf
-
-    def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
-                   dof='pos', **kwargs):
-        """Plot a mechanical transfer function
-
-        See documentation for plotTF in plotting
-        """
-        ff = self.ff
-        tf = self.getMechTF(outDrives, inDrives, dof=dof)
-        fig = plotting.plotTF(
-            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
-        return fig
-
     def extract_zpk(self, name, dof='pos'):
         """Get the mechanical transfer function of an optic
 
@@ -728,7 +616,6 @@ class PyTickle(plant.OpticklePlant):
             raise ValueError('Unrecognized dof ' + dof)
 
         if self._eval("isempty(tf);", nargout=1):
-            print('No TF is set for dof ' + dof)
             zs = []
             ps = []
             k = 0
@@ -975,28 +862,6 @@ class PyTickle(plant.OpticklePlant):
                     print(optic + ' is not a mirror')
 
         return qq
-
-    def getBeamProperties(self, name, port):
-        """Compute the properties of a Gaussian beam at an optic
-
-        Inputs:
-          name: name of the optic
-          port: name of the port
-
-        Returns:
-          w: beam radius on the optic [m]
-          zR: Rayleigh range of the beam [m]
-          z: distance from the beam waist to the optic [m]
-            Negative values indicate that the optic is before the waist.
-          w0: beam waist [m]
-          R: radius of curvature of the phase front on the optic [m]
-          psi: Gouy phase [deg]
-
-        Example:
-          opt.getBeamProperties('EX', 'fr')
-        """
-        qq = self.qq[self._getSinkNum(name, port)]
-        return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     def showBeamProperties(self):
         """Print the beam properties along each link of the model
@@ -1296,6 +1161,7 @@ class PyTickle(plant.OpticklePlant):
         """
         self.probes = self._eval(self.optName + ".getProbeName", 1)
         self.drives = self._eval(self.optName + ".getDriveNames", 1)
+        self._topology.update(*build_dicts(self))
 
     def _eval(self, cmd, nargout=0):
         """Evaluate a matlab command using the pytickle model's engine
@@ -1308,3 +1174,25 @@ class PyTickle(plant.OpticklePlant):
           The outputs from matlab
         """
         return self.eng.eval(cmd, nargout=nargout)
+
+
+def build_dicts(opt):
+    nlinks = int(opt._eval("{:s}.Nlink".format(opt.optName), 1))
+
+    sink_names = [
+        opt._eval("{:s}.getSinkName({:d})".format(opt.optName, ii + 1), 1)
+        for ii in range(nlinks)]
+
+    sink_nums = {}
+    for ii in range(nlinks):
+        sink = opt._eval(
+            "{:s}.getSinkName({:d})".format(opt.optName, ii + 1), 1)
+        sink_nums[sink] = ii
+
+    fields_probed = {}
+    for probe in utils.assertType(opt.probes, list):
+        field = opt._eval(
+            "{:s}.getFieldProbed('{:s}')".format(opt.optName, probe), 1)
+        fields_probed[probe] = int(field) - 1
+
+    return sink_nums, sink_names, fields_probed

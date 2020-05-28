@@ -8,12 +8,17 @@ from . import controls as ctrl
 from . import plotting
 from . import utils
 from numbers import Number
+from .gaussian_beams import beam_properties_from_q
 
 
 class OpticklePlant:
     def __init__(self):
+        self.lambda0 = 0
+        self.vRF = None
+        self.pol = None
         self.probes = []
         self.drives = []
+        self._topology = OptickleTopology()
         self.vRF = None
         self.lambda0 = None
         self.ff = None
@@ -23,6 +28,7 @@ class OpticklePlant:
         self.mMech = {}
         self.mOpt = {}
         self.noiseAC = {}
+        self.mech_plants = {}
         self.poses = None
         self.sigDC_sweep = None
         self.fDC_sweep = None
@@ -144,6 +150,61 @@ class OpticklePlant:
 
         return mMech[driveOutNum, driveInNum]
 
+    def getMechTF(self, outDrives, inDrives, dof='pos'):
+        """Compute a mechanical transfer function
+
+        Inputs:
+          outDrives: name of the output drives
+          inDrives: name of the input drives
+          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+
+        Returns:
+          tf: the transfer function
+            * In units of [m/N] for position
+            * In units of [rad/(N m)] for pitch and yaw
+        """
+        if dof not in ['pos', 'pitch', 'yaw']:
+            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+
+        # figure out the shape of the TF
+        if isinstance(self.ff, Number):
+            # TF is at a single frequency
+            tf = 0
+        else:
+            # TF is for a frequency vector
+            tf = np.zeros(len(self.ff), dtype='complex')
+
+        if isinstance(outDrives, str):
+            outDrives = {outDrives: 1}
+
+        if isinstance(inDrives, str):
+            inDrives = {inDrives: 1}
+
+        # loop through drives to compute the TF
+        for inDrive, c_in in inDrives.items():
+            # get the default mechanical plant of the optic being driven
+            # plant = ctrl.Filter(*self.extract_zpk(inDrive, dof), Hz=False)
+            zpk = self.mech_plants[dof][inDrive]
+            plant = ctrl.Filter(zpk['zs'], zpk['ps'], zpk['k'], Hz=False)
+
+            for outDrive, c_out in outDrives.items():
+                mmech = self.getMechMod(outDrive, inDrive, dof=dof)
+                tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
+
+        return tf
+
+    def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
+                   dof='pos', **kwargs):
+        """Plot a mechanical transfer function
+
+        See documentation for plotTF in plotting
+        """
+        ff = self.ff
+        tf = self.getMechTF(outDrives, inDrives, dof=dof)
+        fig = plotting.plotTF(
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
+        return fig
+
     def getQuantumNoise(self, probeName, dof='pos'):
         """Compute the quantum noise at a probe
 
@@ -231,6 +292,70 @@ class OpticklePlant:
         if newFig:
             return fig
 
+    def computeBeamSpotMotion(self, opticName, driveName, dof):
+        """Compute the beam spot motion on one optic due to angular motion of another
+
+        The beam spot motion must have been monitored by calling monitorBeamSpotMotion
+        before tickling the model.
+
+        Inputs:
+          opticName: name of the optic to compute the BSM on
+          driveName: drive name of the optic from which to compute the BSM from
+          dof: degree of freedom of the optic driving the BSM
+
+        Returns:
+          bsm: the beam spot motion [m/rad]
+
+        Example:
+          To compute the beam spot motion on the front of EX due to pitch
+          motion of IX
+            opt.monitorBeamSpotMotion('EX', 'fr')
+            bsm = opt.computeBeamSpotMotion('EX', 'IX', 'pitch')
+        """
+        # figure out monitoring probe information
+        probeName = opticName + '_DC'
+        # probe_info = self._eval(
+        #     "opt.getSinkName(opt.getFieldProbed('{:s}'))".format(probeName), 1)
+        field_num = self._topology.get_field_probed(probeName)
+        probe_info = self._topology.get_sink_name(field_num)
+        spotPort = probe_info.split('<-')[-1]
+
+        # get TF to monitoring probe power [W/rad]
+        tf = self.getTF(probeName, driveName, dof)
+
+        # DC power on the monitoring probe
+        Pdc = self.getSigDC(probeName)
+
+        # get the beam size on the optic
+        w, _, _, _, _, _ = self.getBeamProperties(opticName, spotPort)
+        w = np.abs(w[self.vRF == 0])
+
+        # convert to spot motion [m/rad]
+        bsm = w/Pdc * tf
+        return bsm
+
+    def getBeamProperties(self, name, port):
+        """Compute the properties of a Gaussian beam at an optic
+
+        Inputs:
+          name: name of the optic
+          port: name of the port
+
+        Returns:
+          w: beam radius on the optic [m]
+          zR: Rayleigh range of the beam [m]
+          z: distance from the beam waist to the optic [m]
+            Negative values indicate that the optic is before the waist.
+          w0: beam waist [m]
+          R: radius of curvature of the phase front on the optic [m]
+          psi: Gouy phase [deg]
+
+        Example:
+          opt.getBeamProperties('EX', 'fr')
+        """
+        # qq = self.qq[self._getSinkNum(name, port)]
+        qq = self.qq[self._topology.get_sink_num(name, port)]
+        return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     def _getDriveIndex(self, name, dof):
         """Find the drive index of a given drive and degree of freedom
@@ -301,3 +426,24 @@ class OpticklePlant:
             raise ValueError('Unrecognized polarization ' + str(pol)
                              + '. Use \'S\' or \'P\'')
         return nPol
+
+
+class OptickleTopology:
+    def __init__(self):
+        self._sink_nums = None
+        self._sink_names = None
+        self._fields_probed = None
+
+    def update(self, sink_nums, sink_names, fields_probed):
+        self._sink_nums = sink_nums
+        self._sink_names = sink_names
+        self._fields_probed = fields_probed
+
+    def get_sink_num(self, name, port):
+        return self._sink_nums[name + '<-' + port]
+
+    def get_sink_name(self, link_num):
+        return self._sink_names[link_num]
+
+    def get_field_probed(self, probe):
+        return self._fields_probed[probe]
