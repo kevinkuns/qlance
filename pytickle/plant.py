@@ -7,20 +7,20 @@ import matplotlib.pyplot as plt
 from . import controls as ctrl
 from . import plotting
 from . import utils
+from . import io
+import h5py
 from numbers import Number
 from .gaussian_beams import beam_properties_from_q
 
 
 class OpticklePlant:
     def __init__(self):
-        self.lambda0 = 0
-        self.vRF = None
-        self.pol = None
-        self.probes = []
-        self.drives = []
         self._topology = OptickleTopology()
         self.vRF = None
         self.lambda0 = None
+        self.pol = None
+        self.probes = []
+        self.drives = []
         self.ff = None
         self.fDC = None
         self.sigAC = {}
@@ -357,6 +357,51 @@ class OpticklePlant:
         qq = self.qq[self._topology.get_sink_num(name, port)]
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
+    def save(self, fname):
+        # FIXME: handle Nones
+        data = h5py.File(fname, 'w')
+        self._topology.save(data)
+        data['vRF'] = self.vRF
+        data['lambda0'] = self.lambda0
+        data['pol'] = io.str2byte(self.pol)
+        data['probes'] = io.str2byte(self.probes)
+        data['drives'] = io.str2byte(self.drives)
+        data['ff'] = self.ff
+        data['fDC'] = self.fDC
+        io.dict_to_hdf5(self.sigAC, 'sigAC', data)
+        data['sigDC_tickle'] = self.sigDC_tickle
+        io.dict_to_hdf5(self.mMech, 'mMech', data)
+        io.dict_to_hdf5(self.mOpt, 'mOpt', data)
+        # noiseAC
+        # mech_plants
+        # poses
+        # sigDC_sweep
+        # fDC_sweep
+        data['qq'] = self.qq
+        data.close()
+
+    def load(self, fname):
+        data = h5py.File(fname, 'r')
+        self._topology.load(data)
+        self.vRF = data['vRF'][()]
+        self.lambda0 = data['lambda0'][()]
+        self.pol = np.array(io.byte2str(data['pol'][()]))
+        self.probes = io.byte2str(data['probes'][()])
+        self.drives = io.byte2str(data['drives'][()])
+        self.ff = data['ff'][()]
+        self.fDC = data['fDC'][()]
+        self.sigAC = io.hdf5_to_dict(data['sigAC'])
+        self.sigDC_tickle = data['sigDC_tickle'][()]
+        self.mMech = io.hdf5_to_dict(data['mMech'])
+        self.mOpt = io.hdf5_to_dict(data['mOpt'])
+        # noiseAC
+        # mech_plants
+        # poses
+        # sigDC_sweep
+        # fDC_sweep
+        self.qq = data['qq']
+        data.close()
+
     def _getDriveIndex(self, name, dof):
         """Find the drive index of a given drive and degree of freedom
         """
@@ -447,3 +492,13 @@ class OptickleTopology:
 
     def get_field_probed(self, probe):
         return self._fields_probed[probe]
+
+    def save(self, data):
+        io.dict_to_hdf5(self._sink_nums, 'topology/sink_nums', data)
+        data['topology/sink_names'] = io.str2byte(self._sink_names)
+        io.dict_to_hdf5(self._fields_probed, 'topology/fields_probed', data)
+
+    def load(self, data):
+        self._sink_nums = io.hdf5_to_dict(data['topology/sink_nums'])
+        self._sink_names = io.byte2str(data['topology/sink_names'])
+        self._fields_probed = io.hdf5_to_dict(data['topology/fields_probed'])

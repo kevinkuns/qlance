@@ -6,6 +6,8 @@ import matlab.engine
 import numpy as np
 import pytickle.optickle as pyt
 import pytickle.controls as ctrl
+import pytickle.plant as plant
+import os
 import pytest
 
 eng = matlab.engine.start_matlab()
@@ -69,6 +71,10 @@ npts = 1000
 ff = np.logspace(np.log10(fmin), np.log10(fmax), npts)
 opt.run(ff, dof='pitch', noise=False)
 
+opt.save('test_torsional_spring.hdf5')
+opt2 = plant.OpticklePlant()
+opt2.load('test_torsional_spring.hdf5')
+os.remove('test_torsional_spring.hdf5')
 
 def test_REFLI_HARD():
     tf = opt.getTF('REFL_I', HARD, dof='pitch')
@@ -102,5 +108,45 @@ def test_mMech_EX_EX():
 
 def test_mMech_IX_EX():
     mMech = opt.getMechMod('IX', 'EX', dof='pitch')
+    ref = data['mMech_IX_EX']
+    assert np.allclose(mMech, ref)
+
+
+##############################################################################
+# test reloaded plants
+##############################################################################
+
+def test_load_REFLI_HARD():
+    tf = opt2.getTF('REFL_I', HARD, dof='pitch')
+    ref = data['tf_REFLI_HARD']
+    assert np.allclose(tf, ref)
+
+
+def test_load_REFLI_SOFT():
+    tf = opt2.getTF('REFL_I', SOFT, dof='pitch')
+    ref = data['tf_REFLI_SOFT']
+    assert np.allclose(tf, ref)
+
+
+def test_load_mech_HARD():
+    tf = opt2.getMechTF(HARD, HARD, dof='pitch')
+    ref = data['mech_HARD']
+    assert np.allclose(tf, ref)
+
+
+def test_load_mech_SOFT():
+    tf = opt2.getMechTF(SOFT, SOFT, dof='pitch')
+    ref = data['mech_SOFT']
+    assert np.allclose(tf, ref)
+
+
+def test_load_mMech_EX_EX():
+    mMech = opt2.getMechMod('EX', 'EX', dof='pitch')
+    ref = data['mMech_EX_EX']
+    assert np.allclose(mMech, ref)
+
+
+def test_load_mMech_IX_EX():
+    mMech = opt2.getMechMod('IX', 'EX', dof='pitch')
     ref = data['mMech_IX_EX']
     assert np.allclose(mMech, ref)
