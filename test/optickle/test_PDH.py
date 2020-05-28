@@ -5,6 +5,8 @@ Unit tests for optickle PDH frequency response and sweeps
 import matlab.engine
 import numpy as np
 import pytickle.optickle as pyt
+import pytickle.plant as plant
+import os
 import pytest
 
 eng = matlab.engine.start_matlab()
@@ -47,6 +49,10 @@ class TestFreqResp:
     opt = optFP('optFR')
     ff = np.logspace(-2, 4, 1000)
     opt.run(ff)
+    opt.save('test_PDH.hdf5')
+    opt2 = plant.OpticklePlant()
+    opt2.load('test_PDH.hdf5')
+    os.remove('test_PDH.hdf5')
 
     def test_tfI(self):
         tfI = self.opt.getTF('REFL_I', 'EX')
@@ -66,6 +72,26 @@ class TestFreqResp:
 
     def test_qnDC(self):
         qnDC = self.opt.getQuantumNoise('REFL_DC')
+        assert np.allclose(qnDC, data['qnDC'])
+
+    def test_reload_tfI(self):
+        tfI = self.opt2.getTF('REFL_I', 'EX')
+        assert np.allclose(tfI, data['tfI'])
+
+    def test_reload_tfQ(self):
+        tfQ = self.opt2.getTF('REFL_Q', 'EX')
+        assert np.allclose(tfQ, data['tfQ'])
+
+    def test_reload_qnI(self):
+        qnI = self.opt2.getQuantumNoise('REFL_I')
+        assert np.allclose(qnI, data['qnQ'])
+
+    def test_reload_qnQ(self):
+        qnQ = self.opt2.getQuantumNoise('REFL_Q')
+        assert np.allclose(qnQ, data['qnQ'])
+
+    def test_reload_qnDC(self):
+        qnDC = self.opt2.getQuantumNoise('REFL_DC')
         assert np.allclose(qnDC, data['qnDC'])
 
 

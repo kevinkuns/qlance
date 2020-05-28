@@ -372,12 +372,13 @@ class OpticklePlant:
         data['sigDC_tickle'] = self.sigDC_tickle
         io.dict_to_hdf5(self.mMech, 'mMech', data)
         io.dict_to_hdf5(self.mOpt, 'mOpt', data)
-        # noiseAC
-        # mech_plants
+        io.possible_none_to_hdf5(self.noiseAC, 'noiseAC', 'dict', data)
+        io.mech_plants_to_hdf5(self.mech_plants, 'mech_plants', data)
         # poses
         # sigDC_sweep
         # fDC_sweep
-        data['qq'] = self.qq
+        # data['qq'] = self.qq  # fix this to possible none
+        io.possible_none_to_hdf5(self.qq, 'qq', 'list', data)
         data.close()
 
     def load(self, fname):
@@ -394,12 +395,14 @@ class OpticklePlant:
         self.sigDC_tickle = data['sigDC_tickle'][()]
         self.mMech = io.hdf5_to_dict(data['mMech'])
         self.mOpt = io.hdf5_to_dict(data['mOpt'])
-        # noiseAC
-        # mech_plants
+        # self.noiseAC = io.hdf5_to_mech_plants(data['noiseAC'], data)
+        self.noiseAC = io.hdf5_to_noiseAC(data['noiseAC'], data)
+        self.mech_plants = io.hdf5_to_mech_plants(data['mech_plants'], data)
         # poses
         # sigDC_sweep
         # fDC_sweep
-        self.qq = data['qq']
+        # self.qq = data['qq']
+        self.qq = io.hdf5_to_possible_none('qq', 'list', data)
         data.close()
 
     def _getDriveIndex(self, name, dof):

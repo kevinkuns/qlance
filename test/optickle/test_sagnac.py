@@ -5,7 +5,10 @@ Unit tests for an Optickle polarization Sagnac
 import matlab.engine
 import numpy as np
 import pytickle.optickle as pyt
+import pytickle.plant as plant
 import optSagnac
+import os
+import pytest
 
 eng = matlab.engine.start_matlab()
 pyt.addOpticklePath(eng)
@@ -23,6 +26,22 @@ opt45 = optSagnac.optSagnac(eng, 'opt45', 45, 6, 10)
 opt.run(ff, noise=False)
 opt00.run(ff)
 opt45.run(ff)
+
+opt.save('test_sagnac.hdf5')
+opt2 = plant.OpticklePlant()
+opt2.load('test_sagnac.hdf5')
+os.remove('test_sagnac.hdf5')
+
+opt00.save('test_sagnac_00.hdf5')
+opt00_2 = plant.OpticklePlant()
+opt00_2.load('test_sagnac_00.hdf5')
+os.remove('test_sagnac_00.hdf5')
+
+opt45.save('test_sagnac_45.hdf5')
+opt45_2 = plant.OpticklePlant()
+opt45_2.load('test_sagnac_45.hdf5')
+os.remove('test_sagnac_45.hdf5')
+
 
 tfCARM = opt.getTF('REFL_I', CARM)
 tfDARM = opt.getTF('AS_DIFF', DARM)
@@ -44,3 +63,19 @@ def test_qn00():
 
 def test_qn45():
     assert np.allclose(qn45, data['qn45'])
+
+
+def test_reload_DARM():
+    assert np.allclose(tfDARM, opt2.getTF('AS_DIFF', DARM))
+
+
+def test_reload_CARM():
+    assert np.allclose(tfCARM, opt2.getTF('REFL_I', CARM))
+
+
+def test_reload_qn00():
+    assert np.allclose(qn00, opt00_2.getQuantumNoise('AS_DIFF'))
+
+
+def test_reload_qn45():
+    assert np.allclose(qn45, opt45_2.getQuantumNoise('AS_DIFF'))
