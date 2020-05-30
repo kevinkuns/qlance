@@ -3,7 +3,7 @@ Control system calculations
 """
 
 import numpy as np
-from scipy.linalg import inv
+from numpy.linalg import inv
 import pandas as pd
 from collections import OrderedDict
 from .utils import assertType, siPrefix, append_str_if_unique
@@ -678,10 +678,17 @@ class ControlSystem:
     def _computeCLTF(self, oltf):
         """Compute the CLTF from an OLTF
         """
-        cltf = np.zeros_like(oltf)
-        nDOF = cltf.shape[0]
-        for fi in range(cltf.shape[-1]):
-            cltf[:, :, fi] = inv(np.identity(nDOF) - oltf[:, :, fi])
+        # transpose so that numpy can invert without a loop
+        oltf = np.einsum('ijf->fij', oltf)
+
+        # make the 3D identity matrix
+        ident = np.zeros_like(oltf)
+        inds = np.arange(oltf.shape[-1])
+        ident[:, inds, inds] = 1
+
+        # invert and transpose back
+        cltf = np.einsum('fij->ijf', inv(ident - oltf))
+
         return cltf
 
     def addFilter(self, dof_to, dof_from, filt):
