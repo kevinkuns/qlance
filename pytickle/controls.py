@@ -308,6 +308,7 @@ class Filter:
         1) Giving a callable function that is the s-domain filter
         2) Giving the zeros, poles, and gain
         3) Giving the zeros, poles, and gain at a specific frequency
+        4) Giving a dictionary specifying the zeros, poles, and gain
       Hz: If True, the zeros and poles are in the frequency domain and in Hz
           If False, the zeros and poles are in the s-domain and in rad/s
           (Default: True)
@@ -318,6 +319,7 @@ class Filter:
           Filter([], 1, 1)
           Filter([], -2*np.pi, 1, Hz=False)
           Filter(lambda s: 1/(s + 2*np.pi))
+          Filter(dict(zs=[], ps=1, k=1))
     """
 
     def __init__(self, *args, **kwargs):
@@ -330,12 +332,24 @@ class Filter:
             a = -2*np.pi
 
         if len(args) == 1:
-            if not callable(args[0]):
-                raise ValueError('One argument filters should be functions')
-            self._filt = args[0]
-            self._zs = None
-            self._ps = None
-            self._k = None
+            if isinstance(args[0], dict):
+                zs = a*np.array(args[0]['zs'])
+                ps = a*np.array(args[0]['ps'])
+                k = args[0]['k']
+                self._filt = partial(zpk, zs, ps, k)
+                self._zs = zs
+                self._ps = ps
+                self._k = k
+
+            elif callable(args[0]):
+                self._filt = args[0]
+                self._zs = None
+                self._ps = None
+                self._k = None
+
+            else:
+                raise ValueError(
+                    'One argument filters should be dictionaries or functions')
 
         elif len(args) == 3:
             zs = a*np.array(args[0])

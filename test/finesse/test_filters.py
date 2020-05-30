@@ -37,6 +37,8 @@ class TestFilters:
 
     filt1a = ctrl.Filter(z1, p1, k1)
     filt1b = ctrl.Filter(-2*np.pi*z1, -2*np.pi*p1, k1, Hz=False)
+    filt1c = ctrl.Filter(dict(zs=z1, ps=p1, k=k1))
+    filt1d = ctrl.Filter(dict(zs=-2*np.pi*z1, ps=-2*np.pi*p1, k=k1), Hz=False)
     filt2a = ctrl.Filter(z2, p2, k2)
     # filt2b = ctrl.Filter(
     #     lambda ss: k2/((ss + 2*np.pi*p2[0])*(ss + 2*np.pi*p2[1])))
@@ -59,6 +61,16 @@ class TestFilters:
     def test_1s(self):
         zpk1 = self.filt1a.get_zpk()
         zpk2 = self.filt1b.get_zpk()
+        assert np.all(check_zpk_equality(zpk1, zpk2))
+
+    def test_1c(self):
+        zpk1 = self.filt1a.get_zpk()
+        zpk2 = self.filt1c.get_zpk()
+        assert np.all(check_zpk_equality(zpk1, zpk2))
+
+    def test_1d(self):
+        zpk1 = self.filt1a.get_zpk()
+        zpk2 = self.filt1d.get_zpk()
         assert np.all(check_zpk_equality(zpk1, zpk2))
 
     def test_2(self):
