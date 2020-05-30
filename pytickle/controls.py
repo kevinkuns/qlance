@@ -7,6 +7,7 @@ from numpy.linalg import inv
 import pandas as pd
 from collections import OrderedDict
 from .utils import assertType, siPrefix, append_str_if_unique
+from . import io
 from functools import partial
 from numbers import Number
 from itertools import cycle, zip_longest
@@ -300,6 +301,23 @@ class DegreeOfFreedom:
         return driveArr
 
 
+def filt_from_hdf5(path, h5file):
+    """Define a filter from a dictionary stored in an hdf5 file
+
+    Inputs:
+      path: path to the dictionary
+      h5file: the hdf5 file
+
+    Returns:
+      filt: the filter instance
+    """
+    zpk_dict = dict(
+        zs=np.array(io.hdf5_to_possible_none(path + '/zs', h5file)),
+        ps=np.array(io.hdf5_to_possible_none(path + '/ps', h5file)),
+        k=h5file[path + '/k'][()])
+    return Filter(zpk_dict, Hz=False)
+
+
 class Filter:
     """A class representing a generic filter
 
@@ -446,6 +464,12 @@ class Filter:
             ff, self.computeFilter(ff), mag_ax=mag_ax, phase_ax=phase_ax,
             dB=dB, **kwargs)
         return fig
+
+    def to_hdf5(self, path, h5file):
+        zs, ps, k = self.get_zpk(Hz=False)
+        io.possible_none_to_hdf5(zs, path + '/zs', h5file)
+        io.possible_none_to_hdf5(ps, path + '/ps', h5file)
+        h5file[path + '/k'] = k
 
 
 class ControlSystem:

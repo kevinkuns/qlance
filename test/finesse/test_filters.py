@@ -5,6 +5,8 @@ Unit tests for control systems
 import numpy as np
 import pytickle.controls as ctrl
 import scipy.signal as sig
+import h5py
+import os
 import pytest
 
 
@@ -48,6 +50,16 @@ class TestFilters:
     filt3c = ctrl.catfilt(filt1b, filt2a)
     # filt3d = ctrl.catfilt(filt1a, filt2b)
     filt4 = ctrl.Filter(z2, p2, g4, f4)
+
+    data1 = h5py.File('test_filters.hdf5', 'w')
+    filt1a.to_hdf5('filt1', data1)
+    filt2a.to_hdf5('filt2', data1)
+    data1.close()
+    data2 = h5py.File('test_filters.hdf5', 'r')
+    filt1r = ctrl.filt_from_hdf5('filt1', data2)
+    filt2r = ctrl.filt_from_hdf5('filt2', data2)
+    data2.close()
+    os.remove('test_filters.hdf5')
 
     def test_1a(self):
         zpk1 = self.filt1a.get_zpk(Hz=True)
@@ -121,3 +133,13 @@ class TestFilters:
         data1 = self.filt3a.computeFilter(self.ff)
         _, data2 = sig.freqresp(ss, 2*np.pi*self.ff)
         assert np.allclose(data1, data2)
+
+    def test_1r(self):
+        zpk1 = self.filt1a.get_zpk()
+        zpk2 = self.filt1r.get_zpk()
+        assert np.all(check_zpk_equality(zpk1, zpk2))
+
+    def test_2r(self):
+        zpk1 = self.filt2a.get_zpk()
+        zpk2 = self.filt2r.get_zpk()
+        assert np.all(check_zpk_equality(zpk1, zpk2))
