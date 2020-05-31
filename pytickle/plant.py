@@ -505,6 +505,7 @@ class FinessePlant:
         self.mechmod = {}
         self.mech_plants = {}
         self.ff = None
+        self.lambda0 = None
 
     def getTF(self, probes, drives, dof='pos'):
         """Compute a transfer function
@@ -627,7 +628,7 @@ class FinessePlant:
         if dof == 'pos':
             # if this was computed from a position TF convert back to W/rtHz
             # 2*np.pi is correct here, not 360
-            qnoise *= self.kat.lambda0 / (2*np.pi)
+            qnoise *= self.lambda0 / (2*np.pi)
 
         if np.any(np.iscomplex(qnoise)):
             print('Warning: some quantum noise spectra are complex')
@@ -698,10 +699,36 @@ class FinessePlant:
 
     def save(self, fname):
         data = h5py.File(fname, 'w')
+        data['probes'] = io.str2byte(self.probes)
+        data['amp_detectors'] = io.str2byte(self.amp_detectors)
+        data['pos_detectors'] = io.str2byte(self.pos_detectors)
+        io.dict_to_hdf5(self.freqresp, 'freqresp', data)
+        if len(self.mech_plants) > 0:
+            # io.dict_to_hdf5(self.mechmod, 'mechmod',data)
+            io.possible_none_to_hdf5(self.mechmod, 'mechmod', data)
+            _mech_plants_to_hdf5(self.mech_plants, 'mech_plants', data)
+        else:
+            io.none_to_hdf5('mechmod', 'dict', data)
+            io.none_to_hdf5('mech_plants', 'dict', data)
+        data['ff'] = self.ff
+        data['lambda0'] = self.lambda0
         data.close()
 
     def load(self, fname):
         data = h5py.File(fname, 'r')
+        self.probes = io.byte2str(data['probes'][()])
+        self.amp_detectors = io.byte2str(data['amp_detectors'][()])
+        self.pos_detectors = io.byte2str(data['pos_detectors'][()])
+        self.freqresp = io.hdf5_to_dict(data['freqresp'])
+        if isinstance(data['mech_plants'], h5py.Group):
+            # self.mechmod = io.hdf5_to_dict(data['mechmod'])
+            self.mechmod = io.hdf5_to_possible_none('mechmod', data)
+            self.mech_plants = _mech_plants_from_hdf5(data['mech_plants'], data)
+        else:
+            self.mechmod = {}
+            self.mech_plants = {}
+        self.ff = data['ff'][()]
+        self.lambda0 = data['lambda0'][()]
         data.close()
 
 

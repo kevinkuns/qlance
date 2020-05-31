@@ -1046,6 +1046,7 @@ class KatFR(plant.FinessePlant):
         plant.FinessePlant.__init__(self)
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'fr')
+        self.lambda0 = self.kat.lambda0
 
         # populate the list of drives if necessary
         if all_drives:
@@ -1097,9 +1098,13 @@ class KatFR(plant.FinessePlant):
 
         drives = [drive for drive in self.drives if has_dof(
             self.kat, drive, dof)]
-        self.freqresp[dof] = {probe: {} for probe in self.probes}
-        self.mechmod[dof] = {drive: {} for drive in self.pos_detectors}
-        self.mech_plants[dof] = {}
+
+        if rtype in ['opt', 'both']:
+            self.freqresp[dof] = {probe: {} for probe in self.probes}
+        if rtype in ['mech', 'both']:
+            self.mech_plants[dof] = {}
+            if self.pos_detectors:
+                self.mechmod[dof] = {drive: {} for drive in self.pos_detectors}
 
         if verbose:
             pbar = tqdm(total=len(drives))

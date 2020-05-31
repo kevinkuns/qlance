@@ -7,6 +7,8 @@ import pytickle.finesse as fin
 import pykat
 import pykat.components as kcmp
 import pykat.commands as kcom
+import pytickle.plant as plant
+import os
 import pytest
 
 
@@ -43,9 +45,12 @@ def katFP():
 class TestFreqResp:
 
     kat = katFP()
-    # fin.addReadout(kat, 'REFL', 'IX_bk', 11e3, 0)
     katFR = fin.KatFR(kat)
     katFR.run(1e-2, 1e4, 1000)
+    katFR.save('test_PDH.hdf5')
+    katFR2 = plant.FinessePlant()
+    katFR2.load('test_PDH.hdf5')
+    os.remove('test_PDH.hdf5')
 
     def test_tfI(self):
         tfI = self.katFR.getTF('REFL_I', 'EX')
@@ -65,6 +70,26 @@ class TestFreqResp:
 
     def test_qnDC(self):
         qnDC = self.katFR.getQuantumNoise('REFL_DC')
+        assert np.allclose(qnDC, data['qnDC'])
+
+    def test_reload_tfI(self):
+        tfI = self.katFR2.getTF('REFL_I', 'EX')
+        assert np.allclose(tfI, data['tfI'])
+
+    def test_reload_tfQ(self):
+        tfQ = self.katFR2.getTF('REFL_Q', 'EX')
+        assert np.allclose(tfQ, data['tfQ'])
+
+    def test_reload_qnI(self):
+        qnI = self.katFR2.getQuantumNoise('REFL_I')
+        assert np.allclose(qnI, data['qnQ'])
+
+    def test_reload_qnQ(self):
+        qnQ = self.katFR2.getQuantumNoise('REFL_Q')
+        assert np.allclose(qnQ, data['qnQ'])
+
+    def test_reload_qnDC(self):
+        qnDC = self.katFR2.getQuantumNoise('REFL_DC')
         assert np.allclose(qnDC, data['qnDC'])
 
 
