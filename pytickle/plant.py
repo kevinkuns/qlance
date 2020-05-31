@@ -182,10 +182,7 @@ class OpticklePlant:
 
         # loop through drives to compute the TF
         for inDrive, c_in in inDrives.items():
-            # # get the default mechanical plant of the optic being driven
-            # # plant = ctrl.Filter(*self.extract_zpk(inDrive, dof), Hz=False)
-            # zpk = self.mech_plants[dof][inDrive]
-            # plant = ctrl.Filter(zpk['zs'], zpk['ps'], zpk['k'], Hz=False)
+            # get the default mechanical plant of the optic being driven
             plant = self.mech_plants[dof][inDrive]
 
             for outDrive, c_out in outDrives.items():
@@ -496,6 +493,218 @@ class OptickleTopology:
         self._sink_nums = io.hdf5_to_dict(data['topology/sink_nums'])
         self._sink_names = io.byte2str(data['topology/sink_names'])
         self._fields_probed = io.hdf5_to_dict(data['topology/fields_probed'])
+
+
+class FinessePlant:
+    def __init__(self):
+        self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
+        self.probes = []
+        self.amp_detectors = []
+        self.pos_detectors = []
+        self.freqresp = {}
+        self.mechmod = {}
+        self.mech_plants = {}
+        self.ff = None
+
+    def getTF(self, probes, drives, dof='pos'):
+        """Compute a transfer function
+
+        Inputs:
+          probes: name of the probes at which the TF is calculated
+          drives: names of the drives from which the TF is calculated
+          dof: degree of freedom of the drives (Default: pos)
+
+        Returns:
+          tf: the transfer function
+            * In units of [W/m] if drive is an optic with dof pos
+            * In units of [W/rad] if drive is an optic with dof pitch or yaw
+
+        Examples:
+          * If only a single drive is used, the drive name can be a string.
+              tf = katFR.getTF('REFL', 'EX')
+
+          * If multiple drives are used, the drive names should be a dict.
+            To compute the DARM transfer function to the AS_DIFF homodyne PD
+              DARM = {'EX': 1/2, 'EY': -1/2}
+              tf = katFR.getTF('AS_DIFF', DARM)
+            [Note: Since DARM is defined as Lx - Ly, to get 1 m of DARM
+            requires 0.5 m of both Lx and Ly]
+        """
+        if dof not in self._dofs:
+            raise ValueError('Unrecognized dof ' + dof)
+
+        # figure out the shape of the TF
+        if isinstance(self.ff, Number):
+            # TF is at a single frequency
+            tf = 0
+        else:
+            # TF is for a frequency vector
+            tf = np.zeros(len(self.ff), dtype='complex')
+
+        if isinstance(drives, str):
+            drives = {drives: 1}
+
+        if isinstance(probes, str):
+            probes = {probes: 1}
+
+        # loop through the drives and probes to compute the TF
+        for probe, pc in probes.items():
+            for drive, drive_pos in drives.items():
+                # add the contribution from this drive
+                tf += pc * drive_pos * self.freqresp[dof][probe][drive]
+
+        return tf
+
+    def getMechMod(self, drive_out, drive_in, dof='pos'):
+        """Get the radiation pressure modifications to drives
+
+        Inputs:
+          drive_out: name of the output drive
+          drive_in: name of the input drive
+          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+        """
+        if dof not in self._dofs:
+            raise ValueError('Unrecognized dof ' + dof)
+
+        out_det = drive_out + '_' + dof
+        if out_det not in self.pos_detectors:
+            raise ValueError(out_det + ' is not a detector in this model')
+
+        return self.mechmod[dof][out_det][drive_in]
+
+    def getMechTF(self, outDrives, inDrives, dof='pos'):
+        """Compute a mechanical transfer function
+
+        Inputs:
+          outDrives: name of the output drives
+          inDrives: name of the input drives
+          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+
+        Returns:
+          tf: the transfer function
+            * In units of [m/N] for position
+            * In units of [rad/(N m)] for pitch and yaw
+        """
+        if dof not in ['pos', 'pitch', 'yaw']:
+            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+
+        # figure out the shape of the TF
+        if isinstance(self.ff, Number):
+            # TF is at a single frequency
+            tf = 0
+        else:
+            # TF is for a frequency vector
+            tf = np.zeros(len(self.ff), dtype='complex')
+
+        if isinstance(outDrives, str):
+            outDrives = {outDrives: 1}
+
+        if isinstance(inDrives, str):
+            inDrives = {inDrives: 1}
+
+        # loop through drives to compute the TF
+        for inDrive, c_in in inDrives.items():
+            # get the default mechanical plant of the optic being driven
+            # comp = self.kat.components[inDrive]
+            # plant = ctrl.Filter(*extract_zpk(comp, dof), Hz=False)
+            plant = self.mech_plants[dof][inDrive]
+
+            for outDrive, c_out in outDrives.items():
+                mmech = self.getMechMod(outDrive, inDrive, dof=dof)
+                tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
+
+        return tf
+
+    def getQuantumNoise(self, probeName, dof='pos'):
+        """Compute the quantum noise at a probe
+
+        Returns the quantum noise at a given probe in [W/rtHz]
+        """
+        qnoise = list(self.freqresp[dof][probeName + '_shot'].values())[0]
+        # without copying multiple calls will reduce noise
+        qnoise = qnoise.copy()
+
+        if dof == 'pos':
+            # if this was computed from a position TF convert back to W/rtHz
+            # 2*np.pi is correct here, not 360
+            qnoise *= self.kat.lambda0 / (2*np.pi)
+
+        if np.any(np.iscomplex(qnoise)):
+            print('Warning: some quantum noise spectra are complex')
+        return np.real(qnoise)
+
+    def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
+               dof='pos', **kwargs):
+        """Plot a transfer function.
+
+        See documentation for plotTF in plotting
+        """
+        ff = self.ff
+        tf = self.getTF(probeName, driveNames, dof=dof)
+        fig = plotting.plotTF(
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
+        return fig
+
+    def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
+                   dof='pos', **kwargs):
+        """Plot a mechanical transfer function
+
+        See documentation for plotTF in plotting
+        """
+        ff = self.ff
+        tf = self.getMechTF(outDrives, inDrives, dof=dof)
+        fig = plotting.plotTF(
+            ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
+        return fig
+
+    def plotQuantumASD(self, probeName, driveNames, fig=None, **kwargs):
+        """Plot the quantum ASD of a probe
+
+        Plots the ASD of a probe referenced the the transfer function for
+        some signal, such as DARM.
+
+        Inputs:
+          probeName: name of the probe
+          driveNames: names of the drives from which the TF to refer the
+            noise to
+          fig: if not None, an existing figure to plot the noise on
+            (Default: None)
+          **kwargs: extra keyword arguments to pass to the plot
+        """
+        ff = self.ff
+        if driveNames:
+            tf = self.getTF(probeName, driveNames)
+            noiseASD = np.abs(self.getQuantumNoise(probeName)/tf)
+        else:
+            noiseASD = np.abs(self.getQuantumNoise(probeName))
+
+        if fig is None:
+            newFig = True
+            fig = plt.figure()
+        else:
+            newFig = False
+
+        fig.gca().loglog(ff, noiseASD, **kwargs)
+        fig.gca().set_ylabel('Noise')
+        fig.gca().set_xlim([min(ff), max(ff)])
+        fig.gca().set_xlabel('Frequency [Hz]')
+        fig.gca().xaxis.grid(True, which='both', alpha=0.5)
+        fig.gca().xaxis.grid(alpha=0.25, which='minor')
+        fig.gca().yaxis.grid(True, which='both', alpha=0.5)
+        fig.gca().yaxis.grid(alpha=0.25, which='minor')
+
+        if newFig:
+            return fig
+
+    def save(self, fname):
+        data = h5py.File(fname, 'w')
+        data.close()
+
+    def load(self, fname):
+        data = h5py.File(fname, 'r')
+        data.close()
+
+
 def _mech_plants_to_hdf5(dictionary, path, h5file):
     for key, val in dictionary.items():
         fpath = path + '/' + key
