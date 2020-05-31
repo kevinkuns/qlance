@@ -5,6 +5,7 @@ Provides code for calling Optickle from within PyTickle
 import numpy as np
 import matlab
 from . import plant
+from . import controls as ctrl
 from numbers import Number
 from collections import OrderedDict
 import pandas as pd
@@ -137,8 +138,10 @@ class PyTickle(plant.OpticklePlant):
             self.mech_plants[dof] = dict()
             for drive in self.drives:
                 drive_name = drive.split('.')[0]
-                zs, ps, k = self.extract_zpk(drive_name, dof=dof)
-                self.mech_plants[dof][drive_name] = dict(zs=zs, ps=ps, k=k)
+                # zs, ps, k = self.extract_zpk(drive_name, dof=dof)
+                # self.mech_plants[dof][drive_name] = dict(zs=zs, ps=ps, k=k)
+                self.mech_plants[dof][drive_name] = ctrl.Filter(
+                    *self.extract_zpk(drive_name, dof=dof), Hz=False)
 
         # get the field basis if the dof is pitch or yaw
         if dof in ['pitch', 'yaw']:

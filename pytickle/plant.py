@@ -182,10 +182,11 @@ class OpticklePlant:
 
         # loop through drives to compute the TF
         for inDrive, c_in in inDrives.items():
-            # get the default mechanical plant of the optic being driven
-            # plant = ctrl.Filter(*self.extract_zpk(inDrive, dof), Hz=False)
-            zpk = self.mech_plants[dof][inDrive]
-            plant = ctrl.Filter(zpk['zs'], zpk['ps'], zpk['k'], Hz=False)
+            # # get the default mechanical plant of the optic being driven
+            # # plant = ctrl.Filter(*self.extract_zpk(inDrive, dof), Hz=False)
+            # zpk = self.mech_plants[dof][inDrive]
+            # plant = ctrl.Filter(zpk['zs'], zpk['ps'], zpk['k'], Hz=False)
+            plant = self.mech_plants[dof][inDrive]
 
             for outDrive, c_out in outDrives.items():
                 mmech = self.getMechMod(outDrive, inDrive, dof=dof)
@@ -358,7 +359,6 @@ class OpticklePlant:
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     def save(self, fname):
-        # FIXME: handle Nones
         data = h5py.File(fname, 'w')
         self._topology.save(data)
         data['vRF'] = self.vRF
@@ -372,13 +372,9 @@ class OpticklePlant:
         data['sigDC_tickle'] = self.sigDC_tickle
         io.dict_to_hdf5(self.mMech, 'mMech', data)
         io.dict_to_hdf5(self.mOpt, 'mOpt', data)
-        io.possible_none_to_hdf5(self.noiseAC, 'noiseAC', 'dict', data)
-        io.mech_plants_to_hdf5(self.mech_plants, 'mech_plants', data)
-        # poses
-        # sigDC_sweep
-        # fDC_sweep
-        # data['qq'] = self.qq  # fix this to possible none
-        io.possible_none_to_hdf5(self.qq, 'qq', 'list', data)
+        io.possible_none_to_hdf5(self.noiseAC, 'noiseAC', data)
+        _mech_plants_to_hdf5(self.mech_plants, 'mech_plants', data)
+        io.possible_none_to_hdf5(self.qq, 'qq', data)
         data.close()
 
     def load(self, fname):
@@ -395,14 +391,9 @@ class OpticklePlant:
         self.sigDC_tickle = data['sigDC_tickle'][()]
         self.mMech = io.hdf5_to_dict(data['mMech'])
         self.mOpt = io.hdf5_to_dict(data['mOpt'])
-        # self.noiseAC = io.hdf5_to_mech_plants(data['noiseAC'], data)
-        self.noiseAC = io.hdf5_to_noiseAC(data['noiseAC'], data)
-        self.mech_plants = io.hdf5_to_mech_plants(data['mech_plants'], data)
-        # poses
-        # sigDC_sweep
-        # fDC_sweep
-        # self.qq = data['qq']
-        self.qq = io.hdf5_to_possible_none('qq', 'list', data)
+        self.noiseAC = io.hdf5_to_possible_none('noiseAC', data)
+        self.mech_plants = _mech_plants_from_hdf5(data['mech_plants'], data)
+        self.qq = io.hdf5_to_possible_none('qq', data)
         data.close()
 
     def _getDriveIndex(self, name, dof):
@@ -505,3 +496,27 @@ class OptickleTopology:
         self._sink_nums = io.hdf5_to_dict(data['topology/sink_nums'])
         self._sink_names = io.byte2str(data['topology/sink_names'])
         self._fields_probed = io.hdf5_to_dict(data['topology/fields_probed'])
+def _mech_plants_to_hdf5(dictionary, path, h5file):
+    for key, val in dictionary.items():
+        fpath = path + '/' + key
+        if isinstance(val, dict):
+            _mech_plants_to_hdf5(val, fpath, h5file)
+            h5file[fpath].attrs['isfilter'] = False
+        elif isinstance(val, ctrl.Filter):
+            val.to_hdf5(path + '/' + key, h5file)
+            h5file[fpath].attrs['isfilter'] = True
+        else:
+            raise ValueError('Something is wrong')
+
+
+def _mech_plants_from_hdf5(h5_group, h5file):
+    plants = {}
+    for key, val in h5_group.items():
+        if isinstance(val, h5py.Group):
+            if val.attrs['isfilter']:
+                plants[key] = ctrl.filt_from_hdf5(val.name, h5file)
+            else:
+                plants[key] = _mech_plants_from_hdf5(val, h5file)
+        else:
+            raise ValueError('Something is wrong')
+    return plants
