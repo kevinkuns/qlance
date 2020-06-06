@@ -369,8 +369,16 @@ def addReadout(
 
 
 def addHomodyneReadout(kat, name, phase=0, qe=1, LOpower=1):
-    # FIXME: add qe
+    # Add homodyne beamsplitter
     addBeamSplitter(kat, name + '_BS', Thr=0.5, aoi=45)
+
+    # Add mirrors to act as loss to model quantum efficiency
+    Thr = qe
+    Lhr = 1 - Thr
+    addMirror(kat, name + '_attnA', Thr=Thr, Lhr=Lhr)
+    addMirror(kat, name + '_attnB', Thr=Thr, Lhr=Lhr)
+    addSpace(kat, name + '_BS_frR', name + '_attnA_fr', 0)
+    addSpace(kat, name + '_BS_bkT', name + '_attnB_fr', 0)
 
     # If no LO, just add a steering mirror
     if LOpower == 0:
@@ -384,9 +392,9 @@ def addHomodyneReadout(kat, name, phase=0, qe=1, LOpower=1):
 
     # Add the detectors
     kat.add(
-        kdet.hd(name + '_DIFF', 180, name + '_BS_bkT', name + '_BS_frR'))
+        kdet.hd(name + '_DIFF', 180, name + '_attnB_bk', name + '_attnA_bk'))
     kat.add(
-        kdet.hd(name + '_SUM', 0, name + '_BS_bkT', name + '_BS_frR'))
+        kdet.hd(name + '_SUM', 0, name + '_attnB_bk', name + '_attnA_bk'))
 
 
 def setHomodynePhase(kat, LOname, phase):
