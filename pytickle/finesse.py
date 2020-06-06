@@ -368,6 +368,30 @@ def addReadout(
             alternate_beam=alternate_beam, dof=dof)
 
 
+def addHomodyneReadout(kat, name, phase=0, qe=1, LOpower=1):
+    addBeamSplitter(kat, name + '_BS', Thr=0.5, aoi=45)
+
+    # If no LO, just add a steering mirror
+    if LOpower == 0:
+        addBeamSplitter(kat, name + '_LOphase', aoi=0, Thr=0)
+        addSpace(kat, name + '_LOphase_frR', name + '_BS_bkO', 0)
+
+    # Add LO if necessary
+    if LOpower > 0:
+        addLaser(kat, name + '_LO', LOpower, phase=phase)
+        addSpace(kat, name + '_LO_out', name + '_BS_bkO', 0)
+
+    # Add the detectors
+    kat.add(
+        kdet.hd(name + '_DIFF', 180, name + '_BS_bkT', name + '_BS_frR'))
+    kat.add(
+        kdet.hd(name + '_SUM', 0, name + '_BS_bkT', name + '_BS_frR'))
+
+
+def setHomodynePhase(kat, LOname, phase):
+    kat.components[LOname].phase = phase
+
+
 def addGouyReadout(kat, name, phaseA, dphaseB=90):
     """Add Gouy phases for WFS readout
 
@@ -1090,6 +1114,9 @@ class KatFR(plant.FinessePlant):
             1: a progress bar of each drive is printed
             2: show the finesse simulation progress bars as well
         """
+        ############################################################
+        # Initialize response dictionaries
+        ############################################################
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
 
@@ -1106,6 +1133,9 @@ class KatFR(plant.FinessePlant):
             if self.pos_detectors:
                 self.mechmod[dof] = {drive: {} for drive in self.pos_detectors}
 
+        ############################################################
+        # Loop through the drives and compute the response for each
+        ############################################################
         if verbose:
             pbar = tqdm(total=len(drives))
 
@@ -1115,15 +1145,23 @@ class KatFR(plant.FinessePlant):
             if verbose <= 1:
                 kat.verbose = False
 
+            # setup the sweep frequency
             kat.signals.f = 1
             kat.add(
                 kcmd.xaxis(linlog, [fmin, fmax], kat.signals.f, npts))
 
-            # apply the signal to each photodiode to compute the
-            # optomechanical plant
+            kat.parse('yaxis re:im')
+
+            # apply the signal to each photodiode
             if rtype in ['opt', 'both']:
                 for probe in self.probes:
                     det = kat.detectors[probe]
+
+                    # homodyne detectors don't have demodulations
+                    if isinstance(det, kdet.hd):
+                        continue
+
+                    # apply signal to last demodulation for PD's
                     if det.num_demods == 0:
                         raise ValueError(
                             '{:s} has no demodulations'.format(probe))
@@ -1131,28 +1169,35 @@ class KatFR(plant.FinessePlant):
                         det.f1.put(kat.xaxis.x)
                     elif det.num_demods == 2:
                         det.f2.put(kat.xaxis.x)
+
                     else:
                         raise ValueError(
                             '{:s} has too many demodulations'.format(probe))
 
-            # run the simulation for this drive and store the results
-            kat.parse('yaxis re:im')
-
+            ############################################################
             # compute the optomechanical plant
+            ############################################################
             if rtype in ['opt', 'both']:
                 kat_opt = kat.deepcopy()
+
+                # run the simulation
                 kat_opt.signals.apply(
                     get_drive_dof(kat, drive, dof, force=False), 1, 0)
                 if dof == 'pos':
                     kat_opt.parse('scale meter')
                 out = kat_opt.run()
 
+                # store the results
                 for probe in self.probes:
                     self.freqresp[dof][probe][drive] = out[probe]
 
-            # compute the radiation pressure modifications to drives
+            ############################################################
+            # compute the radiation pressure loop suppression function
+            ############################################################
             if rtype in ['mech', 'both']:
                 kat_mech = kat.deepcopy()
+
+                # run the simulation
                 kat_mech.signals.apply(
                     get_drive_dof(kat, drive, dof, force=True), 1, 0)
                 out = kat_mech.run()
@@ -1166,6 +1211,7 @@ class KatFR(plant.FinessePlant):
                 else:
                     tf = np.ones_like(out.x)
 
+                # store the results
                 for drive_out in self.pos_detectors:
                     self.mechmod[dof][drive_out][drive] = out[drive_out] / tf
 
