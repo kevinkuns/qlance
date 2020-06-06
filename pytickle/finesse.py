@@ -369,6 +369,7 @@ def addReadout(
 
 
 def addHomodyneReadout(kat, name, phase=0, qe=1, LOpower=1):
+    # FIXME: add qe
     addBeamSplitter(kat, name + '_BS', Thr=0.5, aoi=45)
 
     # If no LO, just add a steering mirror
@@ -414,30 +415,39 @@ def addGouyReadout(kat, name, phaseA, dphaseB=90):
 def monitorShotNoise(kat, probe):
     """Compute the shot noise of a photodiode
 
-    Adds a qnoised detector to a finesse model named 'probe_shot'
+    Adds a qnoised detector for a photodiode or a qhd detector
+    for a homodyne detector to a finesse model named 'probe_shot'
 
     Inputs:
       kat: the finesse model
       probe: probe name to compute shot noise for
 
     Examples:
-      To compute the shot noise for the probe REFL_DC:
-        monitorShotNoise(kat, 'REFL_DC')
+      * To compute the shot noise for the probe 'REFL_DC':
+          monitorShotNoise(kat, 'REFL_DC')
       this adds the qshot detector 'REFL_DC_shot'
+      * To compute the shot noise for the homodyne detector 'AS_DIFF':
+          monitorShotNoise(kat, 'AS_DIFF')
+      this adds the qhd detector 'AS_DIFF_shot'
     """
-    det = kat.detectors[probe]
-    if not isinstance(det, kdet.pd):
-        raise ValueError(probe + ' is not a photodiode')
-
     name = probe + '_shot'
+    det = kat.detectors[probe]
     if name in kat.detectors.keys():
         print(probe + ' already has a shot noise detector. Skipping.')
+        return
 
-    else:
+    if isinstance(det, kdet.pd):
         node, freq, phase, _, alternate_beam = _get_probe_info(det)
         _add_generic_probe(
-            kat, probe + '_shot', node, freq, phase, 'shot',
+            kat, name, node, freq, phase, 'shot',
             alternate_beam=alternate_beam)
+
+    elif isinstance(det, kdet.hd):
+        kat.add(
+            kdet.qhd(name, det.phase.value, det.node1.name, det.node2.name))
+
+    else:
+        raise ValueError(name + ' is not a photodiode or homodyne detector')
 
 
 def monitorAllShotNoise(kat):
@@ -447,8 +457,8 @@ def monitorAllShotNoise(kat):
       kat: the finesse model
     """
     for det in kat.detectors.values():
-        is_pd = isinstance(det, kdet.pd)
-        is_shot = isinstance(det, (kdet.qnoised, kdet.qshot))
+        is_pd = isinstance(det, (kdet.pd, kdet.hd))
+        is_shot = isinstance(det, (kdet.qnoised, kdet.qshot, kdet.qhd))
         if is_pd and not is_shot:
             monitorShotNoise(kat, det.name)
 
@@ -1084,7 +1094,7 @@ class KatFR(plant.FinessePlant):
 
         # populate the list of probes
         self.probes = [name for name, det in kat.detectors.items()
-                       if isinstance(det, (kdet.pd, kdet.hd))]
+                       if isinstance(det, (kdet.pd, kdet.hd, kdet.qhd))]
         self.amp_detectors = [name for name, det in kat.detectors.items()
                               if isinstance(det, kdet.ad)]
 
@@ -1158,7 +1168,7 @@ class KatFR(plant.FinessePlant):
                     det = kat.detectors[probe]
 
                     # homodyne detectors don't have demodulations
-                    if isinstance(det, kdet.hd):
+                    if isinstance(det, (kdet.hd, kdet.qhd)):
                         continue
 
                     # apply signal to last demodulation for PD's
