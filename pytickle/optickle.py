@@ -320,7 +320,7 @@ class PyTickle(plant.OpticklePlant):
         Examples:
         1) add a 10 dB amplitude squeezed field:
             opt.addSqueezer('sqz', sqdB=10)
-        2) add a 10 db squeezed, 15 db anti-squeezed field in phase quadrature:
+        2) add a 10 dB squeezed, 15 dB anti-squeezed field in phase quadrature:
             opt.addSqueezer('sqz', sqdB=10, antidB=15, sqAng=90)
         3) add an amplitude squeezed field with escape efficiency 0.9
            and nonlinear gain 0.5 at 45 deg:
@@ -560,6 +560,12 @@ class PyTickle(plant.OpticklePlant):
         self.addProbeIn(name, opticName, spotPort, 0, 0)
 
     def setPosOffset(self, name, dist):
+        """Set the microscopic offset of an optic
+
+        Inputs:
+          name: name of the optic
+          dist: microscopic distance [m]
+        """
         cmd = self.optName + ".setPosOffset(" + str2mat(name)
         cmd += ", " + str(dist) + ");"
         self._eval(cmd, nargout=0)
@@ -631,52 +637,79 @@ class PyTickle(plant.OpticklePlant):
         return zs, ps, k
 
     def addHomodyneReadout(
-            self, name, phase, qe=1, BnC=True, LOpower=1, nu=None, pol='S',
-            rotateBasis=True):
+            self, name, phase=0, qe=1, LOpower=1, freq=0, pol='S',
+            lambda0=1064e-9, rotateBasis=True):
+        """Add a balanced homodyne detector to the model
+
+        * Adds a beamsplitter 'name_BS' and two photodiodes 'name_DIFF' and
+        'name_SUM' to measure the difference and sum, respectively.
+
+        * The signal should be connected to the 'name_BS' port 'fr'.
+
+        * The local oscillator can be added in one of two ways:
+        1) Explicitly adding a laser to use as the LO. The phase of this
+           laser then controls the homodyne angle and can be changed later
+           with setHomodynePhase.
+
+        2) A signal can be picked off from somewhere else in the model to
+           serve as the LO. In this case an extra steering mirror 'name_LOphase'
+           is added to the model. The microscopic tuning of this mirror controls
+           the homodyne phase and should be set with setPosOffset. This signal
+           should be connected to the 'name_LOphase' port 'fr'
+
+        * To do homodyne detection Optickle's probe basis has to be rotated.
+          This is done with rotateHomodyneBasis. However, once the basis has
+          been rotated no further probes can be added to the model. By default
+          this function rotates the basis. However, if more probes are to be
+          added after this homodyne detector, this function should be called
+          with rotateBasis=False and then rotateHomodyneBasis called manually
+          once all the probes have been added.
+
+        Inputs:
+          name: name of the detector
+          phase: homodyne phase [deg] (Only relevant if LOpower > 0)
+          qe: quantum efficiency of the photodiodes (Default: 1)
+          LOpower: power of the local oscillator.
+          freq: which sideband to add the LO to [Hz] (Default: 0, i.e. carrier)
+          pol: the LO polarization (Default: S)
+          rotateBasis: If true, rotates the homodyne basis (Default: True)
+        """
+
         # Add homodyne optics.
         self.addMirror(name + '_BS', Thr=0.5, aoi=45)
         self.addSink(name + '_attnA', 1 - qe)
         self.addSink(name + '_attnB', 1 - qe)
         self.addSink(name + '_A', 1)
         self.addSink(name + '_B', 1)
+
+        # If no LO, just add a steering mirror
         if LOpower == 0:
             self.addMirror(name + '_LOphase', aoi=0, Thr=0)
+            self.addLink(name + '_LOphase', 'fr', name + '_BS', 'bk', 0)
+
         # Add LO if necessary.
         if LOpower > 0:
-            if nu is None:
-                freqs = mat2py(self.eng.eval(self.optName + ".nu;"))
-                if len(freqs.shape) == 0:
-                    nu = freqs
-                else:
-                    nu = freqs[0]
-            npol = self._pol2opt(pol)
-            self.eng.workspace['nu'] = py2mat(nu)
-            cmd = "Optickle.matchFreqPol(" + self.optName + ", nu"
-            cmd += ", " + str(npol) + ");"
-            ampRF = self._eval(cmd, 1)
-            ampRF = np.sqrt(LOpower)*ampRF
+            ind = self._getSidebandInd(freq, lambda0=lambda0, pol=pol)
+            ampRF = np.zeros_like(self.lambda0)
+            ampRF[ind] = ampRF[ind] = np.sqrt(LOpower)
             self.addSource(name + '_LO', ampRF)
-            self.setHomodynePhase(name + '_LO', phase, BnC)
-        # Add detectors.
-        if LOpower == 0:
-            self.addLink(name + '_LOphase', 'fr', name + '_BS', 'bk', 0)
-        else:
+            self.setHomodynePhase(name + '_LO', phase)
             self.addLink(name + '_LO', 'out', name + '_BS', 'bk', 0)
+
+        # Add the detectors
         self.addLink(name + '_BS', 'fr', name + '_attnA', 'in', 0)
         self.addLink(name + '_attnA', 'out', name + '_A', 'in', 0)
         self.addLink(name + '_BS', 'bk', name + '_attnB', 'in', 0)
         self.addLink(name + '_attnB', 'out', name + '_B', 'in', 0)
         self.addProbeIn(name + '_SUM', name + '_A', 'in', 0, 0)
         self.addProbeIn(name + '_DIFF', name + '_B', 'in', 0, 0)
+
         # Rotate probe basis to do homodyne detection if necessary.
         if rotateBasis:
             self.rotateHomodyneBasis(name)
 
-    def setHomodynePhase(self, LOname, phase, BnC=False):
-        if BnC:
-            phase = np.pi*(90 - phase)/180
-        else:
-            phase = np.pi*phase/180
+    def setHomodynePhase(self, LOname, phase):
+        phase = np.pi*(90 - phase)/180
         cmd = "LO = " + self.optName + ".getOptic(" + str2mat(LOname) + ");"
         self._eval(cmd, nargout=0)
         self._eval("RFamp = abs(LO.vArf);", nargout=0)

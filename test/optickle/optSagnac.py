@@ -146,8 +146,7 @@ def optSagnac(eng, opt, sqzAng=0, sqdB=0, antidB=0):
     phi = 0
     opt.addReadout('REFL', fmod, phi)
 
-    opt.addHomodyneReadout('AS', 90, LOpower=1, pol='P', nu=scc.c/lambda0,
-                           BnC=False)
+    opt.addHomodyneReadout('AS', 0, LOpower=1, pol='P')
     opt.addLink('BS', 'bkB', 'AS_BS', 'fr', 0)
 
     opt.setCavityBasis('IX', 'EX')
