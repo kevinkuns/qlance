@@ -402,12 +402,14 @@ class OpticklePlant:
             driveNum = self.drives.index('{:s}.{:s}'.format(name, dof))
         return driveNum
 
-    def _getSidebandInd(self, freq, lambda0=1064e-9, ftol=1, wltol=1e-10):
+    def _getSidebandInd(
+            self, freq, lambda0=1064e-9, pol='S', ftol=1, wltol=1e-10):
         """Find the index of an RF sideband frequency
 
         Inputs:
           freq: the frequency of the desired sideband
           lambda0: wavelength of desired sideband [m] (Default: 1064 nm)
+          pol: polarization (Default: 'S')
           ftol: tolerance of the difference between freq and the RF sideband
             of the model [Hz] (Default: 1 Hz)
           wltol: tolerance of the difference between lambda0 and the RF
@@ -416,10 +418,12 @@ class OpticklePlant:
         Returns:
           nRF: the index of the RF sideband
         """
-        # FIXME: add support for multiple polarizations
-        ind = np.nonzero(np.logical_and(
+        # indices of the relevent sidebands
+        freq_inds = np.logical_and(
             np.isclose(self.vRF, freq, atol=ftol),
-            np.isclose(self.lambda0, lambda0, atol=wltol)))[0]
+            np.isclose(self.lambda0, lambda0, atol=wltol))
+        # find the right polarization
+        ind = np.nonzero(np.logical_and(freq_inds, self.pol == pol))[0]
 
         if len(ind) == 0:
             msg = 'There are no sidebands with frequency '
