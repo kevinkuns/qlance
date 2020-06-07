@@ -401,6 +401,25 @@ def setHomodynePhase(kat, LOname, phase):
     kat.components[LOname].phase = phase
 
 
+def addSqueezer(kat, name, sqAng, sqdB, df=0):
+    """Add a squeezer to a finesse model
+
+    Adds a squeezer with output node name_out
+
+    Inputs:
+      kat: the finesse model
+      name: name of the squeezer
+      sqAng: squeezing angle [deg]
+      sqdB: squeezing amplitude [dB]
+      df: frequency offset from the carrier [Hz] (Default: 0)
+
+    Example:
+        addSqueezer(kat, 'Sqz', 30, 20)
+      Adds a 20 dB squeezer named 'Sqz' at 30 deg. The output node is 'Sqz_out'
+    """
+    kat.add(kcmp.squeezer(name, name + '_out', angle=90 - sqAng, db=sqdB, f=df))
+
+
 def addGouyReadout(kat, name, phaseA, dphaseB=90):
     """Add Gouy phases for WFS readout
 
@@ -528,7 +547,7 @@ def addModulator(kat, name, fmod, gmod, order, modtype, phase=0):
         modulation_type=modtype, phase=phase))
 
 
-def addLaser(kat, name, P, f=0, phase=0):
+def addLaser(kat, name, P, df=0, phase=0):
     """Add a laser to a finesse model
 
     Adds a laser with output node name_out
@@ -537,7 +556,7 @@ def addLaser(kat, name, P, f=0, phase=0):
       kat: the finesse model
       name: name of the laser
       P: laser power [W]
-      f: frequency offset from the carrier [Hz] (Defualt: 0)
+      df: frequency offset from the carrier [Hz] (Defualt: 0)
       phase: phase of the laser [deg] (Defualt: 0)
 
     Example:
@@ -545,7 +564,7 @@ def addLaser(kat, name, P, f=0, phase=0):
       adds the laser named 'Laser' with input power Pin. The output node
       is 'Laser_out'
     """
-    kat.add(kcmd.laser(name, name + '_out', P=P, f=f, phase=phase))
+    kat.add(kcmd.laser(name, name + '_out', P=P, f=df, phase=phase))
 
 
 def addIsolator(kat, name, r):
