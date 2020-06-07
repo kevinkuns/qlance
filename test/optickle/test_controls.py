@@ -60,7 +60,7 @@ cs.addFilter('SRCL', 'SRCL', filtSRCL)
 cs.addFilter('MICH', 'MICH', filtMICH)
 cs.addFilter('DARM', 'MICH', ctrl.catfilt(filtMICH_FF, filtMICH))
 
-cs.setPyTicklePlant(opt)
+cs.setOptomechanicalPlant(opt)
 
 cs.run()
 

@@ -16,23 +16,47 @@ from .gaussian_beams import beam_properties_from_q
 class OpticklePlant:
     def __init__(self):
         self._topology = OptickleTopology()
-        self.vRF = None
-        self.lambda0 = None
-        self.pol = None
-        self.probes = []
-        self.drives = []
-        self.ff = None
-        self.fDC = None
-        self.sigAC = {}
-        self.sigDC_tickle = None
-        self.mMech = {}
-        self.mOpt = {}
-        self.noiseAC = {}
-        self.mech_plants = {}
-        self.poses = None
-        self.sigDC_sweep = None
-        self.fDC_sweep = None
-        self.qq = None
+        self._vRF = None
+        self._lambda0 = None
+        self._pol = None
+        self._probes = []
+        self._drives = []
+        self._ff = None
+        self._fDC = None
+        self._sigAC = {}
+        self._sigDC_tickle = None
+        self._mMech = {}
+        self._mOpt = {}
+        self._noiseAC = {}
+        self._mech_plants = {}
+        self._poses = None
+        self._sigDC_sweep = None
+        self._fDC_sweep = None
+        self._qq = None
+
+    @property
+    def vRF(self):
+        return self._vRF
+
+    @property
+    def lambda0(self):
+        return self._lambda0
+
+    @property
+    def pol(self):
+        return self._pol
+
+    @property
+    def drives(self):
+        return self._drives
+
+    @property
+    def probes(self):
+        return self._probes
+
+    @property
+    def ff(self):
+        return self._ff
 
     def getTF(self, probes, drives, dof='pos', optOnly=False):
         """Compute a transfer function
@@ -81,9 +105,9 @@ class OpticklePlant:
             tf = np.zeros(len(self.ff), dtype='complex')
 
         if optOnly:
-            tfData = self.mOpt
+            tfData = self._mOpt
         else:
-            tfData = self.sigAC
+            tfData = self._sigAC
 
         if tfData is None:
             msg = 'Must run tickle for the appropriate DOF before ' \
@@ -134,11 +158,11 @@ class OpticklePlant:
 
         # figure out which raw output matrix to use
         if dof in ['pos', 'drive', 'amp', 'phase']:
-            mMech = self.mMech['pos']
+            mMech = self._mMech['pos']
         elif dof == 'pitch':
-            mMech = self.mMech['pitch']
+            mMech = self._mMech['pitch']
         elif dof == 'yaw':
-            mMech = self.mMech['yaw']
+            mMech = self._mMech['yaw']
 
         if mMech is None:
             msg = 'Must run tickle for the appropriate DOF before ' \
@@ -183,7 +207,7 @@ class OpticklePlant:
         # loop through drives to compute the TF
         for inDrive, c_in in inDrives.items():
             # get the default mechanical plant of the optic being driven
-            plant = self.mech_plants[dof][inDrive]
+            plant = self._mech_plants[dof][inDrive]
 
             for outDrive, c_out in outDrives.items():
                 mmech = self.getMechMod(outDrive, inDrive, dof=dof)
@@ -210,9 +234,9 @@ class OpticklePlant:
         """
         probeNum = self.probes.index(probeName)
         try:
-            qnoise = self.noiseAC[dof][probeNum, :]
+            qnoise = self._noiseAC[dof][probeNum, :]
         except IndexError:
-            qnoise = self.noiseAC[dof][probeNum]
+            qnoise = self._noiseAC[dof][probeNum]
         return qnoise
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
@@ -351,8 +375,8 @@ class OpticklePlant:
         Example:
           opt.getBeamProperties('EX', 'fr')
         """
-        # qq = self.qq[self._getSinkNum(name, port)]
-        qq = self.qq[self._topology.get_sink_num(name, port)]
+        # qq = self._qq[self._getSinkNum(name, port)]
+        qq = self._qq[self._topology.get_sink_num(name, port)]
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     def save(self, fname):
@@ -364,33 +388,33 @@ class OpticklePlant:
         data['probes'] = io.str2byte(self.probes)
         data['drives'] = io.str2byte(self.drives)
         data['ff'] = self.ff
-        data['fDC'] = self.fDC
-        io.dict_to_hdf5(self.sigAC, 'sigAC', data)
-        data['sigDC_tickle'] = self.sigDC_tickle
-        io.dict_to_hdf5(self.mMech, 'mMech', data)
-        io.dict_to_hdf5(self.mOpt, 'mOpt', data)
-        io.possible_none_to_hdf5(self.noiseAC, 'noiseAC', data)
-        _mech_plants_to_hdf5(self.mech_plants, 'mech_plants', data)
-        io.possible_none_to_hdf5(self.qq, 'qq', data)
+        data['fDC'] = self._fDC
+        io.dict_to_hdf5(self._sigAC, 'sigAC', data)
+        data['sigDC_tickle'] = self._sigDC_tickle
+        io.dict_to_hdf5(self._mMech, 'mMech', data)
+        io.dict_to_hdf5(self._mOpt, 'mOpt', data)
+        io.possible_none_to_hdf5(self._noiseAC, 'noiseAC', data)
+        _mech_plants_to_hdf5(self._mech_plants, 'mech_plants', data)
+        io.possible_none_to_hdf5(self._qq, 'qq', data)
         data.close()
 
     def load(self, fname):
         data = h5py.File(fname, 'r')
         self._topology.load(data)
-        self.vRF = data['vRF'][()]
-        self.lambda0 = data['lambda0'][()]
-        self.pol = np.array(io.byte2str(data['pol'][()]))
-        self.probes = io.byte2str(data['probes'][()])
-        self.drives = io.byte2str(data['drives'][()])
-        self.ff = data['ff'][()]
-        self.fDC = data['fDC'][()]
-        self.sigAC = io.hdf5_to_dict(data['sigAC'])
-        self.sigDC_tickle = data['sigDC_tickle'][()]
-        self.mMech = io.hdf5_to_dict(data['mMech'])
-        self.mOpt = io.hdf5_to_dict(data['mOpt'])
-        self.noiseAC = io.hdf5_to_possible_none('noiseAC', data)
-        self.mech_plants = _mech_plants_from_hdf5(data['mech_plants'], data)
-        self.qq = io.hdf5_to_possible_none('qq', data)
+        self._vRF = data['vRF'][()]
+        self._lambda0 = data['lambda0'][()]
+        self._pol = np.array(io.byte2str(data['pol'][()]))
+        self._probes = io.byte2str(data['probes'][()])
+        self._drives = io.byte2str(data['drives'][()])
+        self._ff = data['ff'][()]
+        self._fDC = data['fDC'][()]
+        self._sigAC = io.hdf5_to_dict(data['sigAC'])
+        self._sigDC_tickle = data['sigDC_tickle'][()]
+        self._mMech = io.hdf5_to_dict(data['mMech'])
+        self._mOpt = io.hdf5_to_dict(data['mOpt'])
+        self._noiseAC = io.hdf5_to_possible_none('noiseAC', data)
+        self._mech_plants = _mech_plants_from_hdf5(data['mech_plants'], data)
+        self._qq = io.hdf5_to_possible_none('qq', data)
         data.close()
 
     def _getDriveIndex(self, name, dof):
@@ -502,14 +526,39 @@ class OptickleTopology:
 class FinessePlant:
     def __init__(self):
         self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
-        self.probes = []
-        self.amp_detectors = []
-        self.pos_detectors = []
-        self.freqresp = {}
-        self.mechmod = {}
-        self.mech_plants = {}
-        self.ff = None
-        self.lambda0 = None
+        self._drives = []
+        self._probes = []
+        self._amp_detectors = []
+        self._pos_detectors = []
+        self._freqresp = {}
+        self._mechmod = {}
+        self._mech_plants = {}
+        self._ff = None
+        self._lambda0 = None
+
+    @property
+    def drives(self):
+        return self._drives
+
+    @property
+    def probes(self):
+        return self._probes
+
+    @property
+    def amp_detectors(self):
+        return self._amp_detectors
+
+    @property
+    def pos_detectors(self):
+        return self._pos_detectors
+
+    @property
+    def ff(self):
+        return self._ff
+
+    @property
+    def lambda0(self):
+        return self._lambda0
 
     def getTF(self, probes, drives, dof='pos'):
         """Compute a transfer function
@@ -556,7 +605,7 @@ class FinessePlant:
         for probe, pc in probes.items():
             for drive, drive_pos in drives.items():
                 # add the contribution from this drive
-                tf += pc * drive_pos * self.freqresp[dof][probe][drive]
+                tf += pc * drive_pos * self._freqresp[dof][probe][drive]
 
         return tf
 
@@ -575,7 +624,7 @@ class FinessePlant:
         if out_det not in self.pos_detectors:
             raise ValueError(out_det + ' is not a detector in this model')
 
-        return self.mechmod[dof][out_det][drive_in]
+        return self._mechmod[dof][out_det][drive_in]
 
     def getMechTF(self, outDrives, inDrives, dof='pos'):
         """Compute a mechanical transfer function
@@ -610,9 +659,7 @@ class FinessePlant:
         # loop through drives to compute the TF
         for inDrive, c_in in inDrives.items():
             # get the default mechanical plant of the optic being driven
-            # comp = self.kat.components[inDrive]
-            # plant = ctrl.Filter(*extract_zpk(comp, dof), Hz=False)
-            plant = self.mech_plants[dof][inDrive]
+            plant = self._mech_plants[dof][inDrive]
 
             for outDrive, c_out in outDrives.items():
                 mmech = self.getMechMod(outDrive, inDrive, dof=dof)
@@ -625,7 +672,7 @@ class FinessePlant:
 
         Returns the quantum noise at a given probe in [W/rtHz]
         """
-        qnoise = list(self.freqresp[dof][probeName + '_shot'].values())[0]
+        qnoise = list(self._freqresp[dof][probeName + '_shot'].values())[0]
         # without copying multiple calls will reduce noise
         qnoise = qnoise.copy()
 
@@ -706,11 +753,11 @@ class FinessePlant:
         data['probes'] = io.str2byte(self.probes)
         data['amp_detectors'] = io.str2byte(self.amp_detectors)
         data['pos_detectors'] = io.str2byte(self.pos_detectors)
-        io.dict_to_hdf5(self.freqresp, 'freqresp', data)
-        if len(self.mech_plants) > 0:
+        io.dict_to_hdf5(self._freqresp, 'freqresp', data)
+        if len(self._mech_plants) > 0:
             # io.dict_to_hdf5(self.mechmod, 'mechmod',data)
-            io.possible_none_to_hdf5(self.mechmod, 'mechmod', data)
-            _mech_plants_to_hdf5(self.mech_plants, 'mech_plants', data)
+            io.possible_none_to_hdf5(self._mechmod, 'mechmod', data)
+            _mech_plants_to_hdf5(self._mech_plants, 'mech_plants', data)
         else:
             io.none_to_hdf5('mechmod', 'dict', data)
             io.none_to_hdf5('mech_plants', 'dict', data)
@@ -720,19 +767,19 @@ class FinessePlant:
 
     def load(self, fname):
         data = h5py.File(fname, 'r')
-        self.probes = io.byte2str(data['probes'][()])
-        self.amp_detectors = io.byte2str(data['amp_detectors'][()])
-        self.pos_detectors = io.byte2str(data['pos_detectors'][()])
-        self.freqresp = io.hdf5_to_dict(data['freqresp'])
+        self._probes = io.byte2str(data['probes'][()])
+        self._amp_detectors = io.byte2str(data['amp_detectors'][()])
+        self._pos_detectors = io.byte2str(data['pos_detectors'][()])
+        self._freqresp = io.hdf5_to_dict(data['freqresp'])
         if isinstance(data['mech_plants'], h5py.Group):
             # self.mechmod = io.hdf5_to_dict(data['mechmod'])
-            self.mechmod = io.hdf5_to_possible_none('mechmod', data)
-            self.mech_plants = _mech_plants_from_hdf5(data['mech_plants'], data)
+            self._mechmod = io.hdf5_to_possible_none('mechmod', data)
+            self._mech_plants = _mech_plants_from_hdf5(data['mech_plants'], data)
         else:
-            self.mechmod = {}
-            self.mech_plants = {}
-        self.ff = data['ff'][()]
-        self.lambda0 = data['lambda0'][()]
+            self._mechmod = {}
+            self._mech_plants = {}
+        self._ff = data['ff'][()]
+        self._lambda0 = data['lambda0'][()]
         data.close()
 
 

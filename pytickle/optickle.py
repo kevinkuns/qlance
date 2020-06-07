@@ -49,17 +49,17 @@ class PyTickle(plant.OpticklePlant):
 
         # initialize the Optickle model in the matlab engine
         self.eng = eng
-        self.optName = optName
+        self._optName = optName
         self.eng.workspace['vRF'] = py2mat(vRF)
         self.eng.workspace['lambda0'] = py2mat(lambda0)
         self.eng.workspace['pol'] = py2mat(matPol)
         self._eval(
-            self.optName + " = Optickle(vRF, lambda0, pol);", nargout=0)
+            self._optName + " = Optickle(vRF, lambda0, pol);", nargout=0)
 
         # initialize pytickle class variables
-        self.lambda0 = mat2py(self.eng.eval(self.optName + ".lambda"))
-        self.vRF = mat2py(self._eval(self.optName + ".vFrf", 1))
-        self.pol = np.array(pol)
+        self._lambda0 = mat2py(self.eng.eval(self._optName + ".lambda"))
+        self._vRF = mat2py(self._eval(self._optName + ".vFrf", 1))
+        self._pol = np.array(pol)
 
         # Track whether the probe basis has been rotated.
         # If it has, do not let any more probes be added
@@ -70,6 +70,10 @@ class PyTickle(plant.OpticklePlant):
         # PyTickle instance to avoid potentially confusing results
         self._tickled = False
 
+    @property
+    def optName(self):
+        return self._optName
+
     def loadMatModel(self):
         """Loads a matlab model with the same name as this class
         """
@@ -77,8 +81,8 @@ class PyTickle(plant.OpticklePlant):
             msg = 'This pytickle model has already been run\n'
             msg += 'Initialize a new model and load the Matlab model again'
             raise RuntimeError(msg)
-        self.lambda0 = mat2py(self.eng.eval(self.optName + ".lambda"))
-        self.vRF = mat2py(self.eng.eval(self.optName + ".vFrf"))
+        self._lambda0 = mat2py(self.eng.eval(self.optName + ".lambda"))
+        self._vRF = mat2py(self.eng.eval(self.optName + ".vFrf"))
         # FIXME: add polarization
         self._updateNames()
 
@@ -104,15 +108,15 @@ class PyTickle(plant.OpticklePlant):
         self._tickled = True
 
         if ff is not None:
-            self.ff = ff
+            self._ff = ff
             self.eng.workspace['f'] = py2mat(self.ff)
 
         if ff is None:
             output = "[fDC, sigDC_tickle]"
             cmd = "{:s} = {:s}.tickle([], 0);".format(output, self.optName)
             self._eval(cmd, nargout=0)
-            self.fDC = mat2py(self.eng.workspace['fDC'])
-            self.sigDC_tickle = mat2py(self.eng.workspace['sigDC_tickle'])
+            self._fDC = mat2py(self.eng.workspace['fDC'])
+            self._sigDC_tickle = mat2py(self.eng.workspace['sigDC_tickle'])
 
         else:
             if noise:
@@ -125,27 +129,27 @@ class PyTickle(plant.OpticklePlant):
             self._eval(cmd, nargout=0)
             self._eval("sigAC = getProdTF(mOpt, mMech);", nargout=0)
 
-            self.fDC = mat2py(self.eng.workspace['fDC'])
-            self.sigDC_tickle = mat2py(self.eng.workspace['sigDC_tickle'])
-            self.mOpt[dof] = mat2py(self.eng.workspace['mOpt'])
-            self.sigAC[dof] = mat2py(self.eng.workspace['sigAC'])
-            self.mMech[dof] = mat2py(self.eng.workspace['mMech'])
+            self._fDC = mat2py(self.eng.workspace['fDC'])
+            self._sigDC_tickle = mat2py(self.eng.workspace['sigDC_tickle'])
+            self._mOpt[dof] = mat2py(self.eng.workspace['mOpt'])
+            self._sigAC[dof] = mat2py(self.eng.workspace['sigAC'])
+            self._mMech[dof] = mat2py(self.eng.workspace['mMech'])
             if noise:
-                self.noiseAC[dof] = mat2py(
+                self._noiseAC[dof] = mat2py(
                     self.eng.workspace['noiseAC'])
 
             # get the mechanical plants
-            self.mech_plants[dof] = dict()
+            self._mech_plants[dof] = dict()
             for drive in self.drives:
                 drive_name = drive.split('.')[0]
                 # zs, ps, k = self.extract_zpk(drive_name, dof=dof)
-                # self.mech_plants[dof][drive_name] = dict(zs=zs, ps=ps, k=k)
-                self.mech_plants[dof][drive_name] = ctrl.Filter(
+                # self._mech_plants[dof][drive_name] = dict(zs=zs, ps=ps, k=k)
+                self._mech_plants[dof][drive_name] = ctrl.Filter(
                     *self.extract_zpk(drive_name, dof=dof), Hz=False)
 
         # get the field basis if the dof is pitch or yaw
         if dof in ['pitch', 'yaw']:
-            self.qq = mat2py(
+            self._qq = mat2py(
                 self._eval(self.optName + ".getAllFieldBases()", 1))[:, -1]
 
     def sweepLinear(self, startPos, endPos, npts):
@@ -181,9 +185,9 @@ class PyTickle(plant.OpticklePlant):
         cmd += ".sweepLinear(startPos, endPos, npts);"
 
         self.eng.eval(cmd, nargout=0)
-        self.poses = mat2py(self.eng.workspace['poses'])
-        self.sigDC_sweep = mat2py(self.eng.workspace['sigDC'])
-        self.fDC_sweep = mat2py(self.eng.workspace['fDC'])
+        self._poses = mat2py(self.eng.workspace['poses'])
+        self._sigDC_sweep = mat2py(self.eng.workspace['sigDC'])
+        self._fDC_sweep = mat2py(self.eng.workspace['fDC'])
 
     def addMirror(self, name, aoi=0, Chr=0, Thr=0, Lhr=0,
                   Rar=0, Lmd=0, Nmd=1.45):
@@ -825,7 +829,7 @@ class PyTickle(plant.OpticklePlant):
           dpsi: the accumulated Gouy phase along the path [deg]
         """
         linkNum = self._getLinkNum(linkStart, linkEnd)
-        qq = self.qq[linkNum]
+        qq = self._qq[linkNum]
         dl = self.getLinkLength(linkStart, linkEnd)
         dphi = np.angle(qq - dl, deg=True) - np.angle(qq, deg=True)
         return dphi
@@ -875,7 +879,7 @@ class PyTickle(plant.OpticklePlant):
 
     def getFieldBasis(self, optic, port=None, verbose=False):
         if port:
-            qq = self.qq[self._getSinkNum(optic, port)]
+            qq = self._qq[self._getSinkNum(optic, port)]
             if verbose:
                 print('Taking the basis determined by the model')
 
@@ -1011,7 +1015,7 @@ class PyTickle(plant.OpticklePlant):
           poses: the drive positions
           power: the power at those positions [W]
         """
-        if self.fDC_sweep is None:
+        if self._fDC_sweep is None:
             raise ValueError(
                 'Must run sweepLinear before calculating sweep power')
 
@@ -1019,12 +1023,12 @@ class PyTickle(plant.OpticklePlant):
         linkNum = self._getLinkNum(linkStart, linkEnd)
         driveNum = self._getDriveIndex(driveName, 'pos')
 
-        poses = self.poses[driveNum, :]
+        poses = self._poses[driveNum, :]
         if self.vRF.size == 1:
-            power = np.abs(self.fDC_sweep[linkNum, :])**2
+            power = np.abs(self._fDC_sweep[linkNum, :])**2
         else:
             nRF = self._getSidebandInd(fRF, lambda0)
-            power = np.abs(self.fDC_sweep[linkNum, nRF, :])**2
+            power = np.abs(self._fDC_sweep[linkNum, nRF, :])**2
 
         return poses, power
 
@@ -1042,11 +1046,11 @@ class PyTickle(plant.OpticklePlant):
         probeNum = self.probes.index(probeName)
         driveNum = self._getDriveIndex(driveName, 'pos')
 
-        poses = self.poses[driveNum, :]
+        poses = self._poses[driveNum, :]
         try:
-            sig = self.sigDC_sweep[probeNum, :]
+            sig = self._sigDC_sweep[probeNum, :]
         except IndexError:
-            sig = self.sigDC_sweep
+            sig = self._sigDC_sweep
 
         return poses, sig
 
@@ -1060,7 +1064,7 @@ class PyTickle(plant.OpticklePlant):
           power: the DC power on the probe [W]
         """
         probeNum = self.probes.index(probeName)
-        return self.sigDC_tickle[probeNum]
+        return self._sigDC_tickle[probeNum]
 
     def getDCpower(self, linkStart, linkEnd, fRF=0, lambda0=1064e-9):
         """Get the DC power along a link
@@ -1076,16 +1080,16 @@ class PyTickle(plant.OpticklePlant):
         Returns:
           power: the DC power [W]
         """
-        if self.fDC is None:
+        if self._fDC is None:
             raise ValueError(
                 'Must run tickle before getting the DC power levels.')
 
         linkNum = self._getLinkNum(linkStart, linkEnd)
         if self.vRF.size == 1:
-            power = np.abs(self.fDC[linkNum])**2
+            power = np.abs(self._fDC[linkNum])**2
         else:
             nRF = self._getSidebandInd(fRF, lambda0)
-            power = np.abs(self.fDC[linkNum, nRF])**2
+            power = np.abs(self._fDC[linkNum, nRF])**2
 
         return power
 
@@ -1111,9 +1115,9 @@ class PyTickle(plant.OpticklePlant):
         for li, link in enumerate(links):
             line = '{:{pad}s}|'.format(link, pad=pad)
             if nRF == 1:
-                line += utils.printLine([self.fDC[li]], pad2)
+                line += utils.printLine([self._fDC[li]], pad2)
             else:
-                line += utils.printLine(self.fDC[li, :], pad2)
+                line += utils.printLine(self._fDC[li, :], pad2)
             if li % 5 == 0:
                 print('{:_<{length}}'.format('', length=int(l1 + l2 + 1)))
             print(line)
@@ -1133,9 +1137,9 @@ class PyTickle(plant.OpticklePlant):
             probes = self.probes
         for pi, probe in enumerate(probes):
             try:
-                pref, num = utils.siPrefix(self.sigDC_tickle[pi])
+                pref, num = utils.siPrefix(self._sigDC_tickle[pi])
             except IndexError:
-                pref, num = utils.siPrefix(self.sigDC_tickle)
+                pref, num = utils.siPrefix(self._sigDC_tickle)
             pad3 = pad2 - len(pref) - 2
             print('{:{pad1}s}| {:{pad3}.1f} {:s}W|'.format(
                 probe, num, pref, pad1=pad1, pad3=pad3))
@@ -1195,8 +1199,8 @@ class PyTickle(plant.OpticklePlant):
     def _updateNames(self):
         """Refresh the pytickle model's list of probe and drive names
         """
-        self.probes = self._eval(self.optName + ".getProbeName", 1)
-        self.drives = self._eval(self.optName + ".getDriveNames", 1)
+        self._probes = self._eval(self.optName + ".getProbeName", 1)
+        self._drives = self._eval(self.optName + ".getDriveNames", 1)
         self._topology.update(*build_dicts(self))
 
     def _eval(self, cmd, nargout=0):

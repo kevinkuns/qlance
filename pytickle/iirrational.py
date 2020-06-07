@@ -19,10 +19,18 @@ class PlantFit(ctrl.Filter):
     """
     def __init__(self, ff, data, *args, **kwargs):
         ctrl.Filter.__init__(self, [], [], 0)
-        self.ff = ff
-        self.data = data
+        self._ff = ff
+        self._data = data
         snr = 1e5 * np.ones_like(ff)
         self._fit = data2filter(data=data, F_Hz=ff, SNR=snr, *args, **kwargs)
+
+    @property
+    def ff(self):
+        return self._ff
+
+    @property
+    def data(self):
+        return self._data
 
     def _set_zpk(self, zs, ps, k, Hz=False):
         """Set the zpk of the underlying filter

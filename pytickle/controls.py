@@ -272,15 +272,31 @@ class DegreeOfFreedom:
     """
 
     def __init__(self, name, probes, drives, dofType='pos'):
-        self.name = name
-        self.probes = assertType(probes, dict).copy()
-        self.drives = OrderedDict()
-        self.dofType = dofType
+        self._name = name
+        self._probes = assertType(probes, dict).copy()
+        # self._drives = OrderedDict()
+        self._dofType = dofType
 
         # append the type of dof to the names of the drives
         in_drives = assertType(drives, dict).copy()
-        self.drives = OrderedDict(
+        self._drives = OrderedDict(
             {k + '.' + dofType: v for k, v in in_drives.items()})
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def probes(self):
+        return self._probes
+
+    @property
+    def drives(self):
+        return self._drives
+
+    @property
+    def dofType(self):
+        return self._dofType
 
     def probes2dof(self, probeList):
         """Make a vector of probes
@@ -476,37 +492,73 @@ class ControlSystem:
     """A class for a general MIMO control system
     """
     def __init__(self):
-        self.opt = None
-        self.ss = None
-        self.dofs = OrderedDict()
-        self.filters = []
-        self.probes = []
-        self.drives = []
-        self.actFilts = []
-        self.compFilts = []
-        self.plant = None
-        self.ctrlMat = None
-        self.oltf = None
-        self.cltf = None
-        self.inMat = None
-        self.outMat = None
-        self.compMat = None
-        self.actMat = None
-        self.mMech = None
-        self.drive2bsm = None
-        self.outComp = None
+        self._plant_model = None
+        self._ss = None
+        self._dofs = OrderedDict()
+        self._filters = []
+        self._probes = []
+        self._drives = []
+        self._actFilts = []
+        self._compFilts = []
+        self._plant = None
+        self._ctrlMat = None
+        self._oltf = None
+        self._cltf = None
+        self._inMat = None
+        self._outMat = None
+        self._compMat = None
+        self._actMat = None
+        self._mMech = None
+        self._drive2bsm = None
+        self._outComp = None
 
-    def setPyTicklePlant(self, opt):
-        """Set a PyTickle model to be the plant
+    @property
+    def plant_model(self):
+        return self._plant_model
+
+    @property
+    def ff(self):
+        return self.plant_model.ff
+
+    @property
+    def ss(self):
+        return 2j*np.pi*self.ff
+
+    @property
+    def dofs(self):
+        return self._dofs
+
+    @property
+    def filters(self):
+        return self._filters
+
+    @property
+    def probes(self):
+        return self._probes
+
+    @property
+    def drives(self):
+        return self._drives
+
+    @property
+    def actFilts(self):
+        return self._actFilts
+
+    @property
+    def compFilts(self):
+        return self._compFilts
+
+    def setOptomechanicalPlant(self, plant_model):
+        """Set an Optickle or Finesse model to be the optomechanical plant
 
         Inputs:
-          opt: the PyTickle instance to be used as the plant
+          plant_model: the OpticklePlant or FinessePlant instance
         """
-        if self.opt is not None:
+        if self.plant_model is not None:
             raise ValueError('A PyTickle model is already set as the plant')
         else:
-            self.opt = opt
-            self.ss = 2j*np.pi*opt.ff
+            self._plant_model = plant_model
+            # self._ff = 2j*np.pi*plant_model.ff
 
     def run(self, drive2bsm=False, mechmod=True):
         """Compute the control system dynamics
@@ -520,19 +572,19 @@ class ControlSystem:
         Note: The spot test point cannot be used if drive2bsm is False
         and the pos test point cannot be used if mechmod is False
         """
-        self.inMat = self._computeInputMatrix()
-        self.outMat = self._computeOutputMatrix()
-        self.plant = self._computePlant()
-        self.ctrlMat = self._computeController()
-        self.compMat = self._computeCompensator()
-        self.actMat = self._computeResponse()
+        self._inMat = self._computeInputMatrix()
+        self._outMat = self._computeOutputMatrix()
+        self._plant = self._computePlant()
+        self._ctrlMat = self._computeController()
+        self._compMat = self._computeCompensator()
+        self._actMat = self._computeResponse()
         if mechmod:
-            self.mMech = self._computeMechMod()
-        self.outComp = np.einsum('ijf,jk->ikf', self.compMat, self.outMat)
-        self.oltf = {tp: self._computeOLTF(tp)
+            self._mMech = self._computeMechMod()
+        self._outComp = np.einsum('ijf,jk->ikf', self._compMat, self._outMat)
+        self._oltf = {tp: self._computeOLTF(tp)
                      for tp in ['err', 'ctrl', 'act', 'drive', 'sens']}
-        self.cltf = {sig: self._computeCLTF(oltf)
-                     for sig, oltf in self.oltf.items()}
+        self._cltf = {sig: self._computeCLTF(oltf)
+                     for sig, oltf in self._oltf.items()}
         if drive2bsm:
             self._computeBeamSpotMotion()
 
@@ -566,7 +618,7 @@ class ControlSystem:
         """
         nProbes = len(self.probes)
         nDrives = len(self.drives)
-        nff = len(self.opt.ff)
+        nff = len(self.ff)
         plant = np.zeros((nProbes, nDrives, nff), dtype=complex)
 
         for pi, probe in enumerate(self.probes):
@@ -574,7 +626,7 @@ class ControlSystem:
                 driveData = drive.split('.')
                 driveName = driveData[0]
                 dofType = driveData[-1]
-                tf = self.opt.getTF(probe, driveName, dof=dofType)
+                tf = self.plant_model.getTF(probe, driveName, dof=dofType)
                 plant[pi, di, :] = tf
         return plant
 
@@ -650,7 +702,7 @@ class ControlSystem:
 
     def _computeMechMod(self):
         nDrives = len(self.drives)
-        nff = len(self.opt.ff)
+        nff = len(self.ff)
         mMech = np.zeros((nDrives, nDrives, nff), dtype=complex)
         for dit, driveTo in enumerate(self.drives):
             driveData = driveTo.split('.')
@@ -664,13 +716,13 @@ class ControlSystem:
                     msg = 'Input and output drives should be the same ' \
                           + 'degree of freedom (pos, pitch, or yaw)'
                     raise ValueError(msg)
-                mMech[dit, djf, :] = self.opt.getMechMod(
+                mMech[dit, djf, :] = self.plant_model.getMechMod(
                     driveToName, driveFromName, dofToType)
         return mMech
 
     def _computeBeamSpotMotion(self):
         nDrives = len(self.drives)
-        nff = len(self.opt.ff)
+        nff = len(self.ff)
         drive2bsm = np.zeros((nDrives, nDrives, nff), dtype=complex)
         for si, spot_drive in enumerate(self.drives):
             opticName = spot_drive.split('.')[0]
@@ -678,12 +730,10 @@ class ControlSystem:
                 driveData = drive.split('.')
                 driveName = driveData[0]
                 dofType = driveData[-1]
-                drive2bsm[si, di] = self.opt.computeBeamSpotMotion(
+                drive2bsm[si, di] = self.plant_model.computeBeamSpotMotion(
                     opticName, driveName, dofType)
-                # drive2bsm[si, di] = self.opt.computeBeamSpotMotion(
-                #     opticName, 'fr', driveName, dofType)
 
-        self.drive2bsm = drive2bsm
+        self._drive2bsm = drive2bsm
 
     def _computeOLTF(self, tstpnt):
         """Compute the OLTF
@@ -693,23 +743,23 @@ class ControlSystem:
         """
         if tstpnt == 'err':
             oltf = self.getTF('', 'err', '', 'ctrl', closed=False)
-            oltf = multiplyMat(oltf, self.ctrlMat)
+            oltf = multiplyMat(oltf, self._ctrlMat)
 
         elif tstpnt == 'sens':
             oltf = self.getTF('', 'sens', '', 'err', closed=False)
-            oltf = multiplyMat(oltf, self.inMat)
+            oltf = multiplyMat(oltf, self._inMat)
 
         elif tstpnt == 'drive':
             oltf = self.getTF('', 'drive', '', 'sens', closed=False)
-            oltf = multiplyMat(oltf, self.plant)
+            oltf = multiplyMat(oltf, self._plant)
 
         elif tstpnt == 'act':
             oltf = self.getTF('', 'act', '', 'drive', closed=False)
-            oltf = multiplyMat(oltf, self.actMat)
+            oltf = multiplyMat(oltf, self._actMat)
 
         elif tstpnt == 'ctrl':
             oltf = self.getTF('', 'ctrl', '', 'act', closed=False)
-            oltf = multiplyMat(oltf, self.outComp)
+            oltf = multiplyMat(oltf, self._outComp)
 
         return oltf
 
@@ -737,7 +787,7 @@ class ControlSystem:
           dof_from: input DOF
           filt: Filter instance for the filter
         """
-        self.filters.append((dof_to, dof_from, filt))
+        self._filters.append((dof_to, dof_from, filt))
 
     def addCompensator(self, drive, driveType, filt):
         """Add a compensation filter
@@ -752,7 +802,7 @@ class ControlSystem:
             raise ValueError(
                 'A compensator is already set for drive {:s}'.format(drive))
 
-        self.compFilts.append((drive, filt))
+        self._compFilts.append((drive, filt))
 
     def setActuator(self, drive, driveType, filt):
         """Set the actuation plant for a drive
@@ -767,7 +817,7 @@ class ControlSystem:
             raise ValueError(
                 'A response is already set for drive {:s}'.format(drive))
 
-        self.actFilts.append((drive, filt))
+        self._actFilts.append((drive, filt))
 
     def getFilter(self, dof_to, dof_from):
         """Get the filter between two DOFs
@@ -799,7 +849,7 @@ class ControlSystem:
           sig_from: input signal
           tstpnt: which test point to compute the TF for
         """
-        oltf = self.oltf[tstpnt]
+        oltf = self._oltf[tstpnt]
         if sig_from:
             from_ind = self._getIndex(sig_from, tstpnt)
             oltf = oltf[:, from_ind]
@@ -816,7 +866,7 @@ class ControlSystem:
           sig_from: input signal
           tstpnt: which test point to compute the TF for
         """
-        cltf = self.cltf[tstpnt]
+        cltf = self._cltf[tstpnt]
         if sig_from:
             from_ind = self._getIndex(sig_from, tstpnt)
             cltf = cltf[:, from_ind]
@@ -841,8 +891,8 @@ class ControlSystem:
         """
         oltf = self.getOLTF(sig_to, sig_from, tstpnt)
         cltf = self.getCLTF(sig_to, sig_from, tstpnt)
-        ugf, pm = compute_phase_margin(self.opt.ff, oltf)
-        fms, sm = compute_stability_margin(self.opt.ff, cltf)
+        ugf, pm = compute_phase_margin(self.ff, oltf)
+        fms, sm = compute_stability_margin(self.ff, cltf)
         return ugf, pm, fms, sm
 
     def print_margins(self, tstpnt):
@@ -877,15 +927,15 @@ class ControlSystem:
             matrix if an open loop TF is necessary
             """
             if closed:
-                return self.cltf[tp_to]
+                return self._cltf[tp_to]
             else:
                 return 1
 
         # test points and their matrices in cyclic order for computing TFs
         # around the main loop
         tstpnts = ['err', 'sens', 'drive', 'act', 'ctrl']
-        mats = [self.inMat, self.plant, self.actMat, self.outComp,
-                self.ctrlMat]
+        mats = [self._inMat, self._plant, self._actMat, self._outComp,
+                self._ctrlMat]
 
         # Main loop if the input test point is not a calibration test point
         if tp_from in tstpnts:
@@ -918,11 +968,11 @@ class ControlSystem:
 
                 # for pos, apply mechanical modification
                 if tp_to == 'pos':
-                    tf = multiplyMat(self.mMech, loopTF)
+                    tf = multiplyMat(self._mMech, loopTF)
 
                 # for beam spot motion, apply conversion from drives to motion
                 elif tp_to == 'spot':
-                    tf = multiplyMat(self.drive2bsm, loopTF)
+                    tf = multiplyMat(self._drive2bsm, loopTF)
 
             # No valid output test point
             else:
@@ -932,7 +982,7 @@ class ControlSystem:
         # the TF from the corresponding drive and append the output matrix
         elif tp_from == 'cal':
             loopTF = self.getTF('', tp_to, '', 'drive', closed=closed)
-            tf = multiplyMat(loopTF, self.outMat)
+            tf = multiplyMat(loopTF, self._outMat)
 
         # No valid input test point
         else:
@@ -963,13 +1013,13 @@ class ControlSystem:
           totalASD: the total ASD [u/rtHz]
         """
         if tp_to == 'cal':
-            ampTF = inv(self.outMat)
+            ampTF = inv(self._outMat)
             to_ind = self._getIndex(sig_to, 'cal')
             ampTF = ampTF[to_ind]
         else:
             ampTF = self.getTF(sig_to, tp_to, '', tp_from, closed=closed)
         if len(ampTF.shape) == 1:
-            ampTF = np.einsum('i,j->ij', ampTF, np.ones_like(self.opt.ff))
+            ampTF = np.einsum('i,j->ij', ampTF, np.ones_like(self.ff))
         powTF = np.abs(ampTF)**2
         totalPSD = np.zeros(powTF.shape[-1])
         for dof_from, noiseASD in noiseASDs.items():

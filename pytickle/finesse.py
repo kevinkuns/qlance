@@ -1107,29 +1107,24 @@ class KatFR(plant.FinessePlant):
         plant.FinessePlant.__init__(self)
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'fr')
-        self.lambda0 = self.kat.lambda0
+        self._lambda0 = self.kat.lambda0
 
         # populate the list of drives if necessary
         if all_drives:
             comps = (kcmp.mirror, kcmp.beamSplitter, kcmp.laser)
-            self.drives = [
+            self._drives = [
                 name for name, comp in kat.components.items()
                 if isinstance(comp, comps)]
 
-        else:
-            self.drives = []
-
         # populate the list of probes
-        self.probes = [name for name, det in kat.detectors.items()
-                       if isinstance(det, (kdet.pd, kdet.hd, kdet.qhd))]
-        self.amp_detectors = [name for name, det in kat.detectors.items()
-                              if isinstance(det, kdet.ad)]
+        self._probes = [name for name, det in kat.detectors.items()
+                        if isinstance(det, (kdet.pd, kdet.hd, kdet.qhd))]
+        self._amp_detectors = [name for name, det in kat.detectors.items()
+                               if isinstance(det, kdet.ad)]
 
         # populate the list of position detectors
-        self.pos_detectors = [name for name, det in kat.detectors.items()
-                              if isinstance(det, kdet.xd)]
-
-        self.ff = None
+        self._pos_detectors = [name for name, det in kat.detectors.items()
+                               if isinstance(det, kdet.xd)]
 
     def run(self, fmin, fmax, npts, dof='pos', linlog='log', rtype='both',
                verbose=1):
@@ -1164,11 +1159,11 @@ class KatFR(plant.FinessePlant):
             self.kat, drive, dof)]
 
         if rtype in ['opt', 'both']:
-            self.freqresp[dof] = {probe: {} for probe in self.probes}
+            self._freqresp[dof] = {probe: {} for probe in self.probes}
         if rtype in ['mech', 'both']:
-            self.mech_plants[dof] = {}
+            self._mech_plants[dof] = {}
             if self.pos_detectors:
-                self.mechmod[dof] = {drive: {} for drive in self.pos_detectors}
+                self._mechmod[dof] = {drive: {} for drive in self.pos_detectors}
 
         ############################################################
         # Loop through the drives and compute the response for each
@@ -1226,7 +1221,7 @@ class KatFR(plant.FinessePlant):
 
                 # store the results
                 for probe in self.probes:
-                    self.freqresp[dof][probe][drive] = out[probe]
+                    self._freqresp[dof][probe][drive] = out[probe]
 
             ############################################################
             # compute the radiation pressure loop suppression function
@@ -1243,14 +1238,14 @@ class KatFR(plant.FinessePlant):
                 comp = kat_mech.components[drive]
                 if dof in ['pos', 'pitch', 'yaw']:
                     plant = ctrl.Filter(*extract_zpk(comp, dof), Hz=False)
-                    self.mech_plants[dof][drive] = plant
+                    self._mech_plants[dof][drive] = plant
                     tf = plant.computeFilter(out.x)
                 else:
                     tf = np.ones_like(out.x)
 
                 # store the results
                 for drive_out in self.pos_detectors:
-                    self.mechmod[dof][drive_out][drive] = out[drive_out] / tf
+                    self._mechmod[dof][drive_out][drive] = out[drive_out] / tf
 
             if verbose:
                 pbar.update()
@@ -1258,7 +1253,7 @@ class KatFR(plant.FinessePlant):
         if verbose:
             pbar.close()
 
-        self.ff = out.x
+        self._ff = out.x
 
     def addDrives(self, drives):
         """Add drives to the list of drives to compute
@@ -1267,7 +1262,7 @@ class KatFR(plant.FinessePlant):
           katFR.addDrives('EX')
           katFR.addDrives(['IY', 'EY'])
         """
-        append_str_if_unique(self.drives, drives)
+        append_str_if_unique(self._drives, drives)
 
     def removeDrives(self, drives):
         """Remove drives from the list to compute
@@ -1281,7 +1276,7 @@ class KatFR(plant.FinessePlant):
 
         for drive in drives:
             try:
-                self.drives.remove(drive)
+                self._drives.remove(drive)
             except ValueError:
                 pass
 
@@ -1308,19 +1303,27 @@ class KatSweep:
     def __init__(self, kat, drives, dof='pos', relative=True):
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'dc')
-        self.drives = drives
-        if isinstance(self.drives, str):
-            self.drives = {self.drives: 1}
-        self.dof = dof
-        self.sigs = dict.fromkeys(kat.detectors)
-        self.lock_sigs = {}
+        self._drives = drives
+        if isinstance(self._drives, str):
+            self._drives = {self._drives: 1}
+        self._dof = dof
+        self._sigs = dict.fromkeys(kat.detectors)
+        self._lock_sigs = {}
         for cmd in self.kat.commands.values():
             if isinstance(cmd, kcmd.lock):
-                self.lock_sigs[cmd.name] = None
-        self.poses = dict.fromkeys(assertType(drives, dict))
-        self.poses[''] = None
+                self._lock_sigs[cmd.name] = None
+        self._poses = dict.fromkeys(assertType(drives, dict))
+        self._poses[''] = None
         self._relative = relative
-        self.offsets = dict.fromkeys(assertType(drives, dict))
+        self._offsets = dict.fromkeys(assertType(drives, dict))
+
+    @property
+    def drives(self):
+        return self._drives
+
+    @property
+    def dof(self):
+        return self._dof
 
     def sweep(
             self, spos, epos, npts, linlog='lin', verbose=False, debug=False):
@@ -1340,18 +1343,18 @@ class KatSweep:
         kat.parse('set sweepre sweep re')
         kat.add(kcmd.xaxis(linlog, [spos, epos], 're', npts, comp='sweep'))
 
-        for drive, coeff in self.drives.items():
-            comp = get_drive_dof(kat, drive, self.dof, force=False)
+        for drive, coeff in self._drives.items():
+            comp = get_drive_dof(kat, drive, self._dof, force=False)
 
             if self._relative:
-                self.offsets[drive] = comp.value
+                self._offsets[drive] = comp.value
             else:
-                self.offsets[drive] = 0
+                self._offsets[drive] = 0
 
             csign = np.sign(coeff)
             cabs = np.abs(coeff)
-            p0sign = np.sign(self.offsets[drive])
-            p0abs = np.abs(self.offsets[drive])
+            p0sign = np.sign(self._offsets[drive])
+            p0abs = np.abs(self._offsets[drive])
             name = drive + '_sweep'
             func = '({0}) * ({1}) * $sweepre + ({2}) * ({3})'.format(
                 csign, cabs, p0sign, p0abs)
@@ -1363,15 +1366,15 @@ class KatSweep:
             return kat
         out = kat.run()
 
-        for probe in self.sigs.keys():
-            self.sigs[probe] = out[probe]
+        for probe in self._sigs.keys():
+            self._sigs[probe] = out[probe]
 
-        for lock in self.lock_sigs.keys():
-            self.lock_sigs[lock] = out[lock]
+        for lock in self._lock_sigs.keys():
+            self._lock_sigs[lock] = out[lock]
 
-        for drive, coeff in self.drives.items():
-            self.poses[drive] = coeff * out.x + self.offsets[drive]
-        self.poses[''] = out.x
+        for drive, coeff in self._drives.items():
+            self._poses[drive] = coeff * out.x + self._offsets[drive]
+        self._poses[''] = out.x
 
     def getSweepSignal(self, probeName, driveName, func=None):
         """Get data on a sweep signal
@@ -1399,11 +1402,11 @@ class KatSweep:
               poses, power = kat.getSweepSignal(
                                  'SRC_f1', 'SR', func=lambda x: np.abs(x)**2)
         """
-        sig = self.sigs[probeName]
+        sig = self._sigs[probeName]
         if func:
             sig = func(sig)
 
-        return self.poses[driveName], sig
+        return self._poses[driveName], sig
 
     def plotSweepSignal(
             self, probeName, driveName, func=None, fig=None, **kwargs):
@@ -1474,10 +1477,10 @@ class KatSweep:
                 print(exc)
                 print('pos ' + str(pos))
                 print('dp ' + str(pos))
-            dp = self.poses[''][1] - self.poses[''][0]
+            dp = self._poses[''][1] - self._poses[''][0]
         return pos, peak
 
     def get_tuning_dict(self, pos):
-        tunings = {drive: pos * coeff + self.offsets[drive]
-                   for drive, coeff in self.drives.items()}
+        tunings = {drive: pos * coeff + self._offsets[drive]
+                   for drive, coeff in self._drives.items()}
         return tunings

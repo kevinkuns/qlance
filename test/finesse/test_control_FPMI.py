@@ -147,7 +147,7 @@ cs.addFilter('BS', 'BS', filtBS)
 cs.addFilter('DARM', 'BS', ctrl.catfilt(filtFF, filtBS))
 
 # set the optomechanical plant
-cs.setPyTicklePlant(katFR)
+cs.setOptomechanicalPlant(katFR)
 
 # compensation
 gainf0 = 1/np.abs(pum2tst.computeFilter(10))
