@@ -687,7 +687,7 @@ class PyTickle(plant.OpticklePlant):
             self.addMirror(name + '_LOphase', aoi=0, Thr=0)
             self.addLink(name + '_LOphase', 'fr', name + '_BS', 'bk', 0)
 
-        # Add LO if necessary.
+        # Add LO if necessary
         if LOpower > 0:
             ind = self._getSidebandInd(freq, lambda0=lambda0, pol=pol)
             ampRF = np.zeros_like(self.lambda0)
@@ -704,7 +704,7 @@ class PyTickle(plant.OpticklePlant):
         self.addProbeIn(name + '_SUM', name + '_A', 'in', 0, 0)
         self.addProbeIn(name + '_DIFF', name + '_B', 'in', 0, 0)
 
-        # Rotate probe basis to do homodyne detection if necessary.
+        # Rotate probe basis to do homodyne detection if necessary
         if rotateBasis:
             self.rotateHomodyneBasis(name)
 

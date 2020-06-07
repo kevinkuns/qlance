@@ -120,7 +120,7 @@ def opt40m(eng, opt, par, phi=0, zeta=0, Pin=1):
     # Add Readout.
     ##########################################################################
 
-    opt.addHomodyneReadout('AS', zeta, par['qe'], BnC=True, LOpower=0)
+    opt.addHomodyneReadout('AS', zeta, par['qe'], LOpower=0)
 
     # Pick off LO from PR2
     opt.addLink('PR2', 'bkA', 'AS_LOphase', 'fr', 0)
