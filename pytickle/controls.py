@@ -493,7 +493,6 @@ class ControlSystem:
     """
     def __init__(self):
         self._plant_model = None
-        self._ss = None
         self._dofs = OrderedDict()
         self._filters = []
         self._probes = []
@@ -529,24 +528,12 @@ class ControlSystem:
         return self._dofs
 
     @property
-    def filters(self):
-        return self._filters
-
-    @property
     def probes(self):
         return self._probes
 
     @property
     def drives(self):
         return self._drives
-
-    @property
-    def actFilts(self):
-        return self._actFilts
-
-    @property
-    def compFilts(self):
-        return self._compFilts
 
     def setOptomechanicalPlant(self, plant_model):
         """Set an Optickle or Finesse model to be the optomechanical plant
@@ -555,10 +542,9 @@ class ControlSystem:
           plant_model: the OpticklePlant or FinessePlant instance
         """
         if self.plant_model is not None:
-            raise ValueError('A PyTickle model is already set as the plant')
+            raise ValueError('Another model is already set as the plant')
         else:
             self._plant_model = plant_model
-            # self._ff = 2j*np.pi*plant_model.ff
 
     def run(self, drive2bsm=False, mechmod=True):
         """Compute the control system dynamics
@@ -666,7 +652,7 @@ class ControlSystem:
             raise RuntimeError('There is no associated PyTickle model')
         nDOF = len(self.dofs)
         ctrlMat = np.zeros((nDOF, nDOF, len(self.ss)), dtype=complex)
-        for (dof_to, dof_from, filt) in self.filters:
+        for (dof_to, dof_from, filt) in self._filters:
             toInd = list(self.dofs.keys()).index(dof_to)
             fromInd = list(self.dofs.keys()).index(dof_from)
             ctrlMat[toInd, fromInd, :] = filt._filt(self.ss)
@@ -677,11 +663,11 @@ class ControlSystem:
         ndrives = len(self.drives)
         ones = np.ones(nff)
         compMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
-        compdrives = [cf[0] for cf in self.compFilts]
+        compdrives = [cf[0] for cf in self._compFilts]
         for di, drive in enumerate(self.drives):
             try:
                 ind = compdrives.index(drive)
-                compMat[di, di, :] = self.compFilts[ind][-1]._filt(self.ss)
+                compMat[di, di, :] = self._compFilts[ind][-1]._filt(self.ss)
             except ValueError:
                 compMat[di, di, :] = ones
         return compMat
@@ -691,11 +677,11 @@ class ControlSystem:
         ndrives = len(self.drives)
         ones = np.ones(nff)
         actMat = np.zeros((ndrives, ndrives, nff), dtype=complex)
-        actdrives = [rf[0] for rf in self.actFilts]
+        actdrives = [rf[0] for rf in self._actFilts]
         for di, drive in enumerate(self.drives):
             try:
                 ind = actdrives.index(drive)
-                actMat[di, di, :] = self.actFilts[ind][-1]._filt(self.ss)
+                actMat[di, di, :] = self._actFilts[ind][-1]._filt(self.ss)
             except ValueError:
                 actMat[di, di, :] = ones
         return actMat
@@ -787,6 +773,16 @@ class ControlSystem:
           dof_from: input DOF
           filt: Filter instance for the filter
         """
+        dofs_to = np.array([filt[0] for filt in self._filters])
+        dofs_from = np.array([filt[1] for filt in self._filters])
+        inds = [ind for ind, (d1, d2) in enumerate(zip(dofs_to, dofs_from))
+                if d1 == dof_to and d2 == dof_from]
+
+        if len(inds) > 0:
+            raise ValueError(
+                'There is already a filter from {:s} to {:s}'.format(
+                    dof_from, dof_to))
+
         self._filters.append((dof_to, dof_from, filt))
 
     def addCompensator(self, drive, driveType, filt):
@@ -798,7 +794,7 @@ class ControlSystem:
           filt: Filter instance for the filter
         """
         drive += '.' + driveType
-        if drive in [cf[0] for cf in self.compFilts]:
+        if drive in [cf[0] for cf in self._compFilts]:
             raise ValueError(
                 'A compensator is already set for drive {:s}'.format(drive))
 
@@ -813,7 +809,7 @@ class ControlSystem:
           filt: Filter instance for the plant
         """
         drive += '.' + driveType
-        if drive in [rf[0] for rf in self.actFilts]:
+        if drive in [rf[0] for rf in self._actFilts]:
             raise ValueError(
                 'A response is already set for drive {:s}'.format(drive))
 
@@ -829,17 +825,51 @@ class ControlSystem:
         Returns:
           filt: the filter
         """
-        dofs_to = np.array([filt[0] for filt in self.filters])
-        dofs_from = np.array([filt[1] for filt in self.filters])
-        inds = np.logical_and(dof_to == dofs_to, dof_from == dofs_from)
-        nfilts = np.count_nonzero(inds)
+        dofs_to = np.array([filt[0] for filt in self._filters])
+        dofs_from = np.array([filt[1] for filt in self._filters])
+        inds = [ind for ind, (d1, d2) in enumerate(zip(dofs_to, dofs_from))
+                if d1 == dof_to and d2 == dof_from]
+        nfilts = len(inds)
+
         if nfilts == 0:
             raise ValueError('There is no filter from {:s} to {:s}'.format(
                 dof_from, dof_to))
         elif nfilts > 1:
             raise ValueError('There are multiple filters')
         else:
-            return self.filters[inds.nonzero()[0][0]][-1]
+            return self._filters[inds[0]][-1]
+
+    def getActuator(self, drive):
+        """Get the actuation filter for a drive
+
+        Inputs:
+          drive: the drive
+
+        Returns:
+          filt: the filter
+        """
+        drives = [rf[0] for rf in self._actFilts]
+        try:
+            ind = drives.index(drive)
+            return self._actFilts[ind][-1]
+        except ValueError:
+            raise ValueError('No actuator is set for ' + drive)
+
+    def getCompensator(self, drive):
+        """Get the compensation filter for a drive
+
+        Inputs:
+          drive: the drive
+
+        Returns:
+          filt: the filter
+        """
+        drives = [rf[0] for rf in self._actFilts]
+        try:
+            ind = drives.index(drive)
+            return self._actFilts[ind][-1]
+        except ValueError:
+            raise ValueError(drive + ' does not have a compensation filter')
 
     def getOLTF(self, sig_to, sig_from, tstpnt):
         """Compute an OLTF
