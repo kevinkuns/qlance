@@ -32,7 +32,7 @@ gmod = 0.1
 poles = np.array(resRoots(f0, Q, Hz=False))
 
 
-def katFPMI(sqAng, sqdB):
+def katFPMI(sqAng, sqdB, rf=True):
     kat = pykat.finesse.kat()
 
     fin.addMirror(kat, 'EX')
@@ -43,16 +43,20 @@ def katFPMI(sqAng, sqdB):
 
     kat.BS.phi = np.sqrt(2) * 45
 
+    Tpo = 1 - 1/Pin
+    fin.addBeamSplitter(kat, 'LO_PO', Thr=Tpo, aoi=45, comp=True)
+
     for optic in ['EX', 'EY', 'IX', 'IY']:
         fin.setMechTF(kat, optic, [], poles, 1/M)
 
     fin.addLaser(kat, 'Laser', Pin)
-    fin.addModulator(kat, 'Mod', fmod, gmod, 1, 'pm')
-    fin.addSpace(kat, 'Laser_out', 'Mod_in', 0)
+    if rf:
+        fin.addModulator(kat, 'Mod', fmod, gmod, 1, 'pm')
+        fin.addSpace(kat, 'Laser_out', 'Mod_in', 0)
+        fin.addSpace(kat, 'Mod_out', 'LO_PO_frI', 0)
+    else:
+        fin.addSpace(kat, 'Laser_out', 'LO_PO_frI', 0)
 
-    Tpo = 1 - 1/Pin
-    fin.addBeamSplitter(kat, 'LO_PO', Thr=Tpo, aoi=45, comp=True)
-    fin.addSpace(kat, 'Mod_out', 'LO_PO_frI', 0)
     fin.addSpace(kat, 'LO_PO_bkT', 'BS_frI', 0)
 
     fin.addSpace(kat, 'BS_bkT', 'IX_bk', lx)
@@ -67,7 +71,8 @@ def katFPMI(sqAng, sqdB):
     fin.addBeamSplitter(kat, 'AS_PO', aoi=45, Thr=0.5)
     fin.addSpace(kat, 'FI_fr_out', 'AS_PO_frI', 0)
 
-    fin.addReadout(kat, 'AS', 'AS_PO_bkT', fmod, 0)
+    if rf:
+        fin.addReadout(kat, 'AS', 'AS_PO_bkT', fmod, 0)
 
     fin.addSqueezer(kat, 'Sqz', sqAng, sqdB)
     fin.addSpace(kat, 'Sqz_out', 'FI_bk_in', 0)
@@ -176,3 +181,33 @@ class Test45_10_160:
     def test_po(self):
         rslts = get_results(self.data['po'], self.chk_data['po'])
         assert all(rslts)
+
+
+class Test45_10_160_carrier_only:
+    kat_lo = katFPMI(sqAng=45, sqdB=10, rf=False)
+    kat_po = katFPMI(sqAng=45, sqdB=10, rf=False)
+    homodyne_lo(kat_lo, 160)
+    homodyne_po(kat_po, 160)
+    kat_lo = getKatFR(kat_lo)
+    kat_po = getKatFR(kat_po)
+
+    kat_lo.run(fmin, fmax, npts, rtype='opt')
+    kat_po.run(fmin, fmax, npts, rtype='opt')
+
+    chk_data = ref_data['d45_10_160']
+
+    def test_lo(self):
+        qnoise = self.kat_lo.getQuantumNoise('AS_DIFF')
+        tf = self.kat_lo.getTF('AS_DIFF', DARM)
+        rslt1 = np.allclose(qnoise, self.chk_data['lo']['qnoise_DIFF'])
+        rslt2 = np.allclose(
+            tf, self.chk_data['lo']['tf_DIFF'], rtol=1e-2, atol=1e-2)
+        assert all([rslt1, rslt2])
+
+    def test_po(self):
+        qnoise = self.kat_po.getQuantumNoise('AS_DIFF')
+        tf = self.kat_po.getTF('AS_DIFF', DARM)
+        rslt1 = np.allclose(qnoise, self.chk_data['po']['qnoise_DIFF'])
+        rslt2 = np.allclose(
+            tf, self.chk_data['po']['tf_DIFF'], rtol=1e-2, atol=1e-2)
+        assert all([rslt1, rslt2])

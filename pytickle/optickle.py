@@ -695,7 +695,10 @@ class PyTickle(plant.OpticklePlant):
         if LOpower > 0:
             ind = self._getSidebandInd(freq, lambda0=lambda0, pol=pol)
             ampRF = np.zeros_like(self.lambda0)
-            ampRF[ind] = ampRF[ind] = np.sqrt(LOpower)
+            try:
+                ampRF[ind] = np.sqrt(LOpower)
+            except IndexError:
+                ampRF = np.sqrt(LOpower)
             self.addSource(name + '_LO', ampRF)
             self.setHomodynePhase(name + '_LO', phase)
             self.addLink(name + '_LO', 'out', name + '_BS', 'bk', 0)

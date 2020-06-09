@@ -37,8 +37,11 @@ gmod = 0.1
 poles = np.array(resRoots(f0, Q, Hz=False))
 
 
-def optFPMI(eng, opt_name, sqAng, sqdB):
-    vRF = np.array([-fmod, 0, fmod])
+def optFPMI(eng, opt_name, sqAng, sqdB, rf=True):
+    if rf:
+        vRF = np.array([-fmod, 0, fmod])
+    else:
+        vRF = 0
     opt = pyt.PyTickle(eng, opt_name, vRF=vRF)
 
     opt.addMirror('EX')
@@ -50,13 +53,17 @@ def optFPMI(eng, opt_name, sqAng, sqdB):
     for optic in ['EX', 'EY', 'IX', 'IY']:
         opt.setMechTF(optic, [], poles, 1/M)
 
-    opt.addSource('Laser', np.sqrt(Pin)*(vRF == 0))
-    opt.addRFmodulator('Mod', fmod, gmod*1j)
-    opt.addLink('Laser', 'out', 'Mod', 'in', 0)
-
     Tpo = 1 - 1/Pin
     opt.addMirror('LO_PO', Thr=Tpo)
-    opt.addLink('Mod', 'out', 'LO_PO', 'fr', 0)
+
+    opt.addSource('Laser', np.sqrt(Pin)*(vRF == 0))
+    if rf:
+        opt.addRFmodulator('Mod', fmod, gmod*1j)
+        opt.addLink('Laser', 'out', 'Mod', 'in', 0)
+        opt.addLink('Mod', 'out', 'LO_PO', 'fr', 0)
+    else:
+        opt.addLink('Laser', 'out', 'LO_PO', 'fr', 0)
+
     opt.addLink('LO_PO', 'bk', 'BS', 'frA', 0)
 
     opt.addLink('BS', 'bkA', 'IX', 'bk', lx)
@@ -72,9 +79,10 @@ def optFPMI(eng, opt_name, sqAng, sqdB):
     opt.addMirror('AS_PO', aoi=45, Thr=0.5)
     opt.addLink('BS', 'bkB', 'AS_PO', 'fr', 0)
 
-    opt.addSink('AS')
-    opt.addLink('AS_PO', 'fr', 'AS', 'in', 0)
-    opt.addReadout('AS', fmod, 0)
+    if rf:
+        opt.addSink('AS')
+        opt.addLink('AS_PO', 'fr', 'AS', 'in', 0)
+        opt.addReadout('AS', fmod, 0)
 
     opt.addSqueezer('Sqz', sqAng=sqAng, sqdB=sqdB)
     opt.addLink('Sqz', 'out', 'BS', 'bkA', 0)
@@ -173,3 +181,30 @@ class Test45_10_160:
     def test_po(self):
         rslts = get_results(self.data['po'], self.chk_data['po'])
         assert all(rslts)
+
+
+class Test45_10_160_carrier_only:
+    opt_lo = optFPMI(eng, 'opt_lo', sqAng=45, sqdB=10, rf=False)
+    opt_po = optFPMI(eng, 'opt_po', sqAng=45, sqdB=10, rf=False)
+    homodyne_lo(opt_lo, 160)
+    homodyne_po(opt_po, 160)
+    opt_lo.run(ff)
+    opt_po.run(ff)
+
+    chk_data = ref_data['d45_10_160']
+
+    def test_lo(self):
+        qnoise = self.opt_lo.getQuantumNoise('AS_DIFF')
+        tf = self.opt_lo.getTF('AS_DIFF', DARM)
+        rslt1 = np.allclose(qnoise, self.chk_data['lo']['qnoise_DIFF'])
+        rslt2 = np.allclose(
+            tf, self.chk_data['lo']['tf_DIFF'], rtol=1e-2, atol=1e-2)
+        assert all([rslt1, rslt2])
+
+    def test_po(self):
+        qnoise = self.opt_po.getQuantumNoise('AS_DIFF')
+        tf = self.opt_po.getTF('AS_DIFF', DARM)
+        rslt1 = np.allclose(qnoise, self.chk_data['po']['qnoise_DIFF'])
+        rslt2 = np.allclose(
+            tf, self.chk_data['po']['tf_DIFF'], rtol=1e-2, atol=1e-2)
+        assert all([rslt1, rslt2])
