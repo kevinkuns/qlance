@@ -1155,6 +1155,7 @@ class KatFR(plant.FinessePlant):
         if rtype not in ['opt', 'mech', 'both']:
             raise ValueError('Unrecognized response type ' + rtype)
 
+        # list of all drives with this degree of freedom
         drives = [drive for drive in self.drives if has_dof(
             self.kat, drive, dof)]
 
@@ -1241,6 +1242,7 @@ class KatFR(plant.FinessePlant):
                     self._mech_plants[dof][drive] = plant
                     tf = plant.computeFilter(out.x)
                 else:
+                    self._mech_plants[dof][drive] = ctrl.Filter([], [], 1)
                     tf = np.ones_like(out.x)
 
                 # store the results

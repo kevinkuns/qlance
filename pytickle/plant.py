@@ -78,13 +78,18 @@ class OpticklePlant:
             * In units of [W/RAM] if drive is an RF modulator with dof amp
               modulation of an RF modulator.
 
-        Note: To convert [W/RAM] to [W/RIN], divide by 2 since RIN = 2*RAM
+        Note:
+          * To convert phase noise in [W/rad] to frequency noise in [W/Hz],
+            divide by 1j*ff
+          * To convert amplitude noise in [W/RAM] to intensity noise in [W/RIN],
+            divide by 2 since RIN = 2*RAM
 
         Examples:
           * If only a single drive is used, the drive name can be a string.
             To compute the phase transfer function in reflection from a FP
             cavity
               tf = opt.getTF('REFL', 'PM', 'drive')
+            The frequency transfer function is then tf/(1j*ff)
 
           * If multiple drives are used, the drive names should be a dict.
             To compute the DARM transfer function to the AS_DIFF homodyne PD
@@ -572,10 +577,21 @@ class FinessePlant:
           tf: the transfer function
             * In units of [W/m] if drive is an optic with dof pos
             * In units of [W/rad] if drive is an optic with dof pitch or yaw
+            * In units of [W/Hz] if drive is a laser with drive freq
+            * In units of [W/RIN] if dirve is a laser with drive amp
+
+        Note:
+          * To convert frequency noise in [W/Hz] to phase noise in [W/rad],
+            multiply by 1j*ff
+          * To convert intensity noise in [W/RIN] to amplitude noise in [W/RAM],
+            multiply by 2 since RIN = 2*RAM
 
         Examples:
           * If only a single drive is used, the drive name can be a string.
-              tf = katFR.getTF('REFL', 'EX')
+            To compute the frequency transfer function in reflection from a FP
+            cavity
+              tf = katFR.getTF('REFL', 'Laser', 'freq')
+            The phase transfer function is then 1j*ff*tf
 
           * If multiple drives are used, the drive names should be a dict.
             To compute the DARM transfer function to the AS_DIFF homodyne PD

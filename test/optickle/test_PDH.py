@@ -32,9 +32,16 @@ def optFP(opt_name):
     opt.addLink('EX', 'fr', 'IX', 'fr', Lcav)
     opt.setCavityBasis('EX', 'IX')
 
+    for optic in ['IX', 'EX']:
+        opt.setMechTF(optic, [], [0, 0], 1)
+
     opt.addSource('Laser', np.sqrt(Pin)*(vRF == 0))
+    opt.addModulator('AM', 1)
+    opt.addModulator('PM', 1j)
     opt.addRFmodulator('Mod', fmod, gmod*1j)
-    opt.addLink('Laser', 'out', 'Mod', 'in', 0)
+    opt.addLink('Laser', 'out', 'AM', 'in', 0)
+    opt.addLink('AM', 'out', 'PM', 'in', 0)
+    opt.addLink('PM', 'out', 'Mod', 'in', 0)
     opt.addLink('Mod', 'out', 'IX', 'bk', 0)
 
     opt.addSink('REFL')
@@ -64,7 +71,7 @@ class TestFreqResp:
 
     def test_qnI(self):
         qnI = self.opt.getQuantumNoise('REFL_I')
-        assert np.allclose(qnI, data['qnQ'])
+        assert np.allclose(qnI, data['qnI'])
 
     def test_qnQ(self):
         qnQ = self.opt.getQuantumNoise('REFL_Q')
@@ -73,6 +80,22 @@ class TestFreqResp:
     def test_qnDC(self):
         qnDC = self.opt.getQuantumNoise('REFL_DC')
         assert np.allclose(qnDC, data['qnDC'])
+
+    def test_phaseI(self):
+        tf = self.opt.getTF('REFL_I', 'PM', dof='drive')
+        assert np.allclose(tf, data['tfI_phase'])
+
+    def test_phaseQ(self):
+        tf = self.opt.getTF('REFL_Q', 'PM', dof='drive')
+        assert np.allclose(tf, data['tfQ_phase'])
+
+    def test_ampI(self):
+        tf = self.opt.getTF('REFL_I', 'AM', dof='drive')
+        assert np.allclose(tf, data['tfI_amp'])
+
+    def test_ampQ(self):
+        tf = self.opt.getTF('REFL_Q', 'AM', dof='drive')
+        assert np.allclose(tf, data['tfQ_amp'])
 
     def test_reload_tfI(self):
         tfI = self.opt2.getTF('REFL_I', 'EX')
@@ -84,7 +107,7 @@ class TestFreqResp:
 
     def test_reload_qnI(self):
         qnI = self.opt2.getQuantumNoise('REFL_I')
-        assert np.allclose(qnI, data['qnQ'])
+        assert np.allclose(qnI, data['qnI'])
 
     def test_reload_qnQ(self):
         qnQ = self.opt2.getQuantumNoise('REFL_Q')
@@ -93,6 +116,22 @@ class TestFreqResp:
     def test_reload_qnDC(self):
         qnDC = self.opt2.getQuantumNoise('REFL_DC')
         assert np.allclose(qnDC, data['qnDC'])
+
+    def test_reload_phaseI(self):
+        tf = self.opt2.getTF('REFL_I', 'PM', dof='drive')
+        assert np.allclose(tf, data['tfI_phase'])
+
+    def test_reload_phaseQ(self):
+        tf = self.opt2.getTF('REFL_Q', 'PM', dof='drive')
+        assert np.allclose(tf, data['tfQ_phase'])
+
+    def test_reload_ampI(self):
+        tf = self.opt2.getTF('REFL_I', 'AM', dof='drive')
+        assert np.allclose(tf, data['tfI_amp'])
+
+    def test_reload_ampQ(self):
+        tf = self.opt2.getTF('REFL_Q', 'AM', dof='drive')
+        assert np.allclose(tf, data['tfQ_amp'])
 
 
 class TestSweep:
