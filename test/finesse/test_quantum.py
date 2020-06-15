@@ -83,7 +83,7 @@ def katFPMI(sqAng, sqdB, rf=True):
 def homodyne_lo(kat, phi):
     fin.addHomodyneReadout(kat, 'AS', phi, qe=0.9)
     fin.addSpace(kat, 'AS_PO_frR', 'AS_BS_frI', 0)
-    fin.monitorAllShotNoise(kat)
+    fin.monitorAllQuantumNoise(kat)
 
 
 def homodyne_po(kat, phi):
@@ -91,7 +91,7 @@ def homodyne_po(kat, phi):
     fin.addSpace(kat, 'AS_PO_frR', 'AS_BS_frI', 0)
     fin.addSpace(kat, 'LO_PO_frR', 'AS_LOphase_frI', 0)
     kat.AS_LOphase.phi = phi/2
-    fin.monitorAllShotNoise(kat)
+    fin.monitorAllQuantumNoise(kat)
 
 
 def getKatFR(kat):

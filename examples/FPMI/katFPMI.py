@@ -76,6 +76,6 @@ def katFPMI(par):
     fin.monitorMotion(kat, 'BS')
 
     # add probes to compute the shotnoise of all probes in the model
-    fin.monitorAllShotNoise(kat)
+    fin.monitorAllQuantumNoise(kat)
 
     return kat

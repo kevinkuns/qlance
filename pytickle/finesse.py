@@ -439,8 +439,8 @@ def addGouyReadout(kat, name, phaseA, dphaseB=90):
         name + '_B', bs_name + '_bkT', name + '_B', 0, gx=phaseB, gy=phaseB))
 
 
-def monitorShotNoise(kat, probe):
-    """Compute the shot noise of a photodiode
+def monitorQuantumNoise(kat, probe):
+    """Compute the quantum noise of a photodiode
 
     Adds a qnoised detector for a photodiode or a qhd detector
     for a homodyne detector to a finesse model named 'probe_shot'
@@ -451,10 +451,10 @@ def monitorShotNoise(kat, probe):
 
     Examples:
       * To compute the shot noise for the probe 'REFL_DC':
-          monitorShotNoise(kat, 'REFL_DC')
+          monitorQuantumNoise(kat, 'REFL_DC')
       this adds the qshot detector 'REFL_DC_shot'
       * To compute the shot noise for the homodyne detector 'AS_DIFF':
-          monitorShotNoise(kat, 'AS_DIFF')
+          monitorQuantumNoise(kat, 'AS_DIFF')
       this adds the qhd detector 'AS_DIFF_shot'
     """
     name = probe + '_shot'
@@ -477,7 +477,7 @@ def monitorShotNoise(kat, probe):
         raise ValueError(name + ' is not a photodiode or homodyne detector')
 
 
-def monitorAllShotNoise(kat):
+def monitorAllQuantumNoise(kat):
     """Compute the shot noise for all photodiodes in a model
 
     Inputs:
@@ -487,7 +487,7 @@ def monitorAllShotNoise(kat):
         is_pd = isinstance(det, (kdet.pd, kdet.hd))
         is_shot = isinstance(det, (kdet.qnoised, kdet.qshot, kdet.qhd))
         if is_pd and not is_shot:
-            monitorShotNoise(kat, det.name)
+            monitorQuantumNoise(kat, det.name)
 
 
 def monitorMotion(kat, name, dof='pos'):

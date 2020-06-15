@@ -37,8 +37,7 @@ def katFP():
     fin.addSpace(kat, 'Mod_out', 'IX_bk', 0)
 
     fin.addReadout(kat, 'REFL', 'IX_bk', fmod, 0)
-    for det_name in kat.detectors.keys():
-        fin.monitorShotNoise(kat, det_name)
+    fin.monitorAllQuantumNoise(kat)
 
     kat.phase = 2
 
