@@ -14,22 +14,43 @@ class PlantFit(ctrl.Filter):
     Inputs:
       ff: frequency vector of data to be fit [Hz]
       data: plant data to fit
-      args: extra arguments to pass to IIRrational's data2filter fitter
       kwargs: extra keywords to pass to IIRrational's data2filter fitter
+
+    * By default the SNR is set to be 1e5 for all points. This can be
+      overwritten by specifying an array with the 'SNR' keyword.
+    * By default the initial fit order is set to be 20. This can be overwritten
+      with the 'order_initial' keyword.
+
+    Examples:
+      * Find the plant for data tf evaluated at frequency vector ff starting at
+        order 20:
+          plant = PlantFit(ff, tf)
+      * Find the plant starting at order 10:
+          plant = PlantFit(ff, tf, order_initial=10)
     """
-    def __init__(self, ff, data, *args, **kwargs):
+    def __init__(self, ff, data, **kwargs):
         ctrl.Filter.__init__(self, [], [], 0)
         self._ff = ff
         self._data = data
-        snr = 1e5 * np.ones_like(ff)
-        self._fit = data2filter(data=data, F_Hz=ff, SNR=snr, *args, **kwargs)
+
+        if 'SNR' not in kwargs:
+            kwargs['SNR'] = 1e5 * np.ones_like(ff)
+
+        if 'order_initial' not in kwargs:
+            kwargs['order_initial'] = 20
+
+        self._fit = data2filter(data=data, F_Hz=ff, **kwargs)
 
     @property
     def ff(self):
+        """Frequency vector used for the fit
+        """
         return self._ff
 
     @property
     def data(self):
+        """Data used for the fit
+        """
         return self._data
 
     def _set_zpk(self, zs, ps, k, Hz=False):
