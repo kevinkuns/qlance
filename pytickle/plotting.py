@@ -6,8 +6,7 @@ from .utils import mag2db
 # from .gaussian_beams import beam_properties_from_q
 
 
-def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
-           **kwargs):
+def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, **kwargs):
     """Plots a transfer function.
 
     Inputs:
@@ -18,9 +17,6 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
         phase_ax: If not None, existing axis to plot the phase on
             (default: None)
         dB: If True, plots the magnitude in dB (default: False)
-        phase2freq: If true, the transfer function tf/f is plotted instead
-            of tf, which converts a phase TF to a frequency TF
-            (default: False)
         **kwargs: any arguments (color, linestyle, label, etc.) to pass
             to the plot
 
@@ -62,9 +58,6 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, phase2freq=False,
         phase_ax = fig.add_subplot(gs[1], sharex=mag_ax)
     else:
         old_ylims = mag_ax.get_ylim()
-
-    if phase2freq:
-        tf = tf/(1j*ff)
 
     if dB:
         mag_ax.semilogx(ff, mag2db(np.abs(tf)), **kwargs)
