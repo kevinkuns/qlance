@@ -53,6 +53,9 @@ fin.addReadout(kat, 'REFL', 'IX_bk', fmod, 0, dof='pitch')
 fin.monitorMotion(kat, 'EX', dof='pitch')
 fin.monitorMotion(kat, 'IX', dof='pitch')
 
+fin.monitorBeamSpotMotion(kat, 'EX_fr')
+fin.monitorBeamSpotMotion(kat, 'IX_fr')
+
 kat.phase = 2
 kat.maxtem = 1
 
@@ -65,6 +68,7 @@ fmin = 1e-1
 fmax = 30
 npts = 1000
 katTF.run(fmin, fmax, npts, dof='pitch')
+katTF.runDC()
 
 katTF.save('test_torsional_spring.hdf5')
 katTF2 = plant.FinessePlant()
@@ -107,6 +111,18 @@ def test_mMech_IX_EX():
     assert np.allclose(mMech, ref)
 
 
+def test_bsm_EX_IX():
+    bsm = katTF.computeBeamSpotMotion('EX_fr', 'IX', 'pitch')
+    ref = data['bsm_EX_IX']
+    assert np.allclose(bsm, ref)
+
+
+def test_bsm_EX_EX():
+    bsm = katTF.computeBeamSpotMotion('EX_fr', 'EX', 'pitch')
+    ref = data['bsm_EX_EX']
+    assert np.allclose(bsm, ref)
+
+
 ##############################################################################
 # test reloaded plants
 ##############################################################################
@@ -145,3 +161,15 @@ def test_load_mMech_IX_EX():
     mMech = katTF2.getMechMod('IX', 'EX', dof='pitch')
     ref = data['mMech_IX_EX']
     assert np.allclose(mMech, ref)
+
+
+def test_load_bsm_EX_IX():
+    bsm = katTF2.computeBeamSpotMotion('EX_fr', 'IX', 'pitch')
+    ref = data['bsm_EX_IX']
+    assert np.allclose(bsm, ref)
+
+
+def test_load_bsm_EX_EX():
+    bsm = katTF2.computeBeamSpotMotion('EX_fr', 'EX', 'pitch')
+    ref = data['bsm_EX_EX']
+    assert np.allclose(bsm, ref)

@@ -61,6 +61,9 @@ opt.addSink('REFL')
 opt.addLink('IX', 'bk', 'REFL', 'in', 0)
 opt.addReadout('REFL', fmod, 0)
 
+opt.monitorBeamSpotMotion('EX', 'fr')
+opt.monitorBeamSpotMotion('IX', 'fr')
+
 
 HARD = {'IX': -1, 'EX': r}
 SOFT = {'IX': r, 'EX': 1}
@@ -112,6 +115,18 @@ def test_mMech_IX_EX():
     assert np.allclose(mMech, ref)
 
 
+def test_bsm_EX_IX():
+    bsm = opt.computeBeamSpotMotion('EX', 'IX', 'pitch')
+    ref = data['bsm_EX_IX']
+    assert np.allclose(bsm, ref)
+
+
+def test_bsm_EX_EX():
+    bsm = opt.computeBeamSpotMotion('EX', 'EX', 'pitch')
+    ref = data['bsm_EX_EX']
+    assert np.allclose(bsm, ref)
+
+
 ##############################################################################
 # test reloaded plants
 ##############################################################################
@@ -150,3 +165,15 @@ def test_load_mMech_IX_EX():
     mMech = opt2.getMechMod('IX', 'EX', dof='pitch')
     ref = data['mMech_IX_EX']
     assert np.allclose(mMech, ref)
+
+
+def test_load_bsm_EX_IX():
+    bsm = opt2.computeBeamSpotMotion('EX', 'IX', 'pitch')
+    ref = data['bsm_EX_IX']
+    assert np.allclose(bsm, ref)
+
+
+def test_load_bsm_EX_EX():
+    bsm = opt2.computeBeamSpotMotion('EX', 'EX', 'pitch')
+    ref = data['bsm_EX_EX']
+    assert np.allclose(bsm, ref)

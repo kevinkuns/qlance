@@ -347,7 +347,7 @@ class OpticklePlant:
         """Compute the beam spot motion on one optic due to angular motion of another
 
         The beam spot motion must have been monitored by calling monitorBeamSpotMotion
-        before tickling the model.
+        before running the model.
 
         Inputs:
           opticName: name of the optic to compute the BSM on
@@ -569,6 +569,7 @@ class FinessePlant:
         self._probes = []
         self._amp_detectors = []
         self._pos_detectors = []
+        self._bp_detectors = []
         self._freqresp = {}
         self._dcsigs = {}
         self._mechmod = {}
@@ -599,6 +600,12 @@ class FinessePlant:
         """List of position detectors
         """
         return self._pos_detectors
+
+    @property
+    def bp_detectors(self):
+        """List of beam property detectors
+        """
+        return self._bp_detectors
 
     @property
     def ff(self):
@@ -756,6 +763,81 @@ class FinessePlant:
         """
         return self._dcsigs[probeName]
 
+    def computeBeamSpotMotion(self, node, driveName, dof):
+        """Compute the beam spot motion at a node
+
+        The beam spot motion must have been monitored by calling
+        monitorBeamSpotMotion before running the model. Both runDC and run for
+        the degree of interest dof must have been called on the model.
+
+        Inputs:
+          node: name of the node
+          driveName: drive name of the optic from which to compute the BSM from
+          dof: degree of freedom of the optic driving the BSM
+
+        Returns:
+          bsm: the beam spot motion [m/rad]
+
+        Example:
+          To compute the beam spot motion on the front of EX due to pitch
+          motion of IX
+            monitorBeamSpotMotion(kat, 'EX_fr', 'pitch')
+            katFR = KatFR(kat)
+            katFR.runDC()
+            katFR.run(fmin, fmax, npts, dof='pitch')
+            bsm = katFR.computeBeamSpotMotion('EX_fr', 'IX', 'pitch')
+        """
+        if dof == 'pitch':
+            direction = 'y'
+        elif dof == 'yaw':
+            direction = 'x'
+        else:
+            raise ValueError('Unrecognized degree of freedom ' + direction)
+
+        probeName = node + '_bsm_' + direction
+
+        # get TF to monitoring probe power [W/rad]
+        tf = self.getTF(probeName, driveName, dof)
+
+        # DC power on the monitoring probe
+        Pdc = self.getSigDC(node + '_DC')
+
+        # get the beam size on the optic
+        w, _, _, _, _, _ = self.getBeamProperties(node, dof)
+
+        # convert to spot motion [m/rad]
+        bsm = w/Pdc * tf
+        return bsm
+
+    def getBeamProperties(self, node, dof='pitch'):
+        """Compute the properties of a Gaussian beam at a node
+
+        Inputs:
+          node: name of the node
+          dof: which degree of freedom 'pitch' or 'yaw' (Defualt: pitch)
+
+        Returns:
+          w: beam radius on the optic [m]
+          zR: Rayleigh range of the beam [m]
+          z: distance from the beam waist to the optic [m]
+            Negative values indicate that the optic is before the waist.
+          w0: beam waist [m]
+          R: radius of curvature of the phase front on the optic [m]
+          psi: Gouy phase [deg]
+
+        Example:
+          katFR.getBeamProperties('EX_fr')
+        """
+        if dof == 'pitch':
+            direction = 'y'
+        elif dof == 'yaw':
+            direction = 'x'
+        else:
+            raise ValueError('Unrecognized degree of freedom ' + direction)
+
+        qq = self.getSigDC(node + '_bp_' + direction)
+        return beam_properties_from_q(qq, lambda0=self.lambda0)
+
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
                dof='pos', **kwargs):
         """Plot a transfer function.
@@ -829,6 +911,7 @@ class FinessePlant:
         data['probes'] = io.str2byte(self.probes)
         data['amp_detectors'] = io.str2byte(self.amp_detectors)
         data['pos_detectors'] = io.str2byte(self.pos_detectors)
+        data['bp_detectors'] = io.str2byte(self.bp_detectors)
         io.dict_to_hdf5(self._freqresp, 'freqresp', data)
         if len(self._mech_plants) > 0:
             # io.dict_to_hdf5(self.mechmod, 'mechmod',data)
@@ -855,6 +938,7 @@ class FinessePlant:
         self._probes = io.byte2str(data['probes'][()])
         self._amp_detectors = io.byte2str(data['amp_detectors'][()])
         self._pos_detectors = io.byte2str(data['pos_detectors'][()])
+        self._bp_detectors = io.byte2str(data['bp_detectors'][()])
         self._freqresp = io.hdf5_to_dict(data['freqresp'])
         if isinstance(data['mech_plants'], h5py.Group):
             # self.mechmod = io.hdf5_to_dict(data['mechmod'])

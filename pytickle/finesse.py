@@ -520,6 +520,49 @@ def monitorMotion(kat, name, dof='pos'):
     kat.add(kdet.xd(name + '_' + dof, name, mtype))
 
 
+def monitorBeamProperties(kat, node, dof='pitch'):
+    """Monitor the Gaussian beam properties at a node
+
+    Inputs:
+      kat: the finesse model
+      node: name of the node
+      dof: which degree of freedom 'pitch' or 'yaw' (Defualt: pitch)
+    """
+    if dof == 'pitch':
+        direction = 'y'
+    elif dof == 'yaw':
+        direction = 'x'
+    else:
+        raise ValueError('Unrecognized degree of freedom ' + direction)
+
+    name = node + '_bp_' + direction
+    kat.add(kdet.bp(name, direction, 'q', node))
+
+
+def monitorBeamSpotMotion(kat, node, dof='pitch'):
+    """Monitor the beam spot motion at a node
+
+    Inputs:
+      kat: the finesse model
+      node: name of the node
+      dof: which degree of freedom 'pitch' or 'yaw' (Defualt: pitch)
+    """
+    if dof == 'pitch':
+        direction = 'y'
+    elif dof == 'yaw':
+        direction = 'x'
+    else:
+        raise ValueError('Unrecognized degree of freedom ' + direction)
+
+    bpname = node + '_bp_' + direction
+    if bpname not in kat.detectors.keys():
+        monitorBeamProperties(kat, node, dof)
+
+    dcname = node + '_bsm_' + direction
+    addProbe(kat, dcname, node, 0, 0, dof=dof)
+    addProbe(kat, node + '_DC', node, 0, 0, dof='pos')
+
+
 def addModulator(kat, name, fmod, gmod, order, modtype, phase=0):
     """Add a modulator to a finesse model
 
@@ -1126,6 +1169,10 @@ class KatFR(plant.FinessePlant):
         self._pos_detectors = [name for name, det in kat.detectors.items()
                                if isinstance(det, kdet.xd)]
 
+        # populate the list of beam parameter detectors
+        self._bp_detectors = [name for name, det in kat.detectors.items()
+                              if isinstance(det, kdet.bp)]
+
     def runDC(self, verbose=False):
         """Compute the DC signals
 
@@ -1134,10 +1181,12 @@ class KatFR(plant.FinessePlant):
         """
         kat = self.kat.deepcopy()
         set_all_probe_response(kat, 'dc')
+        kat.parse('yaxis re:im')
         kat.noxaxis = True
         kat.verbose = verbose
         out = kat.run()
-        sigs = self.probes + self.amp_detectors + self.pos_detectors
+        sigs = self.probes + self.amp_detectors + self.pos_detectors \
+            + self.bp_detectors
         for sig in sigs:
             self._dcsigs[sig] = out[sig]
 
