@@ -343,14 +343,15 @@ class OpticklePlant:
         probeNum = self.probes.index(probeName)
         return self._sigDC_tickle[probeNum]
 
-    def computeBeamSpotMotion(self, opticName, driveName, dof):
+    def computeBeamSpotMotion(self, opticName, spotPort, driveName, dof):
         """Compute the beam spot motion on one optic due to angular motion of another
 
-        The beam spot motion must have been monitored by calling monitorBeamSpotMotion
-        before running the model.
+        The beam spot motion must have been monitored by calling
+        monitorBeamSpotMotion before running the model.
 
         Inputs:
           opticName: name of the optic to compute the BSM on
+          spotPort: port of the optic to compute the BSM on
           driveName: drive name of the optic from which to compute the BSM from
           dof: degree of freedom of the optic driving the BSM
 
@@ -361,10 +362,10 @@ class OpticklePlant:
           To compute the beam spot motion on the front of EX due to pitch
           motion of IX
             opt.monitorBeamSpotMotion('EX', 'fr')
-            bsm = opt.computeBeamSpotMotion('EX', 'IX', 'pitch')
+            bsm = opt.computeBeamSpotMotion('EX', 'fr', 'IX', 'pitch')
         """
         # figure out monitoring probe information
-        probeName = opticName + '_DC'
+        probeName = '_' + opticName + '_' + spotPort + '_DC'
         # probe_info = self._eval(
         #     "opt.getSinkName(opt.getFieldProbed('{:s}'))".format(probeName), 1)
         field_num = self._topology.get_field_probed(probeName)
@@ -690,7 +691,7 @@ class FinessePlant:
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
 
-        out_det = drive_out + '_' + dof
+        out_det = '_' + drive_out + '_' + dof
         if out_det not in self.pos_detectors:
             raise ValueError(out_det + ' is not a detector in this model')
 
@@ -742,7 +743,8 @@ class FinessePlant:
 
         Returns the quantum noise at a given probe in [W/rtHz]
         """
-        qnoise = list(self._freqresp[dof][probeName + '_shot'].values())[0]
+        shotName = '_' + probeName + '_shot'
+        qnoise = list(self._freqresp[dof][shotName].values())[0]
         # without copying multiple calls will reduce noise
         qnoise = qnoise.copy()
 
@@ -794,13 +796,13 @@ class FinessePlant:
         else:
             raise ValueError('Unrecognized degree of freedom ' + direction)
 
-        probeName = node + '_bsm_' + direction
+        probeName = '_' + node + '_bsm_' + direction
 
         # get TF to monitoring probe power [W/rad]
         tf = self.getTF(probeName, driveName, dof)
 
         # DC power on the monitoring probe
-        Pdc = self.getSigDC(node + '_DC')
+        Pdc = self.getSigDC('_' + node + '_DC')
 
         # get the beam size on the optic
         w, _, _, _, _, _ = self.getBeamProperties(node, dof)
@@ -835,7 +837,7 @@ class FinessePlant:
         else:
             raise ValueError('Unrecognized degree of freedom ' + direction)
 
-        qq = self.getSigDC(node + '_bp_' + direction)
+        qq = self.getSigDC('_' + node + '_bp_' + direction)
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,

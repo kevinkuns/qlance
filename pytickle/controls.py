@@ -716,8 +716,9 @@ class ControlSystem:
                 driveData = drive.split('.')
                 driveName = driveData[0]
                 dofType = driveData[-1]
+                # FIXME: make work with finesse and non-front surfaces
                 drive2bsm[si, di] = self.plant_model.computeBeamSpotMotion(
-                    opticName, driveName, dofType)
+                    opticName, 'fr', driveName, dofType)
 
         self._drive2bsm = drive2bsm
 

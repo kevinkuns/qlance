@@ -457,7 +457,7 @@ def monitorQuantumNoise(kat, probe):
           monitorQuantumNoise(kat, 'AS_DIFF')
       this adds the qhd detector 'AS_DIFF_shot'
     """
-    name = probe + '_shot'
+    name = '_' + probe + '_shot'
     det = kat.detectors[probe]
     if name in kat.detectors.keys():
         print(probe + ' already has a shot noise detector. Skipping.')
@@ -517,7 +517,7 @@ def monitorMotion(kat, name, dof='pos'):
     else:
         raise ValueError('Unrecognized dof ' + dof)
 
-    kat.add(kdet.xd(name + '_' + dof, name, mtype))
+    kat.add(kdet.xd('_' + name + '_' + dof, name, mtype))
 
 
 def monitorBeamProperties(kat, node, dof='pitch'):
@@ -535,7 +535,7 @@ def monitorBeamProperties(kat, node, dof='pitch'):
     else:
         raise ValueError('Unrecognized degree of freedom ' + direction)
 
-    name = node + '_bp_' + direction
+    name = '_' + node + '_bp_' + direction
     kat.add(kdet.bp(name, direction, 'q', node))
 
 
@@ -554,13 +554,13 @@ def monitorBeamSpotMotion(kat, node, dof='pitch'):
     else:
         raise ValueError('Unrecognized degree of freedom ' + direction)
 
-    bpname = node + '_bp_' + direction
+    bpname = '_' + node + '_bp_' + direction
     if bpname not in kat.detectors.keys():
         monitorBeamProperties(kat, node, dof)
 
-    dcname = node + '_bsm_' + direction
+    dcname = '_' + node + '_bsm_' + direction
     addProbe(kat, dcname, node, 0, 0, dof=dof)
-    addProbe(kat, node + '_DC', node, 0, 0, dof='pos')
+    addProbe(kat, '_' + node + '_DC', node, 0, 0, dof='pos')
 
 
 def addModulator(kat, name, fmod, gmod, order, modtype, phase=0):

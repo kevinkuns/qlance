@@ -116,13 +116,13 @@ def test_mMech_IX_EX():
 
 
 def test_bsm_EX_IX():
-    bsm = opt.computeBeamSpotMotion('EX', 'IX', 'pitch')
+    bsm = opt.computeBeamSpotMotion('EX', 'fr', 'IX', 'pitch')
     ref = data['bsm_EX_IX']
     assert np.allclose(bsm, ref)
 
 
 def test_bsm_EX_EX():
-    bsm = opt.computeBeamSpotMotion('EX', 'EX', 'pitch')
+    bsm = opt.computeBeamSpotMotion('EX', 'fr', 'EX', 'pitch')
     ref = data['bsm_EX_EX']
     assert np.allclose(bsm, ref)
 
@@ -168,12 +168,12 @@ def test_load_mMech_IX_EX():
 
 
 def test_load_bsm_EX_IX():
-    bsm = opt2.computeBeamSpotMotion('EX', 'IX', 'pitch')
+    bsm = opt2.computeBeamSpotMotion('EX', 'fr', 'IX', 'pitch')
     ref = data['bsm_EX_IX']
     assert np.allclose(bsm, ref)
 
 
 def test_load_bsm_EX_EX():
-    bsm = opt2.computeBeamSpotMotion('EX', 'EX', 'pitch')
+    bsm = opt2.computeBeamSpotMotion('EX', 'fr', 'EX', 'pitch')
     ref = data['bsm_EX_EX']
     assert np.allclose(bsm, ref)

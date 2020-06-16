@@ -555,8 +555,8 @@ class PyTickle(plant.OpticklePlant):
           To monitor beam spot motion on the front of EX
             opt.monitorBeamSpotMotion('EX', 'fr')
         """
-        # add a sink at the optic 'optic_DC'
-        name = opticName + '_DC'
+        # add a sink at the optic '_optic_spotPort_DC'
+        name = '_' + opticName + '_' + spotPort + '_DC'
         # self.addSink(name)
 
         # add an unphisical probe 'optic_Dc'
