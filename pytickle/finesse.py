@@ -1126,6 +1126,21 @@ class KatFR(plant.FinessePlant):
         self._pos_detectors = [name for name, det in kat.detectors.items()
                                if isinstance(det, kdet.xd)]
 
+    def runDC(self, verbose=False):
+        """Compute the DC signals
+
+        Inputs:
+          verbose: whether to show the finesse progress bar (Default: False)
+        """
+        kat = self.kat.deepcopy()
+        set_all_probe_response(kat, 'dc')
+        kat.noxaxis = True
+        kat.verbose = verbose
+        out = kat.run()
+        sigs = self.probes + self.amp_detectors + self.pos_detectors
+        for sig in sigs:
+            self._dcsigs[sig] = out[sig]
+
     def run(self, fmin, fmax, npts, dof='pos', linlog='log', rtype='both',
                verbose=1):
         """Compute the frequency response

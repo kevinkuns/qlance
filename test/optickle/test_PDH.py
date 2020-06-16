@@ -97,6 +97,18 @@ class TestFreqResp:
         tf = self.opt.getTF('REFL_Q', 'AM', dof='drive')
         assert np.allclose(tf, data['tfQ_amp'])
 
+    def test_DC_DC(self):
+        sig = self.opt.getSigDC('REFL_DC')
+        assert np.isclose(sig, data['dcDC'])
+
+    def test_DC_I(self):
+        sig = self.opt.getSigDC('REFL_I')
+        assert np.isclose(sig, data['dcI'])
+
+    def test_DC_Q(self):
+        sig = self.opt.getSigDC('REFL_Q')
+        assert np.isclose(sig, data['dcQ'])
+
     def test_reload_tfI(self):
         tfI = self.opt2.getTF('REFL_I', 'EX')
         assert np.allclose(tfI, data['tfI'])
@@ -132,6 +144,18 @@ class TestFreqResp:
     def test_reload_ampQ(self):
         tf = self.opt2.getTF('REFL_Q', 'AM', dof='drive')
         assert np.allclose(tf, data['tfQ_amp'])
+
+    def test_reload_DC_DC(self):
+        sig = self.opt2.getSigDC('REFL_DC')
+        assert np.isclose(sig, data['dcDC'])
+
+    def test_reload_DC_I(self):
+        sig = self.opt2.getSigDC('REFL_I')
+        assert np.isclose(sig, data['dcI'])
+
+    def test_reload_DC_Q(self):
+        sig = self.opt2.getSigDC('REFL_Q')
+        assert np.isclose(sig, data['dcQ'])
 
 
 class TestSweep:

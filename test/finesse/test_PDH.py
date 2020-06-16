@@ -50,6 +50,7 @@ class TestFreqResp:
     katFR = fin.KatFR(kat)
     katFR.run(1e-2, 1e4, 1000)
     katFR.run(1e-2, 1e4, 1000, dof='freq')
+    katFR.runDC()
     katFR.run(1e-2, 1e4, 1000, dof='amp')
     katFR.save('test_PDH.hdf5')
     katFR2 = plant.FinessePlant()
@@ -92,6 +93,18 @@ class TestFreqResp:
         tf = self.katFR.getTF('REFL_Q', 'Laser', dof='amp')
         assert np.allclose(tf, data['tfQ_amp'])
 
+    def test_DC_DC(self):
+        sig = self.katFR.getSigDC('REFL_DC')
+        assert np.isclose(sig, data['dcDC'])
+
+    def test_DC_I(self):
+        sig = self.katFR.getSigDC('REFL_I')
+        assert np.isclose(sig, data['dcI'])
+
+    def test_DC_Q(self):
+        sig = self.katFR.getSigDC('REFL_Q')
+        assert np.isclose(sig, data['dcQ'])
+
     def test_reload_tfI(self):
         tfI = self.katFR2.getTF('REFL_I', 'EX')
         assert np.allclose(tfI, data['tfI'])
@@ -127,6 +140,18 @@ class TestFreqResp:
     def test_reload_ampQ(self):
         tf = self.katFR2.getTF('REFL_Q', 'Laser', dof='amp')
         assert np.allclose(tf, data['tfQ_amp'])
+
+    def test_reload_DC_DC(self):
+        sig = self.katFR2.getSigDC('REFL_DC')
+        assert np.isclose(sig, data['dcDC'])
+
+    def test_reload_DC_I(self):
+        sig = self.katFR2.getSigDC('REFL_I')
+        assert np.isclose(sig, data['dcI'])
+
+    def test_reload_DC_Q(self):
+        sig = self.katFR2.getSigDC('REFL_Q')
+        assert np.isclose(sig, data['dcQ'])
 
 
 class TestSweep:

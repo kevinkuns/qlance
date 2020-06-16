@@ -36,26 +36,38 @@ class OpticklePlant:
 
     @property
     def vRF(self):
+        """Vector of RF sidebands computed [Hz]
+        """
         return self._vRF
 
     @property
     def lambda0(self):
+        """Wavelength [m]
+        """
         return self._lambda0
 
     @property
     def pol(self):
+        """Vector of polarizations for each field
+        """
         return self._pol
 
     @property
     def drives(self):
+        """List of drives
+        """
         return self._drives
 
     @property
     def probes(self):
+        """List of probes
+        """
         return self._probes
 
     @property
     def ff(self):
+        """Frequency vector [Hz]
+        """
         return self._ff
 
     def getTF(self, probes, drives, dof='pos', optOnly=False):
@@ -397,6 +409,11 @@ class OpticklePlant:
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     def save(self, fname):
+        """Export data to an hdf5 file
+
+        Inputs:
+          fname: file name to save data to
+        """
         data = h5py.File(fname, 'w')
         self._topology.save(data)
         data['vRF'] = self.vRF
@@ -416,6 +433,11 @@ class OpticklePlant:
         data.close()
 
     def load(self, fname):
+        """Load stored data from an hdf5 file
+
+        Inputs:
+          fname: file name to read from
+        """
         data = h5py.File(fname, 'r')
         self._topology.load(data)
         self._vRF = data['vRF'][()]
@@ -548,6 +570,7 @@ class FinessePlant:
         self._amp_detectors = []
         self._pos_detectors = []
         self._freqresp = {}
+        self._dcsigs = {}
         self._mechmod = {}
         self._mech_plants = {}
         self._ff = None
@@ -555,26 +578,38 @@ class FinessePlant:
 
     @property
     def drives(self):
+        """List of drives
+        """
         return self._drives
 
     @property
     def probes(self):
+        """List of probes: photodiodes and homodyne detectors
+        """
         return self._probes
 
     @property
     def amp_detectors(self):
+        """List of amplitude detectors
+        """
         return self._amp_detectors
 
     @property
     def pos_detectors(self):
+        """List of position detectors
+        """
         return self._pos_detectors
 
     @property
     def ff(self):
+        """Frequency vector [Hz]
+        """
         return self._ff
 
     @property
     def lambda0(self):
+        """Wavelength [m]
+        """
         return self._lambda0
 
     def getTF(self, probes, drives, dof='pos'):
@@ -713,6 +748,14 @@ class FinessePlant:
             print('Warning: some quantum noise spectra are complex')
         return np.real(qnoise)
 
+    def getSigDC(self, probeName):
+        """Get the DC signal from a probe
+
+        Inputs:
+          probeName: name of the probe
+        """
+        return self._dcsigs[probeName]
+
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
                dof='pos', **kwargs):
         """Plot a transfer function.
@@ -777,6 +820,11 @@ class FinessePlant:
             return fig
 
     def save(self, fname):
+        """Export data to an hdf5 file
+
+        Inputs:
+          fname: file name to save data to
+        """
         data = h5py.File(fname, 'w')
         data['probes'] = io.str2byte(self.probes)
         data['amp_detectors'] = io.str2byte(self.amp_detectors)
@@ -789,11 +837,20 @@ class FinessePlant:
         else:
             io.none_to_hdf5('mechmod', 'dict', data)
             io.none_to_hdf5('mech_plants', 'dict', data)
+        if len(self._dcsigs) > 0:
+            io.dict_to_hdf5(self._dcsigs, 'dcsigs', data)
+        else:
+            io.none_to_hdf5('dcsigs', 'dict', data)
         data['ff'] = self.ff
         data['lambda0'] = self.lambda0
         data.close()
 
     def load(self, fname):
+        """Load stored data from an hdf5 file
+
+        Inputs:
+          fname: file name to read from
+        """
         data = h5py.File(fname, 'r')
         self._probes = io.byte2str(data['probes'][()])
         self._amp_detectors = io.byte2str(data['amp_detectors'][()])
@@ -806,6 +863,7 @@ class FinessePlant:
         else:
             self._mechmod = {}
             self._mech_plants = {}
+        self._dcsigs = io.hdf5_to_possible_none('dcsigs', data)
         self._ff = data['ff'][()]
         self._lambda0 = data['lambda0'][()]
         data.close()
