@@ -1057,18 +1057,6 @@ class PyTickle(plant.OpticklePlant):
 
         return poses, sig
 
-    def getSigDC(self, probeName):
-        """Get the DC power on a probe
-
-        Inputs:
-          probeName: the probe name
-
-        Returns:
-          power: the DC power on the probe [W]
-        """
-        probeNum = self.probes.index(probeName)
-        return self._sigDC_tickle[probeNum]
-
     def getDCpower(self, linkStart, linkEnd, fRF=0, lambda0=1064e-9):
         """Get the DC power along a link
 

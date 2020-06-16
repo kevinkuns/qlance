@@ -319,6 +319,18 @@ class OpticklePlant:
         if newFig:
             return fig
 
+    def getSigDC(self, probeName):
+        """Get the DC power on a probe
+
+        Inputs:
+          probeName: the probe name
+
+        Returns:
+          power: the DC power on the probe [W]
+        """
+        probeNum = self.probes.index(probeName)
+        return self._sigDC_tickle[probeNum]
+
     def computeBeamSpotMotion(self, opticName, driveName, dof):
         """Compute the beam spot motion on one optic due to angular motion of another
 
