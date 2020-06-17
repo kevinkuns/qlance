@@ -14,7 +14,7 @@ from .matlab import mat2py, py2mat, str2mat, addOpticklePath
 
 
 class PyTickle(plant.OpticklePlant):
-    """A class for an Optickle model
+    """An Optickle model
 
     Inputs:
       eng: the python matlab engine
@@ -22,17 +22,7 @@ class PyTickle(plant.OpticklePlant):
       vRF: vector of RF frequencies [Hz] (Default: 0)
       lambda0: carrier wavelength [m] (Default: 1064e-9)
       pol: polarization (Default: 'S')
-
-    Attributes:
-      eng: same as input
-      optName: same as input
-      vRF: same as input
-      lambda0: same as input
-      pol: same as input
-      probes: list of probe names associated with the model
-      drives: list of drive names associated with the model
     """
-
     def __init__(self, eng, optName, vRF=0, lambda0=1064e-9, pol='S'):
         plant.OpticklePlant.__init__(self)
         # convert RF and polarization information
@@ -72,10 +62,22 @@ class PyTickle(plant.OpticklePlant):
 
     @property
     def optName(self):
+        """Optickle model name
+        """
         return self._optName
 
     def loadMatModel(self):
         """Loads a matlab model with the same name as this class
+
+        Execute the necessary commands to make the model in the matlab engine
+        and then call loadMatModel to load it into pytickle.
+
+        For example if the optFP.m script makes a model specified by the
+        parameters in parFP.m, to make a pytickle model named opt1:
+            opt1 = PyTickle(eng, 'opt1')
+            eng.eval("par = parFP;", nargout=0)
+            eng.eval("opt1 = optFP(par);", nargout=0)
+            opt1.loadMatModel()
         """
         if self._tickled:
             msg = 'This pytickle model has already been run\n'
@@ -286,6 +288,9 @@ class PyTickle(plant.OpticklePlant):
         Inputs:
           name: name of the laser
           ampRF: amplitude of each RF component [sqrt(W)]
+
+        Example: to add a 10 W laser with all the power in the carrier
+          opt.addSource('Laser', np.sqrt(10)*(vRF == 0))
         """
         if isinstance(ampRF, np.ndarray):
             self.eng.workspace['ampRF'] = py2mat(ampRF)
@@ -673,12 +678,28 @@ class PyTickle(plant.OpticklePlant):
           name: name of the detector
           phase: homodyne phase [deg] (Only relevant if LOpower > 0)
           qe: quantum efficiency of the photodiodes (Default: 1)
-          LOpower: power of the local oscillator.
+          LOpower: power of the local oscillator [W] (Defualt 1)
+            if LOpower=0, no LO is added and a steering mirror is added instead
           freq: which sideband to add the LO to [Hz] (Default: 0, i.e. carrier)
           pol: the LO polarization (Default: S)
           rotateBasis: If true, rotates the homodyne basis (Default: True)
-        """
 
+        Example: Add a homodyne detector AS to sense the signal from SR bk
+          with a 30 deg homodyne angle.
+
+          1) To add with an LO:
+               opt.addHomodyneReadout('AS', 30)
+               opt.addLink('SR', 'bk', 'AS_BS', 'fr', 0)
+
+          2) To use a beam picked off from PR2 bkA as the LO:
+               opt.addHomodyneReadout('AS', LOpower=0)
+               opt.addLink('SR', 'bk', 'AS_BS', 'fr', 0)
+               opt.addLink('PR2', 'bkA', 'AS_LOphase', 'fr', 0)
+               opt.setPosOffset('AS_LOphase', dL)
+             where dL is the microscopic tuning required to get a 30 deg
+             homodyne angle. Probably 30/2 * lambda0 / 360 depending on other
+             tunings in the model.
+        """
         # Add homodyne optics.
         self.addMirror(name + '_BS', Thr=0.5, aoi=45)
         self.addSink(name + '_attnA', 1 - qe)
@@ -716,6 +737,16 @@ class PyTickle(plant.OpticklePlant):
             self.rotateHomodyneBasis(name)
 
     def setHomodynePhase(self, LOname, phase):
+        """Set the phase of a LO used for homodyne detection
+
+        Inputs:
+          LOname: name of the LO
+          phase: homodyne phase [deg]
+
+        Example:
+          To set the phase of the LO AS_LO used in the AS homodyne detector
+            opt.setHomodynePhase('AS_LO', 45)
+        """
         phase = np.pi*(90 - phase)/180
         cmd = "LO = " + self.optName + ".getOptic(" + str2mat(LOname) + ");"
         self._eval(cmd, nargout=0)
@@ -724,6 +755,22 @@ class PyTickle(plant.OpticklePlant):
                    nargout=0)
 
     def rotateHomodyneBasis(self, probes):
+        """Rotate the probe basis to do homodyne detection
+
+        Optickle's probe basis needs to be rotated to do homodyne detection.
+        rotateHomodyneBasis does this by specifying all of the homodyne
+        detectors in a model. If there is only one detector, it's added last,
+        and it's added with addHomodyneReadout with the default rotateBasis=True
+        keyword, this is done automatically.
+
+        Inputs:
+          probes: a string or list of probes
+
+        Example: If there are two homodyne detectors BHD1 and BHD2
+        (so that there are four probes named BHD1_SUM, BHD1_DIFF, BHD2_SUM, and
+        BHD2_DIFF) rotate the basis with
+          opt.rotateHomodyneBasis(['BHD1', 'BHD2'])
+        """
         if isinstance(probes, str):
             probes = [probes]
         mProbeOut = np.identity(len(self.probes))
@@ -881,6 +928,20 @@ class PyTickle(plant.OpticklePlant):
             self.optName + ".setLinkLength(linkNum, linkLen);", nargout=0)
 
     def getFieldBasis(self, optic, port=None, verbose=False):
+        """Get the Gaussian field basis
+
+        Inputs:
+          optic: the optic at which to compute the basis
+          port: the port at which to evaluate the basis
+          verbose: verbosity (Default: False)
+
+        Returns:
+          the complex beam parameter
+
+        Example:
+          To find the basis at the front of EX:
+          opt.getFieldBasis('EX', 'fr')
+        """
         if port:
             qq = self._qq[self._getSinkNum(optic, port)]
             if verbose:
@@ -1154,6 +1215,12 @@ class PyTickle(plant.OpticklePlant):
         return self._eval(cmd, nargout=1)
 
     def _getSinkNum(self, name, port):
+        """Find the number of a sink
+
+        Inputs:
+          name: name of the sink
+          port: sink port
+        """
         cmd = "{:s}.getFieldIn({:s}, {:s})".format(
             self.optName, str2mat(name), str2mat(port))
         sinkNum = self._eval(cmd, nargout=1)

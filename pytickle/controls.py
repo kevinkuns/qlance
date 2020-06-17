@@ -284,18 +284,26 @@ class DegreeOfFreedom:
 
     @property
     def name(self):
+        """DOF name
+        """
         return self._name
 
     @property
     def probes(self):
+        """Dictionary of probes used to sense the DOF
+        """
         return self._probes
 
     @property
     def drives(self):
+        """Dictionary of probes defining the DOF
+        """
         return self._drives
 
     @property
     def dofType(self):
+        """Type of DOF
+        """
         return self._dofType
 
     def probes2dof(self, probeList):
@@ -482,6 +490,17 @@ class Filter:
         return fig
 
     def to_hdf5(self, path, h5file):
+        """Save a filter to an hdf5 file
+
+        Inputs:
+          path: full path where to save the filter
+          h5file: the hdf5file
+
+        Example:
+          To save the filter filt to an hdf5 file 'data.hdf5':
+          h5file = h5py.File('data.hdf5', 'w')
+          filt.to_hdf5('filt', h5file)
+        """
         zs, ps, k = self.get_zpk(Hz=False)
         io.possible_none_to_hdf5(zs, path + '/zs', h5file)
         io.possible_none_to_hdf5(ps, path + '/ps', h5file)
@@ -489,7 +508,7 @@ class Filter:
 
 
 class ControlSystem:
-    """A class for a general MIMO control system
+    """A general MIMO control system
     """
     def __init__(self):
         self._plant_model = None
@@ -513,26 +532,38 @@ class ControlSystem:
 
     @property
     def plant_model(self):
+        """The Optickle or Finesse optomechanical plant
+        """
         return self._plant_model
 
     @property
     def ff(self):
+        """Frequency vector [Hz]
+        """
         return self.plant_model.ff
 
     @property
     def ss(self):
+        """Imaginary frequency vector [rad/s]
+        """
         return 2j*np.pi*self.ff
 
     @property
     def dofs(self):
+        """Dictionary of degrees of freedom
+        """
         return self._dofs
 
     @property
     def probes(self):
+        """List of probes
+        """
         return self._probes
 
     @property
     def drives(self):
+        """List of drives
+        """
         return self._drives
 
     def setOptomechanicalPlant(self, plant_model):

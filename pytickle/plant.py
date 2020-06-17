@@ -14,6 +14,8 @@ from .gaussian_beams import beam_properties_from_q
 
 
 class OpticklePlant:
+    """An Optickle optomechanical plant
+    """
     def __init__(self):
         self._topology = OptickleTopology()
         self._vRF = None
@@ -564,6 +566,8 @@ class OptickleTopology:
 
 
 class FinessePlant:
+    """A Finesse Optomechanical plant
+    """
     def __init__(self):
         self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
         self._drives = []

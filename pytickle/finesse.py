@@ -369,6 +369,46 @@ def addReadout(
 
 
 def addHomodyneReadout(kat, name, phase=0, qe=1, LOpower=1):
+    """Add a balanced homodyne detector to a Finesse model
+
+    * Adds a beamsplitter 'name_BS' and two photodiodes 'name_DIFF' and
+    'name_SUM' to measure the difference and sum, respectively.
+
+    * The signal should be connected to the node 'name_BS_frI'
+
+    * The local oscillator can be added in one of two ways:
+    1) Explicitly adding a laser to use as the LO. The phase of this
+       laser then controls the homodyne angle and can be changed later
+       with setHomodynePhase.
+
+    2) A signal can be picked off from somewhere else in the model to
+       serve as the LO. In this case an extra steering mirror 'name_LOphase'
+       is added to the model. The microscopic tuning of this mirror controls
+       the homodyne phase. This signal should be connected to the node
+       'name_LOphase_frI'
+
+    Inputs:
+      kat: the finesse model
+      name: name of the detector
+      phase: homodyne phase [deg] (Only relevant if LOpower > 0)
+      qe: quantum efficiency of the photodiodes (Default: 1)
+      LOpower: power of the local oscillator [W] (Default: 1)
+        if LOpower=0, no LO is added and a steering mirror is added instead
+
+    Example: Add a homodyne detector AS to sense the signal from SR_bk
+      with a 30 deg homodyne angle.
+
+      1) To add with an LO:
+           addHomodyneReadout(kat, 'AS', 30)
+           addSpace(kat, 'SR_bk', 'AS_BS_frI', 0)
+
+      2) To use a beam picked off from PR2_bkT as the LO:
+           addHomodyneReadout(kat, 'AS', LOpower=0)
+           addSpace(kat, 'SR_bk', 'AS_BS_frI', 0)
+           addSpace(kat, 'PR2_bkT', 'AS_LOphase_frI', 0)
+           AS_LOphase.phi = theta
+         where theta is the tuning required to get a 30 deg homodyne angle
+    """
     # Add homodyne beamsplitter
     addBeamSplitter(kat, name + '_BS', Thr=0.5, aoi=45)
 
@@ -398,6 +438,17 @@ def addHomodyneReadout(kat, name, phase=0, qe=1, LOpower=1):
 
 
 def setHomodynePhase(kat, LOname, phase):
+    """Set the phase of a LO used for homodyne detection
+
+    Inputs:
+      kat: the finesse model
+      LOname: name of the LO
+      phase: homodyne phase [deg]
+
+    Example:
+      To set the phase of the LO AS_LO used in the AS homodyne detector
+        setHomodynePhase(kat, 'AS_LO', 45)
+    """
     kat.components[LOname].phase = phase
 
 
@@ -1385,10 +1436,14 @@ class KatSweep:
 
     @property
     def drives(self):
+        """Dictionary of drives
+        """
         return self._drives
 
     @property
     def dof(self):
+        """Type of degree of freedom
+        """
         return self._dof
 
     def sweep(
