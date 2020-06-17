@@ -10,7 +10,7 @@ from . import utils
 from . import io
 import h5py
 from numbers import Number
-from .gaussian_beams import beam_properties_from_q
+from .utils import beam_properties_from_q
 
 
 class OpticklePlant:
