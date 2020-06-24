@@ -407,7 +407,10 @@ class OpticklePlant:
         Example:
           opt.getBeamProperties('EX', 'fr')
         """
-        # qq = self._qq[self._getSinkNum(name, port)]
+        if self._qq is None:
+            raise RuntimeError(
+                'Beam properties cannot be computed if a pitch or yaw response'
+                + ' has not been calculated and an HG basis has not been set.')
         qq = self._qq[self._topology.get_sink_num(name, port)]
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
