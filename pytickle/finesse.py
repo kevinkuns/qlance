@@ -1202,6 +1202,7 @@ class KatFR(plant.FinessePlant):
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'fr')
         self._lambda0 = self.kat.lambda0
+        self.kat.noxaxis = False
 
         # populate the list of drives if necessary
         if all_drives:
