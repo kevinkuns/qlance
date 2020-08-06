@@ -12,6 +12,7 @@ from functools import partial
 from numbers import Number
 from itertools import cycle, zip_longest
 import scipy.signal as sig
+import IIRrational.AAA as AAA
 import matplotlib.pyplot as plt
 from . import plotting
 
@@ -956,6 +957,22 @@ class ControlSystem:
         ugf, pm = compute_phase_margin(self.ff, oltf)
         fms, sm = compute_stability_margin(self.ff, cltf)
         return ugf, pm, fms, sm
+
+    def check_stability(self, tstpnt):
+        """Check the stability of all of the loops
+
+        Inputs:
+          tstpnt: test point
+        """
+        stability = OrderedDict()
+        for dof in self.dofs.keys():
+            cltf = self.getCLTF(dof, dof, tstpnt)
+            fit = AAA.tfAAA(self.ff, cltf)
+            z, p, k = fit.zpk
+            stability[dof] = np.all(np.real(p) < 0)
+
+        for dof, stab in stability.items():
+            print(dof, stab)
 
     def print_margins(self, tstpnt):
         """Print the stability margins for all loops
