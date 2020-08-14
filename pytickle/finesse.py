@@ -279,7 +279,7 @@ def _add_generic_probe(kat, name, node, freq, phase, probe_type, freqresp=True,
 
 
 def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
-             dof='pos'):
+             doftype='pos'):
     """Add a probe to a finesse model
 
     Inputs:
@@ -291,25 +291,25 @@ def addProbe(kat, name, node, freq, phase, freqresp=True, alternate_beam=False,
       freqresp: if True, the probe is used for a frequency response
         measurement (Default: True)
       alternate_beam: if True, the alternate beam is probed (Default: False)
-      dof: which DOF is probed: pos, pitch, or yaw (Default: pos)
+      doftype: which DOF is probed: pos, pitch, or yaw (Default: pos)
 
     Examples:
       * addProbe(kat, 'REFL_DC', 'REFL_in', 0, 0)
       adds the DC probe 'REFL_DC' to the node 'REFL_in'
-      * addProbe(kat, 'REFL_Q', 'REFL_in', fmod, 90, dof='pitch')
+      * addProbe(kat, 'REFL_Q', 'REFL_in', fmod, 90, doftype='pitch')
       adds the RF probe 'REFL_Q' demodulated at fmod with phase 90
       to sense pitch motion
     """
-    if dof not in ['pos', 'pitch', 'yaw']:
-        raise ValueError('Unrecognized dof ' + dof)
+    if doftype not in ['pos', 'pitch', 'yaw']:
+        raise ValueError('Unrecognized doftype ' + doftype)
 
-    _add_generic_probe(kat, name, node, freq, phase, dof, freqresp=freqresp,
+    _add_generic_probe(kat, name, node, freq, phase, doftype, freqresp=freqresp,
                        alternate_beam=alternate_beam)
 
 
 def addReadout(
         kat, name, node, freqs, phases, freqresp=True, alternate_beam=False,
-        dof='pos', fnames=None):
+        doftype='pos', fnames=None):
     """Add RF and DC probes to a detection port
 
     Inputs:
@@ -320,7 +320,7 @@ def addReadout(
       phases: demodulation phases [deg]
       freqresp: same as for add_probe
       alternate_beam: same as for add_probe
-      dof: same as for add_probe
+      doftype: same as for add_probe
       fnames: suffixes for RF probe names (Optional)
         If blank and there are multiple demod frequencies, the suffixes
         1, 2, 3, ... are added
@@ -356,16 +356,16 @@ def addReadout(
 
     # Add the probes
     addProbe(kat, name + '_DC', node, 0, 0, freqresp=freqresp,
-             alternate_beam=alternate_beam, dof=dof)
+             alternate_beam=alternate_beam, doftype=doftype)
     for freq, phase, fname in zip(freqs, phases, fnames):
         nameI = name + '_I' + fname
         nameQ = name + '_Q' + fname
         addProbe(
             kat, nameI, node, freq, phase, freqresp=freqresp,
-            alternate_beam=alternate_beam, dof=dof)
+            alternate_beam=alternate_beam, doftype=doftype)
         addProbe(
             kat, nameQ, node, freq, phase + 90, freqresp=freqresp,
-            alternate_beam=alternate_beam, dof=dof)
+            alternate_beam=alternate_beam, doftype=doftype)
 
 
 def addHomodyneReadout(kat, name, phase=0, qe=1, LOpower=1):
@@ -541,15 +541,15 @@ def monitorAllQuantumNoise(kat):
             monitorQuantumNoise(kat, det.name)
 
 
-def monitorMotion(kat, name, dof='pos'):
+def monitorMotion(kat, name, doftype='pos'):
     """Monitor the motion of an optic
 
-    Adds a motion detector to a finesse model named 'name_dof'
+    Adds a motion detector to a finesse model named 'name_doftype'
 
     Inputs:
       kat: the finesse model
       name: name of the optic
-      dof: what type of motion to measured: pos, pitch, or yaw (Default: pos)
+      doftype: what type of motion to measured: pos, pitch, or yaw (Default: pos)
 
     Examples:
       * To monitor the mechanical response of the mirror 'EX':
@@ -559,29 +559,29 @@ def monitorMotion(kat, name, dof='pos'):
           monitorMotion(kat, 'IX', 'pitch')
         this adds the xd detector 'IX_pitch'
     """
-    if dof == 'pos':
+    if doftype == 'pos':
         mtype = 'z'
-    elif dof == 'pitch':
+    elif doftype == 'pitch':
         mtype = 'ry'
-    elif dof == 'yaw':
+    elif doftype == 'yaw':
         mtype = 'rx'
     else:
-        raise ValueError('Unrecognized dof ' + dof)
+        raise ValueError('Unrecognized doftype ' + doftype)
 
-    kat.add(kdet.xd('_' + name + '_' + dof, name, mtype))
+    kat.add(kdet.xd('_' + name + '_' + doftype, name, mtype))
 
 
-def monitorBeamProperties(kat, node, dof='pitch'):
+def monitorBeamProperties(kat, node, doftype='pitch'):
     """Monitor the Gaussian beam properties at a node
 
     Inputs:
       kat: the finesse model
       node: name of the node
-      dof: which degree of freedom 'pitch' or 'yaw' (Defualt: pitch)
+      doftype: which degree of freedom 'pitch' or 'yaw' (Defualt: pitch)
     """
-    if dof == 'pitch':
+    if doftype == 'pitch':
         direction = 'y'
-    elif dof == 'yaw':
+    elif doftype == 'yaw':
         direction = 'x'
     else:
         raise ValueError('Unrecognized degree of freedom ' + direction)
@@ -590,28 +590,28 @@ def monitorBeamProperties(kat, node, dof='pitch'):
     kat.add(kdet.bp(name, direction, 'q', node))
 
 
-def monitorBeamSpotMotion(kat, node, dof='pitch'):
+def monitorBeamSpotMotion(kat, node, doftype='pitch'):
     """Monitor the beam spot motion at a node
 
     Inputs:
       kat: the finesse model
       node: name of the node
-      dof: which degree of freedom 'pitch' or 'yaw' (Defualt: pitch)
+      doftype: which degree of freedom 'pitch' or 'yaw' (Defualt: pitch)
     """
-    if dof == 'pitch':
+    if doftype == 'pitch':
         direction = 'y'
-    elif dof == 'yaw':
+    elif doftype == 'yaw':
         direction = 'x'
     else:
         raise ValueError('Unrecognized degree of freedom ' + direction)
 
     bpname = '_' + node + '_bp_' + direction
     if bpname not in kat.detectors.keys():
-        monitorBeamProperties(kat, node, dof)
+        monitorBeamProperties(kat, node, doftype)
 
     dcname = '_' + node + '_bsm_' + direction
-    addProbe(kat, dcname, node, 0, 0, dof=dof)
-    addProbe(kat, '_' + node + '_DC', node, 0, 0, dof='pos')
+    addProbe(kat, dcname, node, 0, 0, doftype=doftype)
+    addProbe(kat, '_' + node + '_DC', node, 0, 0, doftype='pos')
 
 
 def addModulator(kat, name, fmod, gmod, order, modtype, phase=0):
@@ -848,69 +848,69 @@ def set_all_probe_response(kat, resp):
             set_probe_response(kat, det.name, resp)
 
 
-def get_drive_dof(kat, drive, dof, force=False):
+def get_drive_dof(kat, drive, doftype, force=False):
     """Return the component for a given degree of freedom
 
     Inputs:
       kat: the finesse model
       drive: the name of the drive
-      dof: which DOF to drive pos, pitch, or yaw
+      doftype: which DOF to drive pos, pitch, or yaw
       force: if True a force or torque is applied instead of the motion
         (Default: False)
 
     Returns:
       the component
     """
-    if dof not in ['pos', 'pitch', 'yaw', 'amp', 'freq', 'len']:
-        raise ValueError('Unrecognized dof ' + dof)
+    if doftype not in ['pos', 'pitch', 'yaw', 'amp', 'freq', 'len']:
+        raise ValueError('Unrecognized doftype ' + doftype)
 
     if force:
-        if dof == 'pos':
+        if doftype == 'pos':
             return kat.components[drive].Fz
-        elif dof == 'pitch':
+        elif doftype == 'pitch':
             return kat.components[drive].Fry
-        elif dof == 'yaw':
+        elif doftype == 'yaw':
             return kat.components[drive].Frx
-        elif dof == 'amp':
+        elif doftype == 'amp':
             return kat.components[drive].P
-        elif dof == 'freq':
+        elif doftype == 'freq':
             return kat.components[drive].f
-        elif dof == 'len':
+        elif doftype == 'len':
             return kat.components[drive].L
 
     else:
-        if dof == 'pos':
+        if doftype == 'pos':
             return kat.components[drive].phi
-        elif dof == 'pitch':
+        elif doftype == 'pitch':
             return kat.components[drive].ybeta
-        elif dof == 'yaw':
+        elif doftype == 'yaw':
             return kat.components[drive].xbeta
-        elif dof == 'amp':
+        elif doftype == 'amp':
             return kat.components[drive].P
-        elif dof == 'freq':
+        elif doftype == 'freq':
             return kat.components[drive].f
-        elif dof == 'len':
+        elif doftype == 'len':
             return kat.components[drive].L
 
 
-def has_dof(kat, drive, dof):
+def has_dof(kat, drive, doftype):
     """Check whether a component has a given degree of freedom
     """
     comp = kat.components[drive]
-    if dof in ['pos', 'pitch', 'yaw']:
+    if doftype in ['pos', 'pitch', 'yaw']:
         if isinstance(comp, (kcmp.mirror, kcmp.beamSplitter)):
             return True
         else:
             return False
 
-    elif dof in ['amp', 'freq']:
+    elif doftype in ['amp', 'freq']:
         if isinstance(comp, kcmp.laser):
             return True
         else:
             return False
 
 
-def extract_zpk(comp, dof):
+def extract_zpk(comp, doftype):
     """Extract the zpk of a mechanical transfer function for a kat component
 
     Extracts the zeros, poles, and gain of the longitudinal, pitch, or yaw
@@ -920,7 +920,7 @@ def extract_zpk(comp, dof):
 
     Inputs:
       comp: the component
-      dof: the degree of freedom (pos, pitch, or yaw)
+      doftype: the degree of freedom (pos, pitch, or yaw)
 
     Returns:
       zs: the zeros
@@ -931,25 +931,25 @@ def extract_zpk(comp, dof):
       extract_zpk(kat.EX, 'pos')
       extract_zpk(kat.components['IX'], 'pitch')
     """
-    if dof == 'pos':
+    if doftype == 'pos':
         tf = comp.zmech.value
-    elif dof == 'pitch':
+    elif doftype == 'pitch':
         tf = comp.rymech.value
-    elif dof == 'yaw':
+    elif doftype == 'yaw':
         tf = comp.rxmech.value
     else:
-        raise ValueError('Unrecognized dof ' + dof)
+        raise ValueError('Unrecognized doftype ' + doftype)
 
     if tf is None:
         # There's no mechanical transfer function defined, so the response is
         # either 1/(M Omega^2) for pos or 1/(I Omega^2) for pitch or yaw
         zs = []
         ps = [0, 0]
-        if dof == 'pos':
+        if doftype == 'pos':
             kinv = comp.mass.value
-        elif dof == 'pitch':
+        elif doftype == 'pitch':
             kinv = comp.Iy.value
-        elif dof == 'yaw':
+        elif doftype == 'yaw':
             kinv = comp.Ix.value
 
         if kinv is None:
@@ -979,7 +979,7 @@ def extract_zpk(comp, dof):
     return zs, ps, k
 
 
-def setMechTF(kat, name, zs, ps, k, dof='pos'):
+def setMechTF(kat, name, zs, ps, k, doftype='pos'):
     """Set the mechanical transfer function of an optic
 
     The transfer function is from radiation pressure to one of the degrees
@@ -996,10 +996,10 @@ def setMechTF(kat, name, zs, ps, k, dof='pos'):
       zs: the zeros
       ps: the poles
       k: the gain
-      dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+      doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
     """
     # define the transfer function and add it to the model
-    tf_name = '{:s}TF_{:s}'.format(dof, name)
+    tf_name = '{:s}TF_{:s}'.format(doftype, name)
     tf = kcmd.tf2(tf_name)
     for z in remove_conjugates(zs):
         tf.addZero(z)
@@ -1012,17 +1012,17 @@ def setMechTF(kat, name, zs, ps, k, dof='pos'):
     # masses and moments of inertia must be set to 1 for the gain to be correct
     comp = kat.components[name]
 
-    if dof == 'pos':
+    if doftype == 'pos':
         comp.mass = 1
         comp.zmech = tf
-    elif dof == 'pitch':
+    elif doftype == 'pitch':
         comp.Iy = 1
         comp.rymech = tf
-    elif dof == 'yaw':
+    elif doftype == 'yaw':
         comp.Ix = 1
         comp.rxmech = tf
     else:
-        raise ValueError('Unrecognized dof ' + dof)
+        raise ValueError('Unrecognized doftype ' + doftype)
 
 
 def setCavityBasis(kat, node_name1, node_name2):
@@ -1080,7 +1080,7 @@ def setCavityBasis(kat, node_name1, node_name2):
     kat.add(kcmd.cavity(cav_name, mirr1, node1, mirr2, node2))
 
 
-def add_lock(kat, name, probe, drive, gain, tol, offset=0, dof='pos'):
+def add_lock(kat, name, probe, drive, gain, tol, offset=0, doftype='pos'):
     """Add a lock to a finesse model
 
     Inputs:
@@ -1091,7 +1091,7 @@ def add_lock(kat, name, probe, drive, gain, tol, offset=0, dof='pos'):
       gain: gain of the lock
       tol: tolerance (or accuracy) of the lock
       offset: offset in the error point (Default: 0)
-      dof: degree of freedom to drive (Default 'pos')
+      doftype: degree of freedom to drive (Default 'pos')
     """
     # FIXME: add functionality for linear combinations of probes and drives
     if probe not in kat.detectors.keys():
@@ -1105,7 +1105,7 @@ def add_lock(kat, name, probe, drive, gain, tol, offset=0, dof='pos'):
     func = '${0}_err0 + ({1}) * ({2})'.format(name, off_sign, off_abs)
     kat.add(kcmd.func(name + '_err', func))
     kat.add(kcmd.lock(lock_name, err_sig, gain, tol))
-    comp = get_drive_dof(kat, drive, dof, force=False)
+    comp = get_drive_dof(kat, drive, doftype, force=False)
     comp.put(kat.commands[lock_name].output)
 
 
@@ -1120,9 +1120,9 @@ def remove_all_locks(kat):
             cmd.remove()
 
 
-def set_tunings(kat, tunings, dof='pos'):
+def set_tunings(kat, tunings, doftype='pos'):
     for drive, pos in tunings.items():
-        comp = get_drive_dof(kat, drive, dof, force=False)
+        comp = get_drive_dof(kat, drive, doftype, force=False)
         comp.value = pos
 
 
@@ -1242,7 +1242,7 @@ class KatFR(plant.FinessePlant):
         for sig in sigs:
             self._dcsigs[sig] = out[sig]
 
-    def run(self, fmin, fmax, npts, dof='pos', linlog='log', rtype='both',
+    def run(self, fmin, fmax, npts, doftype='pos', linlog='log', rtype='both',
                verbose=1):
         """Compute the frequency response
 
@@ -1250,7 +1250,7 @@ class KatFR(plant.FinessePlant):
           fmin: minimum frequency [Hz]
           fmax: maximum frequency [Hz]
           npts: number of frequency points to compute
-          dof: which degree of freedom to compute (Default: pos)
+          doftype: which degree of freedom to compute (Default: pos)
           linlog: if 'log' the frequency vector is log spaced
             if 'lin' the vector is linearly spaced (Default 'log')
           rtype: what response type to calculate (Default: 'both')
@@ -1265,22 +1265,22 @@ class KatFR(plant.FinessePlant):
         ############################################################
         # Initialize response dictionaries
         ############################################################
-        if dof not in self._dofs:
-            raise ValueError('Unrecognized dof ' + dof)
+        if doftype not in self._doftypes:
+            raise ValueError('Unrecognized doftype ' + doftype)
 
         if rtype not in ['opt', 'mech', 'both']:
             raise ValueError('Unrecognized response type ' + rtype)
 
         # list of all drives with this degree of freedom
         drives = [drive for drive in self.drives if has_dof(
-            self.kat, drive, dof)]
+            self.kat, drive, doftype)]
 
         if rtype in ['opt', 'both']:
-            self._freqresp[dof] = {probe: {} for probe in self.probes}
+            self._freqresp[doftype] = {probe: {} for probe in self.probes}
         if rtype in ['mech', 'both']:
-            self._mech_plants[dof] = {}
+            self._mech_plants[doftype] = {}
             if self.pos_detectors:
-                self._mechmod[dof] = {drive: {} for drive in self.pos_detectors}
+                self._mechmod[doftype] = {drive: {} for drive in self.pos_detectors}
 
         ############################################################
         # Loop through the drives and compute the response for each
@@ -1331,14 +1331,14 @@ class KatFR(plant.FinessePlant):
 
                 # run the simulation
                 kat_opt.signals.apply(
-                    get_drive_dof(kat, drive, dof, force=False), 1, 0)
-                if dof == 'pos':
+                    get_drive_dof(kat, drive, doftype, force=False), 1, 0)
+                if doftype == 'pos':
                     kat_opt.parse('scale meter')
                 out = kat_opt.run()
 
                 # store the results
                 for probe in self.probes:
-                    self._freqresp[dof][probe][drive] = out[probe]
+                    self._freqresp[doftype][probe][drive] = out[probe]
 
             ############################################################
             # compute the radiation pressure loop suppression function
@@ -1348,22 +1348,22 @@ class KatFR(plant.FinessePlant):
 
                 # run the simulation
                 kat_mech.signals.apply(
-                    get_drive_dof(kat, drive, dof, force=True), 1, 0)
+                    get_drive_dof(kat, drive, doftype, force=True), 1, 0)
                 out = kat_mech.run()
 
                 # extract the mechanical plant for this drive
                 comp = kat_mech.components[drive]
-                if dof in ['pos', 'pitch', 'yaw']:
-                    plant = ctrl.Filter(*extract_zpk(comp, dof), Hz=False)
-                    self._mech_plants[dof][drive] = plant
+                if doftype in ['pos', 'pitch', 'yaw']:
+                    plant = ctrl.Filter(*extract_zpk(comp, doftype), Hz=False)
+                    self._mech_plants[doftype][drive] = plant
                     tf = plant.computeFilter(out.x)
                 else:
-                    self._mech_plants[dof][drive] = ctrl.Filter([], [], 1)
+                    self._mech_plants[doftype][drive] = ctrl.Filter([], [], 1)
                     tf = np.ones_like(out.x)
 
                 # store the results
                 for drive_out in self.pos_detectors:
-                    self._mechmod[dof][drive_out][drive] = out[drive_out] / tf
+                    self._mechmod[doftype][drive_out][drive] = out[drive_out] / tf
 
             if verbose:
                 pbar.update()
@@ -1405,7 +1405,7 @@ class KatSweep:
     Inputs:
       kat: the finesse model
       drives: which drives to sweep
-      dof: degree of freedom to sweep (Default: pos)
+      doftype: degree of freedom to sweep (Default: pos)
       relative: if True drives are swept around the operating point instead
         of the absolute value of the drive. (Default: True)
 
@@ -1418,13 +1418,13 @@ class KatSweep:
         katSweep2.sweep(-10, 10, 100)
       will compute the DC response for tunings from -10 to 10 deg.
     """
-    def __init__(self, kat, drives, dof='pos', relative=True):
+    def __init__(self, kat, drives, doftype='pos', relative=True):
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'dc')
         self._drives = drives
         if isinstance(self._drives, str):
             self._drives = {self._drives: 1}
-        self._dof = dof
+        self._doftype = doftype
         self._sigs = dict.fromkeys(kat.detectors)
         self._lock_sigs = {}
         for cmd in self.kat.commands.values():
@@ -1442,10 +1442,10 @@ class KatSweep:
         return self._drives
 
     @property
-    def dof(self):
+    def doftype(self):
         """Type of degree of freedom
         """
-        return self._dof
+        return self._doftype
 
     def sweep(
             self, spos, epos, npts, linlog='lin', verbose=False, debug=False):
@@ -1466,7 +1466,7 @@ class KatSweep:
         kat.add(kcmd.xaxis(linlog, [spos, epos], 're', npts, comp='sweep'))
 
         for drive, coeff in self._drives.items():
-            comp = get_drive_dof(kat, drive, self._dof, force=False)
+            comp = get_drive_dof(kat, drive, self._doftype, force=False)
 
             if self._relative:
                 self._offsets[drive] = comp.value

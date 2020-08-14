@@ -88,7 +88,7 @@ class PyTickle(plant.OpticklePlant):
         # FIXME: add polarization
         self._updateNames()
 
-    def run(self, ff=None, noise=True, dof='pos'):
+    def run(self, ff=None, noise=True, doftype='pos'):
         """Compute the optomechanical response and quantum noise
 
         Computes the optomechanical response and quantum noise of this model
@@ -101,7 +101,7 @@ class PyTickle(plant.OpticklePlant):
             which reduces runtime if the AC signals are not needed.
           noise: If False, the quantum noise is not computed which can decrease
             runtime. (Default: True)
-          dof: which degree of freedom or mode to compute the response for:
+          doftype: which degree of freedom or mode to compute the response for:
             pos: position or TEM00 mode
             pitch: pitch or TEM01 mode
             yaw: yaw or TEM10 mode
@@ -126,31 +126,31 @@ class PyTickle(plant.OpticklePlant):
             else:
                 output = "[fDC, sigDC_tickle, mOpt, mMech]"
             cmd = "{:s} = {:s}.tickle2([], f, {:d});".format(
-                output, self.optName, self._dof2opt(dof))
+                output, self.optName, self._doftype2opt(doftype))
 
             self._eval(cmd, nargout=0)
             self._eval("sigAC = getProdTF(mOpt, mMech);", nargout=0)
 
             self._fDC = mat2py(self.eng.workspace['fDC'])
             self._sigDC_tickle = mat2py(self.eng.workspace['sigDC_tickle'])
-            self._mOpt[dof] = mat2py(self.eng.workspace['mOpt'])
-            self._sigAC[dof] = mat2py(self.eng.workspace['sigAC'])
-            self._mMech[dof] = mat2py(self.eng.workspace['mMech'])
+            self._mOpt[doftype] = mat2py(self.eng.workspace['mOpt'])
+            self._sigAC[doftype] = mat2py(self.eng.workspace['sigAC'])
+            self._mMech[doftype] = mat2py(self.eng.workspace['mMech'])
             if noise:
-                self._noiseAC[dof] = mat2py(
+                self._noiseAC[doftype] = mat2py(
                     self.eng.workspace['noiseAC'])
 
             # get the mechanical plants
-            self._mech_plants[dof] = dict()
+            self._mech_plants[doftype] = dict()
             for drive in self.drives:
                 drive_name = drive.split('.')[0]
-                # zs, ps, k = self.extract_zpk(drive_name, dof=dof)
-                # self._mech_plants[dof][drive_name] = dict(zs=zs, ps=ps, k=k)
-                self._mech_plants[dof][drive_name] = ctrl.Filter(
-                    *self.extract_zpk(drive_name, dof=dof), Hz=False)
+                # zs, ps, k = self.extract_zpk(drive_name, doftype=doftype)
+                # self._mech_plants[doftype][drive_name] = dict(zs=zs, ps=ps, k=k)
+                self._mech_plants[doftype][drive_name] = ctrl.Filter(
+                    *self.extract_zpk(drive_name, doftype=doftype), Hz=False)
 
-        # get the field basis if the dof is pitch or yaw
-        if dof in ['pitch', 'yaw']:
+        # get the field basis if the doftype is pitch or yaw
+        if doftype in ['pitch', 'yaw']:
             self._qq = mat2py(
                 self._eval(self.optName + ".getAllFieldBases()", 1))[:, -1]
 
@@ -579,7 +579,7 @@ class PyTickle(plant.OpticklePlant):
         cmd += ", " + str(dist) + ");"
         self._eval(cmd, nargout=0)
 
-    def setMechTF(self, name, z, p, k, dof='pos'):
+    def setMechTF(self, name, z, p, k, doftype='pos'):
         """Set the mechanical transfer function of an optic
 
         The transfer function is from radiation pressure to one of the degrees
@@ -592,9 +592,9 @@ class PyTickle(plant.OpticklePlant):
           z: zeros
           p: poles
           k: gain
-          dof: degree of freedom: pos, pitch, or yaw (default: pos)
+          doftype: degree of freedom: pos, pitch, or yaw (default: pos)
         """
-        nDOF = self._dof2opt(dof)
+        nDOF = self._doftype2opt(doftype)
 
         self.eng.workspace['z'] = py2mat(z, is_complex=True)
         self.eng.workspace['p'] = py2mat(p, is_complex=True)
@@ -605,7 +605,7 @@ class PyTickle(plant.OpticklePlant):
         cmd = self.optName + ".setMechTF(" + str2mat(name) + ", tf, nDOF);"
         self._eval(cmd, nargout=0)
 
-    def extract_zpk(self, name, dof='pos'):
+    def extract_zpk(self, name, doftype='pos'):
         """Get the mechanical transfer function of an optic
 
         Returns the zeros, poles, and gain of the mechanical transfer function
@@ -615,7 +615,7 @@ class PyTickle(plant.OpticklePlant):
 
         Inputs:
           name: name of the optic
-          dof: degree of freedom: pos, pitch, or yaw (defualt: pos)
+          doftype: degree of freedom: pos, pitch, or yaw (defualt: pos)
 
         Returns:
           zs: the zeros
@@ -624,14 +624,14 @@ class PyTickle(plant.OpticklePlant):
         """
         self._eval("obj = {:s}.getOptic({:s});".format(
             self.optName, str2mat(name)))
-        if dof == 'pos':
+        if doftype == 'pos':
             self._eval("tf = obj.mechTF;")
-        elif dof == 'pitch':
+        elif doftype == 'pitch':
             self._eval("tf = obj.mechTFpit;")
-        elif dof == 'yaw':
+        elif doftype == 'yaw':
             self._eval("tf = obj.mechTFyaw;")
         else:
-            raise ValueError('Unrecognized dof ' + dof)
+            raise ValueError('Unrecognized doftype ' + doftype)
 
         if self._eval("isempty(tf);", nargout=1):
             zs = []
@@ -1009,7 +1009,7 @@ class PyTickle(plant.OpticklePlant):
                                'display.max_columns', None):
             display(beam_properties)
 
-    def getABCD(self, *args, dof='pitch'):
+    def getABCD(self, *args, doftype='pitch'):
         """Get the ABCD matrix of an optic or path
 
         Returns the ABCD matrix of an optic if three arguments are supplied
@@ -1019,12 +1019,12 @@ class PyTickle(plant.OpticklePlant):
           name: name of the optic
           inPort: input port of the transformation
           outPort: output port of the transformation
-          dof: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
+          doftype: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
 
         Inputs (2 for path):
           linkStart: name of the start of the link
           linkEnd: name of the end of the link
-          dof: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
+          doftype: degree of freedom 'pitch' or 'yaw' (Default: 'pitch')
 
         Returns:
           abcd: the ABCD matrix
@@ -1038,9 +1038,9 @@ class PyTickle(plant.OpticklePlant):
         if len(args) == 3:
             name, inPort, outPort = args
 
-            if dof == 'pitch':
+            if doftype == 'pitch':
                 ax = "y"
-            elif dof == 'yaw':
+            elif doftype == 'yaw':
                 ax = "x"
 
             self._eval("obj = {:s}.getOptic({:s});".format(

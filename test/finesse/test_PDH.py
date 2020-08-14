@@ -4,6 +4,7 @@ Unit tests for finesse PDH frequency response and sweeps
 
 import numpy as np
 import pytickle.finesse as fin
+from pytickle.controls import DegreeOfFreedom
 import pykat
 import pykat.components as kcmp
 import pykat.commands as kcom
@@ -49,21 +50,29 @@ class TestFreqResp:
     kat = katFP()
     katFR = fin.KatFR(kat)
     katFR.run(1e-2, 1e4, 1000)
-    katFR.run(1e-2, 1e4, 1000, dof='freq')
+    katFR.run(1e-2, 1e4, 1000, doftype='freq')
     katFR.runDC()
-    katFR.run(1e-2, 1e4, 1000, dof='amp')
+    katFR.run(1e-2, 1e4, 1000, doftype='amp')
     katFR.save('test_PDH.hdf5')
     katFR2 = plant.FinessePlant()
     katFR2.load('test_PDH.hdf5')
     os.remove('test_PDH.hdf5')
 
     def test_tfI(self):
-        tfI = self.katFR.getTF('REFL_I', 'EX')
-        assert np.allclose(tfI, data['tfI'])
+        ex = DegreeOfFreedom('EX')
+        tfI1 = self.katFR.getTF('REFL_I', 'EX')
+        tfI2 = self.katFR.getTF('REFL_I', ex)
+        c1 = np.allclose(tfI1, data['tfI'])
+        c2 = np.allclose(tfI2, data['tfI'])
+        assert np.all([c1, c2])
 
     def test_tfQ(self):
-        tfQ = self.katFR.getTF('REFL_Q', 'EX')
-        assert np.allclose(tfQ, data['tfQ'])
+        ex = DegreeOfFreedom(name='EX', drives='EX', doftype='pos')
+        tfQ1 = self.katFR.getTF('REFL_Q', 'EX')
+        tfQ2 = self.katFR.getTF('REFL_Q', ex)
+        c1 = np.allclose(tfQ1, data['tfQ'])
+        c2 = np.allclose(tfQ2, data['tfQ'])
+        assert np.all([c1, c2])
 
     def test_qnI(self):
         qnI = self.katFR.getQuantumNoise('REFL_I')
@@ -78,19 +87,27 @@ class TestFreqResp:
         assert np.allclose(qnDC, data['qnDC'])
 
     def test_freqI(self):
-        tf = self.katFR.getTF('REFL_I', 'Laser', dof='freq')
-        assert np.allclose(tf, data['tfI_freq'])
+        laser = DegreeOfFreedom('Laser', 'freq')
+        tf1 = self.katFR.getTF('REFL_I', 'Laser', doftype='freq')
+        tf2 = self.katFR.getTF('REFL_I', laser)
+        c1 = np.allclose(tf1, data['tfI_freq'])
+        c2 = np.allclose(tf2, data['tfI_freq'])
+        assert np.all([c1, c2])
 
     def test_freqQ(self):
-        tf = self.katFR.getTF('REFL_Q', 'Laser', dof='freq')
+        tf = self.katFR.getTF('REFL_Q', 'Laser', doftype='freq')
         assert np.allclose(tf, data['tfQ_freq'])
 
     def test_ampI(self):
-        tf = self.katFR.getTF('REFL_I', 'Laser', dof='amp')
-        assert np.allclose(tf, data['tfI_amp'])
+        laser = DegreeOfFreedom('Laser', 'amp')
+        tf1 = self.katFR.getTF('REFL_I', 'Laser', doftype='amp')
+        tf2 = self.katFR.getTF('REFL_I', laser)
+        c1 = np.allclose(tf1, data['tfI_amp'])
+        c2 = np.allclose(tf2, data['tfI_amp'])
+        assert np.all([c1, c2])
 
     def test_ampQ(self):
-        tf = self.katFR.getTF('REFL_Q', 'Laser', dof='amp')
+        tf = self.katFR.getTF('REFL_Q', 'Laser', doftype='amp')
         assert np.allclose(tf, data['tfQ_amp'])
 
     def test_DC_DC(self):
@@ -126,19 +143,19 @@ class TestFreqResp:
         assert np.allclose(qnDC, data['qnDC'])
 
     def test_reload_freqI(self):
-        tf = self.katFR2.getTF('REFL_I', 'Laser', dof='freq')
+        tf = self.katFR2.getTF('REFL_I', 'Laser', doftype='freq')
         assert np.allclose(tf, data['tfI_freq'])
 
     def test_reload_freqQ(self):
-        tf = self.katFR2.getTF('REFL_Q', 'Laser', dof='freq')
+        tf = self.katFR2.getTF('REFL_Q', 'Laser', doftype='freq')
         assert np.allclose(tf, data['tfQ_freq'])
 
     def test_reload_ampI(self):
-        tf = self.katFR2.getTF('REFL_I', 'Laser', dof='amp')
+        tf = self.katFR2.getTF('REFL_I', 'Laser', doftype='amp')
         assert np.allclose(tf, data['tfI_amp'])
 
     def test_reload_ampQ(self):
-        tf = self.katFR2.getTF('REFL_Q', 'Laser', dof='amp')
+        tf = self.katFR2.getTF('REFL_Q', 'Laser', doftype='amp')
         assert np.allclose(tf, data['tfQ_amp'])
 
     def test_reload_DC_DC(self):

@@ -139,8 +139,8 @@ filtFF   = ctrl.Filter([], [], 4.98e-3)
 cs = ctrl.ControlSystem()
 
 # define degrees of freedom
-cs.addDOF('DARM', probesDARM, DARM)
-cs.addDOF('CARM', probesCARM, CARM)
+cs.addDOF(drives=DARM, probes=probesDARM, name='DARM')
+cs.addDOF(name='CARM', probes=probesCARM, drives=CARM, doftype='pos')
 cs.addDOF('BS', probesBS, 'BS')
 
 # define control filters

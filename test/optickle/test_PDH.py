@@ -6,6 +6,7 @@ import matlab.engine
 import numpy as np
 import pytickle.optickle as pyt
 import pytickle.plant as plant
+from pytickle.controls import DegreeOfFreedom
 import os
 import pytest
 
@@ -62,12 +63,20 @@ class TestFreqResp:
     os.remove('test_PDH.hdf5')
 
     def test_tfI(self):
-        tfI = self.opt.getTF('REFL_I', 'EX')
-        assert np.allclose(tfI, data['tfI'])
+        ex = DegreeOfFreedom('EX')
+        tfI1 = self.opt.getTF('REFL_I', 'EX')
+        tfI2 = self.opt.getTF('REFL_I', ex)
+        c1 = np.allclose(tfI1, data['tfI'])
+        c2 = np.allclose(tfI2, data['tfI'])
+        assert np.all([c1, c2])
 
     def test_tfQ(self):
-        tfQ = self.opt.getTF('REFL_Q', 'EX')
-        assert np.allclose(tfQ, data['tfQ'])
+        ex = DegreeOfFreedom(name='EX', drives='EX', doftype='pos')
+        tfQ1 = self.opt.getTF('REFL_Q', 'EX')
+        tfQ2 = self.opt.getTF('REFL_Q', ex)
+        c1 = np.allclose(tfQ1, data['tfQ'])
+        c2 = np.allclose(tfQ2, data['tfQ'])
+        assert np.all([c1, c2])
 
     def test_qnI(self):
         qnI = self.opt.getQuantumNoise('REFL_I')
@@ -82,19 +91,27 @@ class TestFreqResp:
         assert np.allclose(qnDC, data['qnDC'])
 
     def test_phaseI(self):
-        tf = self.opt.getTF('REFL_I', 'PM', dof='drive')
-        assert np.allclose(tf, data['tfI_phase'])
+        pm = DegreeOfFreedom('PM', 'drive')
+        tf1 = self.opt.getTF('REFL_I', 'PM', doftype='drive')
+        tf2 = self.opt.getTF('REFL_I', pm)
+        c1 = np.allclose(tf1, data['tfI_phase'])
+        c2 = np.allclose(tf2, data['tfI_phase'])
+        assert np.all([c1, c2])
 
     def test_phaseQ(self):
-        tf = self.opt.getTF('REFL_Q', 'PM', dof='drive')
+        tf = self.opt.getTF('REFL_Q', 'PM', doftype='drive')
         assert np.allclose(tf, data['tfQ_phase'])
 
     def test_ampI(self):
-        tf = self.opt.getTF('REFL_I', 'AM', dof='drive')
-        assert np.allclose(tf, data['tfI_amp'])
+        am = DegreeOfFreedom('AM', 'drive')
+        tf1 = self.opt.getTF('REFL_I', 'AM', doftype='drive')
+        tf2 = self.opt.getTF('REFL_I', am)
+        c1 = np.allclose(tf1, data['tfI_amp'])
+        c2 = np.allclose(tf2, data['tfI_amp'])
+        assert np.all([c1, c2])
 
     def test_ampQ(self):
-        tf = self.opt.getTF('REFL_Q', 'AM', dof='drive')
+        tf = self.opt.getTF('REFL_Q', 'AM', doftype='drive')
         assert np.allclose(tf, data['tfQ_amp'])
 
     def test_DC_DC(self):
@@ -130,19 +147,19 @@ class TestFreqResp:
         assert np.allclose(qnDC, data['qnDC'])
 
     def test_reload_phaseI(self):
-        tf = self.opt2.getTF('REFL_I', 'PM', dof='drive')
+        tf = self.opt2.getTF('REFL_I', 'PM', doftype='drive')
         assert np.allclose(tf, data['tfI_phase'])
 
     def test_reload_phaseQ(self):
-        tf = self.opt2.getTF('REFL_Q', 'PM', dof='drive')
+        tf = self.opt2.getTF('REFL_Q', 'PM', doftype='drive')
         assert np.allclose(tf, data['tfQ_phase'])
 
     def test_reload_ampI(self):
-        tf = self.opt2.getTF('REFL_I', 'AM', dof='drive')
+        tf = self.opt2.getTF('REFL_I', 'AM', doftype='drive')
         assert np.allclose(tf, data['tfI_amp'])
 
     def test_reload_ampQ(self):
-        tf = self.opt2.getTF('REFL_Q', 'AM', dof='drive')
+        tf = self.opt2.getTF('REFL_Q', 'AM', doftype='drive')
         assert np.allclose(tf, data['tfQ_amp'])
 
     def test_reload_DC_DC(self):

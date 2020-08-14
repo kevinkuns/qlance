@@ -72,24 +72,24 @@ class OpticklePlant:
         """
         return self._ff
 
-    def getTF(self, probes, drives, dof='pos', optOnly=False):
+    def getTF(self, probes, drives, doftype='pos', optOnly=False):
         """Compute a transfer function
 
         Inputs:
           probes: name of the probes at which the TF is calculated
           drives: names of the drives from which the TF is calculated
-          dof: degree of freedom of the drives (Default: pos)
+          doftype: degree of freedom of the drives (Default: pos)
           optOnly: if True, only return the optical TF with no mechanics
             (Default: False)
 
         Returns:
           tf: the transfer function
-            * In units of [W/m] if drive is an optic with dof pos
-            * In units of [W/rad] if drive is an optic with dof pitch or yaw
-            * In units of [W/rad] if drive is a PM modulator with dof drive
-            * In units of [W/RAM] if drive is an AM modulator with dof drive
-            * In units of [W/rad] if drive is an RF modulator with dof phase
-            * In units of [W/RAM] if drive is an RF modulator with dof amp
+            * In units of [W/m] if drive is an optic with doftype pos
+            * In units of [W/rad] if drive is an optic with doftype pitch or yaw
+            * In units of [W/rad] if drive is a PM modulator with doftype drive
+            * In units of [W/RAM] if drive is an AM modulator with doftype drive
+            * In units of [W/rad] if drive is an RF modulator with doftype phase
+            * In units of [W/RAM] if drive is an RF modulator with doftype amp
               modulation of an RF modulator.
 
         Note:
@@ -112,8 +112,13 @@ class OpticklePlant:
             [Note: Since DARM is defined as Lx - Ly, to get 1 m of DARM
             requires 0.5 m of both Lx and Ly]
         """
-        if dof not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
-            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+        if isinstance(drives, ctrl.DegreeOfFreedom):
+            doftype = drives.doftype
+            drives = {
+                key.split('.')[0]: val for key, val in drives.drives.items()}
+
+        if doftype not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
+            raise ValueError('Unrecognized degree of freedom {:s}'.format(doftype))
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
@@ -134,11 +139,11 @@ class OpticklePlant:
             raise RuntimeError(msg)
 
         # figure out which raw output matrix to use
-        if dof in ['pos', 'drive', 'amp', 'phase']:
+        if doftype in ['pos', 'drive', 'amp', 'phase']:
             tfData = tfData['pos']
-        elif dof == 'pitch':
+        elif doftype == 'pitch':
             tfData = tfData['pitch']
-        elif dof == 'yaw':
+        elif doftype == 'yaw':
             tfData = tfData['yaw']
 
         if isinstance(drives, str):
@@ -154,7 +159,7 @@ class OpticklePlant:
 
             for drive, drive_pos in drives.items():
                 # get the drive index
-                driveNum = self._getDriveIndex(drive, dof)
+                driveNum = self._getDriveIndex(drive, doftype)
 
                 # add the contribution from this drive
                 try:
@@ -164,23 +169,23 @@ class OpticklePlant:
 
         return tf
 
-    def getMechMod(self, drive_out, drive_in, dof='pos'):
+    def getMechMod(self, drive_out, drive_in, doftype='pos'):
         """Get the radiation pressure modifications to drives
 
         Inputs:
           drive_out: name of the output drive
           drive_in: name of the input drive
-          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+          doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
         """
-        if dof not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
-            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+        if doftype not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
+            raise ValueError('Unrecognized degree of freedom {:s}'.format(doftype))
 
         # figure out which raw output matrix to use
-        if dof in ['pos', 'drive', 'amp', 'phase']:
+        if doftype in ['pos', 'drive', 'amp', 'phase']:
             mMech = self._mMech['pos']
-        elif dof == 'pitch':
+        elif doftype == 'pitch':
             mMech = self._mMech['pitch']
-        elif dof == 'yaw':
+        elif doftype == 'yaw':
             mMech = self._mMech['yaw']
 
         if mMech is None:
@@ -188,26 +193,26 @@ class OpticklePlant:
                   + 'calculating a transfer function.'
             raise RuntimeError(msg)
 
-        driveInNum = self._getDriveIndex(drive_in, dof)
-        driveOutNum = self._getDriveIndex(drive_out, dof)
+        driveInNum = self._getDriveIndex(drive_in, doftype)
+        driveOutNum = self._getDriveIndex(drive_out, doftype)
 
         return mMech[driveOutNum, driveInNum]
 
-    def getMechTF(self, outDrives, inDrives, dof='pos'):
+    def getMechTF(self, outDrives, inDrives, doftype='pos'):
         """Compute a mechanical transfer function
 
         Inputs:
           outDrives: name of the output drives
           inDrives: name of the input drives
-          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+          doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
 
         Returns:
           tf: the transfer function
             * In units of [m/N] for position
             * In units of [rad/(N m)] for pitch and yaw
         """
-        if dof not in ['pos', 'pitch', 'yaw']:
-            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+        if doftype not in ['pos', 'pitch', 'yaw']:
+            raise ValueError('Unrecognized degree of freedom {:s}'.format(doftype))
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
@@ -226,46 +231,46 @@ class OpticklePlant:
         # loop through drives to compute the TF
         for inDrive, c_in in inDrives.items():
             # get the default mechanical plant of the optic being driven
-            plant = self._mech_plants[dof][inDrive]
+            plant = self._mech_plants[doftype][inDrive]
 
             for outDrive, c_out in outDrives.items():
-                mmech = self.getMechMod(outDrive, inDrive, dof=dof)
+                mmech = self.getMechMod(outDrive, inDrive, doftype=doftype)
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
         return tf
 
     def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
-                   dof='pos', **kwargs):
+                   doftype='pos', **kwargs):
         """Plot a mechanical transfer function
 
         See documentation for plotTF in plotting
         """
         ff = self.ff
-        tf = self.getMechTF(outDrives, inDrives, dof=dof)
+        tf = self.getMechTF(outDrives, inDrives, doftype=doftype)
         fig = plotting.plotTF(
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig
 
-    def getQuantumNoise(self, probeName, dof='pos'):
+    def getQuantumNoise(self, probeName, doftype='pos'):
         """Compute the quantum noise at a probe
 
         Returns the quantum noise at a given probe in [W/rtHz]
         """
         probeNum = self.probes.index(probeName)
         try:
-            qnoise = self._noiseAC[dof][probeNum, :]
+            qnoise = self._noiseAC[doftype][probeNum, :]
         except IndexError:
-            qnoise = self._noiseAC[dof][probeNum]
+            qnoise = self._noiseAC[doftype][probeNum]
         return qnoise
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
-               dof='pos', optOnly=False, **kwargs):
+               doftype='pos', optOnly=False, **kwargs):
         """Plot a transfer function.
 
         See documentation for plotTF in plotting
         """
         ff = self.ff
-        tf = self.getTF(probeName, driveNames, dof=dof, optOnly=optOnly)
+        tf = self.getTF(probeName, driveNames, doftype=doftype, optOnly=optOnly)
         fig = plotting.plotTF(
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig
@@ -345,7 +350,7 @@ class OpticklePlant:
         probeNum = self.probes.index(probeName)
         return self._sigDC_tickle[probeNum]
 
-    def computeBeamSpotMotion(self, opticName, spotPort, driveName, dof):
+    def computeBeamSpotMotion(self, opticName, spotPort, driveName, doftype):
         """Compute the beam spot motion on one optic due to angular motion of another
 
         The beam spot motion must have been monitored by calling
@@ -355,7 +360,7 @@ class OpticklePlant:
           opticName: name of the optic to compute the BSM on
           spotPort: port of the optic to compute the BSM on
           driveName: drive name of the optic from which to compute the BSM from
-          dof: degree of freedom of the optic driving the BSM
+          doftype: degree of freedom of the optic driving the BSM
 
         Returns:
           bsm: the beam spot motion [m/rad]
@@ -375,7 +380,7 @@ class OpticklePlant:
         spotPort = probe_info.split('<-')[-1]
 
         # get TF to monitoring probe power [W/rad]
-        tf = self.getTF(probeName, driveName, dof)
+        tf = self.getTF(probeName, driveName, doftype)
 
         # DC power on the monitoring probe
         Pdc = self.getSigDC(probeName)
@@ -462,13 +467,13 @@ class OpticklePlant:
         self._qq = io.hdf5_to_possible_none('qq', data)
         data.close()
 
-    def _getDriveIndex(self, name, dof):
+    def _getDriveIndex(self, name, doftype):
         """Find the drive index of a given drive and degree of freedom
         """
-        if dof in ['pos', 'pitch', 'yaw']:
+        if doftype in ['pos', 'pitch', 'yaw']:
             driveNum = self.drives.index(name + '.pos')
-        elif dof in ['drive', 'amp', 'phase']:
-            driveNum = self.drives.index('{:s}.{:s}'.format(name, dof))
+        elif doftype in ['drive', 'amp', 'phase']:
+            driveNum = self.drives.index('{:s}.{:s}'.format(name, doftype))
         return driveNum
 
     def _getSidebandInd(
@@ -509,17 +514,17 @@ class OpticklePlant:
         else:
             return int(ind)
 
-    def _dof2opt(self, dof):
+    def _doftype2opt(self, doftype):
         """Convert degrees of freedom to 1s, 2s, and 3s for Optickle
         """
-        if dof == 'pos':
+        if doftype == 'pos':
             nDOF = 1
-        elif dof == 'pitch':
+        elif doftype == 'pitch':
             nDOF = 2
-        elif dof == 'yaw':
+        elif doftype == 'yaw':
             nDOF = 3
         else:
-            raise ValueError('Unrecognized degree of freedom ' + str(dof)
+            raise ValueError('Unrecognized degree of freedom ' + str(doftype)
                              + '. Choose \'pos\', \'pitch\', or \'yaw\'.')
 
         return nDOF
@@ -572,7 +577,7 @@ class FinessePlant:
     """A Finesse Optomechanical plant
     """
     def __init__(self):
-        self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
+        self._doftypes = ['pos', 'pitch', 'yaw', 'amp', 'freq']
         self._drives = []
         self._probes = []
         self._amp_detectors = []
@@ -627,18 +632,18 @@ class FinessePlant:
         """
         return self._lambda0
 
-    def getTF(self, probes, drives, dof='pos'):
+    def getTF(self, probes, drives, doftype='pos'):
         """Compute a transfer function
 
         Inputs:
           probes: name of the probes at which the TF is calculated
           drives: names of the drives from which the TF is calculated
-          dof: degree of freedom of the drives (Default: pos)
+          doftype: degree of freedom of the drives (Default: pos)
 
         Returns:
           tf: the transfer function
-            * In units of [W/m] if drive is an optic with dof pos
-            * In units of [W/rad] if drive is an optic with dof pitch or yaw
+            * In units of [W/m] if drive is an optic with doftype pos
+            * In units of [W/rad] if drive is an optic with doftype pitch or yaw
             * In units of [W/Hz] if drive is a laser with drive freq
             * In units of [W/RIN] if dirve is a laser with drive amp
 
@@ -662,8 +667,13 @@ class FinessePlant:
             [Note: Since DARM is defined as Lx - Ly, to get 1 m of DARM
             requires 0.5 m of both Lx and Ly]
         """
-        if dof not in self._dofs:
-            raise ValueError('Unrecognized dof ' + dof)
+        if isinstance(drives, ctrl.DegreeOfFreedom):
+            doftype = drives.doftype
+            drives = {
+                key.split('.')[0]: val for key, val in drives.drives.items()}
+
+        if doftype not in self._doftypes:
+            raise ValueError('Unrecognized doftype ' + doftype)
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
@@ -683,42 +693,42 @@ class FinessePlant:
         for probe, pc in probes.items():
             for drive, drive_pos in drives.items():
                 # add the contribution from this drive
-                tf += pc * drive_pos * self._freqresp[dof][probe][drive]
+                tf += pc * drive_pos * self._freqresp[doftype][probe][drive]
 
         return tf
 
-    def getMechMod(self, drive_out, drive_in, dof='pos'):
+    def getMechMod(self, drive_out, drive_in, doftype='pos'):
         """Get the radiation pressure modifications to drives
 
         Inputs:
           drive_out: name of the output drive
           drive_in: name of the input drive
-          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+          doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
         """
-        if dof not in self._dofs:
-            raise ValueError('Unrecognized dof ' + dof)
+        if doftype not in self._doftypes:
+            raise ValueError('Unrecognized doftype ' + doftype)
 
-        out_det = '_' + drive_out + '_' + dof
+        out_det = '_' + drive_out + '_' + doftype
         if out_det not in self.pos_detectors:
             raise ValueError(out_det + ' is not a detector in this model')
 
-        return self._mechmod[dof][out_det][drive_in]
+        return self._mechmod[doftype][out_det][drive_in]
 
-    def getMechTF(self, outDrives, inDrives, dof='pos'):
+    def getMechTF(self, outDrives, inDrives, doftype='pos'):
         """Compute a mechanical transfer function
 
         Inputs:
           outDrives: name of the output drives
           inDrives: name of the input drives
-          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+          doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
 
         Returns:
           tf: the transfer function
             * In units of [m/N] for position
             * In units of [rad/(N m)] for pitch and yaw
         """
-        if dof not in ['pos', 'pitch', 'yaw']:
-            raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+        if doftype not in ['pos', 'pitch', 'yaw']:
+            raise ValueError('Unrecognized degree of freedom {:s}'.format(doftype))
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
@@ -737,25 +747,25 @@ class FinessePlant:
         # loop through drives to compute the TF
         for inDrive, c_in in inDrives.items():
             # get the default mechanical plant of the optic being driven
-            plant = self._mech_plants[dof][inDrive]
+            plant = self._mech_plants[doftype][inDrive]
 
             for outDrive, c_out in outDrives.items():
-                mmech = self.getMechMod(outDrive, inDrive, dof=dof)
+                mmech = self.getMechMod(outDrive, inDrive, doftype=doftype)
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
         return tf
 
-    def getQuantumNoise(self, probeName, dof='pos'):
+    def getQuantumNoise(self, probeName, doftype='pos'):
         """Compute the quantum noise at a probe
 
         Returns the quantum noise at a given probe in [W/rtHz]
         """
         shotName = '_' + probeName + '_shot'
-        qnoise = list(self._freqresp[dof][shotName].values())[0]
+        qnoise = list(self._freqresp[doftype][shotName].values())[0]
         # without copying multiple calls will reduce noise
         qnoise = qnoise.copy()
 
-        if dof == 'pos':
+        if doftype == 'pos':
             # if this was computed from a position TF convert back to W/rtHz
             # 2*np.pi is correct here, not 360
             qnoise *= self.lambda0 / (2*np.pi)
@@ -772,17 +782,17 @@ class FinessePlant:
         """
         return self._dcsigs[probeName]
 
-    def computeBeamSpotMotion(self, node, driveName, dof):
+    def computeBeamSpotMotion(self, node, driveName, doftype):
         """Compute the beam spot motion at a node
 
         The beam spot motion must have been monitored by calling
         monitorBeamSpotMotion before running the model. Both runDC and run for
-        the degree of interest dof must have been called on the model.
+        the degree of interest doftype must have been called on the model.
 
         Inputs:
           node: name of the node
           driveName: drive name of the optic from which to compute the BSM from
-          dof: degree of freedom of the optic driving the BSM
+          doftype: degree of freedom of the optic driving the BSM
 
         Returns:
           bsm: the beam spot motion [m/rad]
@@ -793,12 +803,12 @@ class FinessePlant:
             monitorBeamSpotMotion(kat, 'EX_fr', 'pitch')
             katFR = KatFR(kat)
             katFR.runDC()
-            katFR.run(fmin, fmax, npts, dof='pitch')
+            katFR.run(fmin, fmax, npts, doftype='pitch')
             bsm = katFR.computeBeamSpotMotion('EX_fr', 'IX', 'pitch')
         """
-        if dof == 'pitch':
+        if doftype == 'pitch':
             direction = 'y'
-        elif dof == 'yaw':
+        elif doftype == 'yaw':
             direction = 'x'
         else:
             raise ValueError('Unrecognized degree of freedom ' + direction)
@@ -806,24 +816,24 @@ class FinessePlant:
         probeName = '_' + node + '_bsm_' + direction
 
         # get TF to monitoring probe power [W/rad]
-        tf = self.getTF(probeName, driveName, dof)
+        tf = self.getTF(probeName, driveName, doftype)
 
         # DC power on the monitoring probe
         Pdc = self.getSigDC('_' + node + '_DC')
 
         # get the beam size on the optic
-        w, _, _, _, _, _ = self.getBeamProperties(node, dof)
+        w, _, _, _, _, _ = self.getBeamProperties(node, doftype)
 
         # convert to spot motion [m/rad]
         bsm = w/Pdc * tf
         return bsm
 
-    def getBeamProperties(self, node, dof='pitch'):
+    def getBeamProperties(self, node, doftype='pitch'):
         """Compute the properties of a Gaussian beam at a node
 
         Inputs:
           node: name of the node
-          dof: which degree of freedom 'pitch' or 'yaw' (Defualt: pitch)
+          doftype: which degree of freedom 'pitch' or 'yaw' (Defualt: pitch)
 
         Returns:
           w: beam radius on the optic [m]
@@ -837,9 +847,9 @@ class FinessePlant:
         Example:
           katFR.getBeamProperties('EX_fr')
         """
-        if dof == 'pitch':
+        if doftype == 'pitch':
             direction = 'y'
-        elif dof == 'yaw':
+        elif doftype == 'yaw':
             direction = 'x'
         else:
             raise ValueError('Unrecognized degree of freedom ' + direction)
@@ -848,25 +858,25 @@ class FinessePlant:
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
-               dof='pos', **kwargs):
+               doftype='pos', **kwargs):
         """Plot a transfer function.
 
         See documentation for plotTF in plotting
         """
         ff = self.ff
-        tf = self.getTF(probeName, driveNames, dof=dof)
+        tf = self.getTF(probeName, driveNames, doftype=doftype)
         fig = plotting.plotTF(
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig
 
     def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
-                   dof='pos', **kwargs):
+                   doftype='pos', **kwargs):
         """Plot a mechanical transfer function
 
         See documentation for plotTF in plotting
         """
         ff = self.ff
-        tf = self.getMechTF(outDrives, inDrives, dof=dof)
+        tf = self.getMechTF(outDrives, inDrives, doftype=doftype)
         fig = plotting.plotTF(
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig

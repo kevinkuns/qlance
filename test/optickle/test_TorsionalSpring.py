@@ -45,8 +45,8 @@ opt.addLink('EX', 'fr', 'IX', 'fr', Lcav)
 opt.setCavityBasis('IX', 'EX')
 
 # set the pitch response
-opt.setMechTF('EX', [], poles, 1/I, dof='pitch')
-opt.setMechTF('IX', [], poles, 1/I, dof='pitch')
+opt.setMechTF('EX', [], poles, 1/I, doftype='pitch')
+opt.setMechTF('IX', [], poles, 1/I, doftype='pitch')
 
 # add input
 opt.addSource('Laser', np.sqrt(Pin)*(vRF == 0))
@@ -72,7 +72,7 @@ fmin = 1e-1
 fmax = 30
 npts = 1000
 ff = np.logspace(np.log10(fmin), np.log10(fmax), npts)
-opt.run(ff, dof='pitch', noise=False)
+opt.run(ff, doftype='pitch', noise=False)
 
 opt.save('test_torsional_spring.hdf5')
 opt2 = plant.OpticklePlant()
@@ -80,37 +80,41 @@ opt2.load('test_torsional_spring.hdf5')
 os.remove('test_torsional_spring.hdf5')
 
 def test_REFLI_HARD():
-    tf = opt.getTF('REFL_I', HARD, dof='pitch')
+    hard = ctrl.DegreeOfFreedom(HARD, 'pitch')
+    tf1 = opt.getTF('REFL_I', HARD, doftype='pitch')
+    tf2 = opt.getTF('REFL_I', hard)
     ref = data['tf_REFLI_HARD']
-    assert np.allclose(tf, ref)
+    c1 = np.allclose(tf1, ref)
+    c2 = np.allclose(tf2, ref)
+    assert np.all([c1, c2])
 
 
 def test_REFLI_SOFT():
-    tf = opt.getTF('REFL_I', SOFT, dof='pitch')
+    tf = opt.getTF('REFL_I', SOFT, doftype='pitch')
     ref = data['tf_REFLI_SOFT']
     assert np.allclose(tf, ref)
 
 
 def test_mech_HARD():
-    tf = opt.getMechTF(HARD, HARD, dof='pitch')
+    tf = opt.getMechTF(HARD, HARD, doftype='pitch')
     ref = data['mech_HARD']
     assert np.allclose(tf, ref)
 
 
 def test_mech_SOFT():
-    tf = opt.getMechTF(SOFT, SOFT, dof='pitch')
+    tf = opt.getMechTF(SOFT, SOFT, doftype='pitch')
     ref = data['mech_SOFT']
     assert np.allclose(tf, ref)
 
 
 def test_mMech_EX_EX():
-    mMech = opt.getMechMod('EX', 'EX', dof='pitch')
+    mMech = opt.getMechMod('EX', 'EX', doftype='pitch')
     ref = data['mMech_EX_EX']
     assert np.allclose(mMech, ref)
 
 
 def test_mMech_IX_EX():
-    mMech = opt.getMechMod('IX', 'EX', dof='pitch')
+    mMech = opt.getMechMod('IX', 'EX', doftype='pitch')
     ref = data['mMech_IX_EX']
     assert np.allclose(mMech, ref)
 
@@ -132,37 +136,37 @@ def test_bsm_EX_EX():
 ##############################################################################
 
 def test_load_REFLI_HARD():
-    tf = opt2.getTF('REFL_I', HARD, dof='pitch')
+    tf = opt2.getTF('REFL_I', HARD, doftype='pitch')
     ref = data['tf_REFLI_HARD']
     assert np.allclose(tf, ref)
 
 
 def test_load_REFLI_SOFT():
-    tf = opt2.getTF('REFL_I', SOFT, dof='pitch')
+    tf = opt2.getTF('REFL_I', SOFT, doftype='pitch')
     ref = data['tf_REFLI_SOFT']
     assert np.allclose(tf, ref)
 
 
 def test_load_mech_HARD():
-    tf = opt2.getMechTF(HARD, HARD, dof='pitch')
+    tf = opt2.getMechTF(HARD, HARD, doftype='pitch')
     ref = data['mech_HARD']
     assert np.allclose(tf, ref)
 
 
 def test_load_mech_SOFT():
-    tf = opt2.getMechTF(SOFT, SOFT, dof='pitch')
+    tf = opt2.getMechTF(SOFT, SOFT, doftype='pitch')
     ref = data['mech_SOFT']
     assert np.allclose(tf, ref)
 
 
 def test_load_mMech_EX_EX():
-    mMech = opt2.getMechMod('EX', 'EX', dof='pitch')
+    mMech = opt2.getMechMod('EX', 'EX', doftype='pitch')
     ref = data['mMech_EX_EX']
     assert np.allclose(mMech, ref)
 
 
 def test_load_mMech_IX_EX():
-    mMech = opt2.getMechMod('IX', 'EX', dof='pitch')
+    mMech = opt2.getMechMod('IX', 'EX', doftype='pitch')
     ref = data['mMech_IX_EX']
     assert np.allclose(mMech, ref)
 

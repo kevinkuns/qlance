@@ -264,23 +264,29 @@ class DegreeOfFreedom:
       name: name of the DOF
       probes: the probes used to sense the DOF (a dict or single string)
       drives: the drives defining the DOF (a dict or single string)
-      dofType: type of DOF: pos, pitch, or yaw (Default: pos)
+      doftype: type of DOF: pos, pitch, or yaw (Default: pos)
 
     Example:
       For DARM where L = Lx - Ly and it is sensed by AS_DIFF
-        DegreeOfFreedom('DARM', 'AS_DIFF', {'EX.pos': 1, 'EY.pos': -1})
+        DegreeOfFreedom('DARM', 'AS_DIFF', {'EX': 1, 'EY': -1})
     """
 
-    def __init__(self, name, probes, drives, dofType='pos'):
+    def __init__(self, drives=None, doftype='pos', probes=None, name=''):
+        if drives is None:
+            raise ValueError('drives must either be a string or a dictionary')
         self._name = name
-        self._probes = assertType(probes, dict).copy()
+        self._doftype = doftype
+
+        if probes is None:
+            self._probes = None
+        else:
+            self._probes = assertType(probes, dict).copy()
         # self._drives = OrderedDict()
-        self._dofType = dofType
 
         # append the type of dof to the names of the drives
         in_drives = assertType(drives, dict).copy()
         self._drives = OrderedDict(
-            {k + '.' + dofType: v for k, v in in_drives.items()})
+            {k + '.' + doftype: v for k, v in in_drives.items()})
 
     @property
     def name(self):
@@ -301,10 +307,10 @@ class DegreeOfFreedom:
         return self._drives
 
     @property
-    def dofType(self):
+    def doftype(self):
         """Type of DOF
         """
-        return self._dofType
+        return self._doftype
 
     def probes2dof(self, probeList):
         """Make a vector of probes
@@ -605,23 +611,25 @@ class ControlSystem:
         if drive2bsm:
             self._computeBeamSpotMotion()
 
-    def addDOF(self, name, probes, drives, dofType='pos'):
+    def addDOF(self, name, probes, drives, doftype='pos'):
         """Add a degree of freedom to the model
 
         Inputs:
           name: name of the DOF
           probes: the probes used to sense the DOF
           drives: the drives used to define the DOF
+          doftype: type of DOF: pos, pitch, or yaw (Default: pos)
 
         Example:
           For DARM where L = Lx - Ly and it is sensed by AS_DIFF
-          cs.addDOF('DARM', 'AS_DIFF', {'EX.pos': 1, 'EY.pos': -1})
+          cs.addDOF('DARM', 'AS_DIFF', {'EX': 1, 'EY': -1})
         """
         if name in self.dofs.keys():
             raise ValueError(
                 'Degree of freedom {:s} already exists'.format(name))
 
-        dof = DegreeOfFreedom(name, probes, drives, dofType=dofType)
+        dof = DegreeOfFreedom(
+            name=name, probes=probes, drives=drives, doftype=doftype)
         self.dofs[name] = dof
         append_str_if_unique(self.probes, dof.probes)
         append_str_if_unique(self.drives, dof.drives)
@@ -642,8 +650,8 @@ class ControlSystem:
             for di, drive in enumerate(self.drives):
                 driveData = drive.split('.')
                 driveName = driveData[0]
-                dofType = driveData[-1]
-                tf = self.plant_model.getTF(probe, driveName, dof=dofType)
+                doftype = driveData[-1]
+                tf = self.plant_model.getTF(probe, driveName, doftype=doftype)
                 plant[pi, di, :] = tf
         return plant
 
@@ -746,10 +754,10 @@ class ControlSystem:
             for di, drive in enumerate(self.drives):
                 driveData = drive.split('.')
                 driveName = driveData[0]
-                dofType = driveData[-1]
+                doftype = driveData[-1]
                 # FIXME: make work with finesse and non-front surfaces
                 drive2bsm[si, di] = self.plant_model.computeBeamSpotMotion(
-                    opticName, 'fr', driveName, dofType)
+                    opticName, 'fr', driveName, doftype)
 
         self._drive2bsm = drive2bsm
 
