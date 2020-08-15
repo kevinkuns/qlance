@@ -246,19 +246,18 @@ class OpticklePlant:
             # TF is for a frequency vector
             tf = np.zeros(len(self.ff), dtype='complex')
 
-        if isinstance(outDrives, str):
-            outDrives = {outDrives: 1}
-
-        if isinstance(inDrives, str):
-            inDrives = {inDrives: 1}
+        if not isinstance(outDrives, ctrl.DegreeOfFreedom):
+            outDrives = ctrl.DegreeOfFreedom(outDrives, doftype=doftype)
+        if not isinstance(inDrives, ctrl.DegreeOfFreedom):
+            inDrives = ctrl.DegreeOfFreedom(inDrives, doftype=doftype)
 
         # loop through drives to compute the TF
-        for inDrive, c_in in inDrives.items():
+        for inDrive, c_in in inDrives.dofs():
             # get the default mechanical plant of the optic being driven
-            plant = self._mech_plants[doftype][inDrive]
+            plant = self._mech_plants[inDrive.doftype][inDrive.name]
 
-            for outDrive, c_out in outDrives.items():
-                mmech = self.getMechMod(outDrive, inDrive, doftype=doftype)
+            for outDrive, c_out in outDrives.dofs():
+                mmech = self.getMechMod(outDrive, inDrive)
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
         return tf
@@ -782,19 +781,18 @@ class FinessePlant:
             # TF is for a frequency vector
             tf = np.zeros(len(self.ff), dtype='complex')
 
-        if isinstance(outDrives, str):
-            outDrives = {outDrives: 1}
-
-        if isinstance(inDrives, str):
-            inDrives = {inDrives: 1}
+        if not isinstance(outDrives, ctrl.DegreeOfFreedom):
+            outDrives = ctrl.DegreeOfFreedom(outDrives, doftype=doftype)
+        if not isinstance(inDrives, ctrl.DegreeOfFreedom):
+            inDrives = ctrl.DegreeOfFreedom(inDrives, doftype=doftype)
 
         # loop through drives to compute the TF
-        for inDrive, c_in in inDrives.items():
+        for inDrive, c_in in inDrives.dofs():
             # get the default mechanical plant of the optic being driven
-            plant = self._mech_plants[doftype][inDrive]
+            plant = self._mech_plants[inDrive.doftype][inDrive.name]
 
-            for outDrive, c_out in outDrives.items():
-                mmech = self.getMechMod(outDrive, inDrive, doftype=doftype)
+            for outDrive, c_out in outDrives.dofs():
+                mmech = self.getMechMod(outDrive, inDrive)
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
         return tf

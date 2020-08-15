@@ -312,6 +312,14 @@ class DegreeOfFreedom:
         """
         return self._doftype
 
+    def dofs(self):
+        """Iterator over the drives returned as DegreeOfFreedom instances
+        """
+        for drive, cc in self.drives.items():
+            name = drive.split('.')[0]
+            dof = DegreeOfFreedom(drives=name, doftype=self.doftype, name=name)
+            yield dof, cc
+
     def probes2dof(self, probeList):
         """Make a vector of probes
         """

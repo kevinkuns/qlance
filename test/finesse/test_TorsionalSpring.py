@@ -97,10 +97,27 @@ def test_mech_HARD():
     assert np.allclose(tf, ref)
 
 
+def test_mech_HARD2():
+    hard = ctrl.DegreeOfFreedom(HARD, 'pitch')
+    tf = katTF.getMechTF(hard, hard)
+    ref = data['mech_HARD']
+    assert np.allclose(tf, ref)
+
+
 def test_mech_SOFT():
     tf = katTF.getMechTF(SOFT, SOFT, doftype='pitch')
     ref = data['mech_SOFT']
     assert np.allclose(tf, ref)
+
+
+def test_mech_SOFT2():
+    soft = ctrl.DegreeOfFreedom(SOFT, 'pitch')
+    tf1 = katTF.getMechTF(SOFT, soft, doftype='pitch')
+    tf2 = katTF.getMechTF(soft, SOFT, doftype='pitch')
+    ref = data['mech_SOFT']
+    c1 = np.allclose(tf1, ref)
+    c2 = np.allclose(tf2, ref)
+    assert np.all([c1, c2])
 
 
 def test_mMech_EX_EX():
