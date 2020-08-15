@@ -35,6 +35,7 @@ class OpticklePlant:
         self._sigDC_sweep = None
         self._fDC_sweep = None
         self._qq = None
+        self._doftypes = ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']
 
     @property
     def vRF(self):
@@ -177,24 +178,47 @@ class OpticklePlant:
           drive_in: name of the input drive
           doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
         """
-        if doftype not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
-            raise ValueError('Unrecognized degree of freedom {:s}'.format(doftype))
+        err_msg = ('Mechanical modifications can only be calculated for '
+                   + 'degrees of freedom with one drive')
+        if isinstance(drive_out, ctrl.DegreeOfFreedom):
+            if len(drive_out.drives) != 1:
+                raise ValueError(err_msg)
+            for key in drive_out.drives.keys():
+                drive_out, doftype_out = key.split('.')
+        else:
+            doftype_out = doftype
+
+        if isinstance(drive_in, ctrl.DegreeOfFreedom):
+            if len(drive_in.drives) != 1:
+                raise ValueError(err_msg)
+            for key in drive_in.drives.keys():
+                drive_in, doftype_in = key.split('.')
+        else:
+            doftype_in = doftype
+
+        if doftype_in not in self._doftypes:
+            raise ValueError('Unrecognized in doftype ' + doftype_in)
+        if doftype_out not in self._doftypes:
+            raise ValueError('Unrecognized out doftype ' + doftype_out)
 
         # figure out which raw output matrix to use
-        if doftype in ['pos', 'drive', 'amp', 'phase']:
+        pos_types = ['pos', 'drive', 'amp', 'phase']
+        if doftype_in in pos_types and doftype_out in pos_types:
             mMech = self._mMech['pos']
-        elif doftype == 'pitch':
+        elif doftype_in == 'pitch' and doftype_out == 'pitch':
             mMech = self._mMech['pitch']
-        elif doftype == 'yaw':
+        elif doftype_in == 'yaw' and doftype_out == 'yaw':
             mMech = self._mMech['yaw']
+        else:
+            raise ValueError('Input and output doftypes must be the same')
 
         if mMech is None:
             msg = 'Must run tickle for the appropriate DOF before ' \
                   + 'calculating a transfer function.'
             raise RuntimeError(msg)
 
-        driveInNum = self._getDriveIndex(drive_in, doftype)
-        driveOutNum = self._getDriveIndex(drive_out, doftype)
+        driveInNum = self._getDriveIndex(drive_in, doftype_in)
+        driveOutNum = self._getDriveIndex(drive_out, doftype_out)
 
         return mMech[driveOutNum, driveInNum]
 
@@ -705,14 +729,34 @@ class FinessePlant:
           drive_in: name of the input drive
           doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
         """
-        if doftype not in self._doftypes:
-            raise ValueError('Unrecognized doftype ' + doftype)
+        err_msg = ('Mechanical modifications can only be calculated for '
+                   + 'degrees of freedom with one drive')
+        if isinstance(drive_out, ctrl.DegreeOfFreedom):
+            if len(drive_out.drives) != 1:
+                raise ValueError(err_msg)
+            for key in drive_out.drives.keys():
+                drive_out, doftype_out = key.split('.')
+        else:
+            doftype_out = doftype
 
-        out_det = '_' + drive_out + '_' + doftype
+        if isinstance(drive_in, ctrl.DegreeOfFreedom):
+            if len(drive_in.drives) != 1:
+                raise ValueError(err_msg)
+            for key in drive_in.drives.keys():
+                drive_in, doftype_in = key.split('.')
+        else:
+            doftype_in = doftype
+
+        if doftype_in not in self._doftypes:
+            raise ValueError('Unrecognized in doftype ' + doftype_in)
+        if doftype_out not in self._doftypes:
+            raise ValueError('Unrecognized out doftype ' + doftype_out)
+
+        out_det = '_' + drive_out + '_' + doftype_out
         if out_det not in self.pos_detectors:
             raise ValueError(out_det + ' is not a detector in this model')
 
-        return self._mechmod[doftype][out_det][drive_in]
+        return self._mechmod[doftype_in][out_det][drive_in]
 
     def getMechTF(self, outDrives, inDrives, doftype='pos'):
         """Compute a mechanical transfer function

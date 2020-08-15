@@ -113,8 +113,26 @@ def test_mMech_EX_EX():
     assert np.allclose(mMech, ref)
 
 
+def test_mMech_EX_EX2():
+    ex = ctrl.DegreeOfFreedom('EX', doftype='pitch')
+    mMech1 = opt.getMechMod('EX', ex, doftype='pitch')
+    mMech2 = opt.getMechMod(ex, 'EX', doftype='pitch')
+    ref = data['mMech_EX_EX']
+    c1 = np.allclose(mMech1, ref)
+    c2 = np.allclose(mMech2, ref)
+    assert np.all([c1, c2])
+
+
 def test_mMech_IX_EX():
     mMech = opt.getMechMod('IX', 'EX', doftype='pitch')
+    ref = data['mMech_IX_EX']
+    assert np.allclose(mMech, ref)
+
+
+def test_mMech_IX_EX2():
+    ex = ctrl.DegreeOfFreedom('EX', 'pitch')
+    ix = ctrl.DegreeOfFreedom('IX', 'pitch')
+    mMech = opt.getMechMod(ix, ex)
     ref = data['mMech_IX_EX']
     assert np.allclose(mMech, ref)
 
