@@ -126,6 +126,12 @@ class TestFreqResp:
         sig = self.opt.getSigDC('REFL_Q')
         assert np.isclose(sig, data['dcQ'])
 
+    def test_amp2pos(self):
+        ex = DegreeOfFreedom('EX')
+        laser_amp = DegreeOfFreedom('AM', 'drive')
+        amp2pos = self.opt.getMechTF(ex, laser_amp)
+        assert np.allclose(amp2pos, data['amp2pos'])
+
     def test_reload_tfI(self):
         tfI = self.opt2.getTF('REFL_I', 'EX')
         assert np.allclose(tfI, data['tfI'])

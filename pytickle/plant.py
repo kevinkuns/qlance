@@ -235,7 +235,7 @@ class OpticklePlant:
             * In units of [m/N] for position
             * In units of [rad/(N m)] for pitch and yaw
         """
-        if doftype not in ['pos', 'pitch', 'yaw']:
+        if doftype not in self._doftypes:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(doftype))
 
         # figure out the shape of the TF
@@ -254,7 +254,12 @@ class OpticklePlant:
         # loop through drives to compute the TF
         for inDrive, c_in in inDrives.dofs():
             # get the default mechanical plant of the optic being driven
-            plant = self._mech_plants[inDrive.doftype][inDrive.name]
+            dof_in = self._doftype2pos(inDrive.doftype)
+            plant = self._mech_plants[dof_in][inDrive.name]
+            if inDrive.doftype in ['drive', 'amp', 'phase']:
+                z, p, k = plant.get_zpk()
+                if k == 0:
+                    plant = ctrl.Filter([], [], 1)
 
             for outDrive, c_out in outDrives.dofs():
                 mmech = self.getMechMod(outDrive, inDrive)
@@ -552,6 +557,14 @@ class OpticklePlant:
 
         return nDOF
 
+    def _doftype2pos(self, doftype):
+        """Convert doftypes into pos, pitch, or yaw
+        """
+        if doftype in ['pos', 'drive', 'amp', 'phase']:
+            return 'pos'
+        else:
+            return doftype
+
     def _pol2opt(self, pol):
         """Convert S and P polarizations to 1s and 0s for Optickle
         """
@@ -770,7 +783,7 @@ class FinessePlant:
             * In units of [m/N] for position
             * In units of [rad/(N m)] for pitch and yaw
         """
-        if doftype not in ['pos', 'pitch', 'yaw']:
+        if doftype not in self._doftypes:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(doftype))
 
         # figure out the shape of the TF

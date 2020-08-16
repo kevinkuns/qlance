@@ -39,6 +39,7 @@ def katFP():
 
     fin.addReadout(kat, 'REFL', 'IX_bk', fmod, 0)
     fin.monitorAllQuantumNoise(kat)
+    fin.monitorMotion(kat, 'EX')
 
     kat.phase = 2
 
@@ -121,6 +122,12 @@ class TestFreqResp:
     def test_DC_Q(self):
         sig = self.katFR.getSigDC('REFL_Q')
         assert np.isclose(sig, data['dcQ'])
+
+    def test_amp2pos(self):
+        ex = DegreeOfFreedom('EX')
+        laser_amp = DegreeOfFreedom('Laser', 'amp')
+        amp2pos = self.katFR.getMechTF(ex, laser_amp)
+        assert np.allclose(amp2pos, data['amp2pos'])
 
     def test_reload_tfI(self):
         tfI = self.katFR2.getTF('REFL_I', 'EX')
