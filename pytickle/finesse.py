@@ -221,7 +221,7 @@ def addSpace(kat, node1, node2, length, n=1, new_comp=None):
         ncmp = np.count_nonzero(inds)
         if ncmp != 1:
             raise ValueError(
-                'The node {:s} is connected to {:d}'.format(ncmp, node_name)
+                'The node {:s} is connected to {:d}'.format(node_name, ncmp)
                 + ' components but should only be connected to one')
         return comps[inds][0].name
 
