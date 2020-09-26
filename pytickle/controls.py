@@ -430,6 +430,9 @@ class Filter:
                   + ' and gain at a specific frequency'
             raise ValueError(msg)
 
+    def __call__(self, ff):
+        return self.computeFilter(ff)
+
     def computeFilter(self, ff):
         """Compute the filter
 

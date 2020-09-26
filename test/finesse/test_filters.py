@@ -85,6 +85,11 @@ class TestFilters:
         zpk2 = self.filt1d.get_zpk()
         assert np.all(check_zpk_equality(zpk1, zpk2))
 
+    def test_1a_compute(self):
+        tf1 = self.filt1a.computeFilter(self.ff)
+        tf2 = self.filt1a(self.ff)
+        assert np.allclose(tf1, tf2)
+
     def test_2(self):
         k2 = self.k2
         p2 = self.p2
