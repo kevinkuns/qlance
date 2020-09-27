@@ -117,10 +117,6 @@ class OpticklePlant:
         if dof not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
 
-        if fit:
-            tf = self.getTF(probes, drives, dof=dof, optOnly=optOnly)
-            return ctrl.FitTF(self.ff, tf)
-
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
             # TF is at a single frequency
@@ -168,7 +164,10 @@ class OpticklePlant:
                 except IndexError:
                     tf += pc * drive_pos * tfData[driveNum]
 
-        return tf
+        if fit:
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
     def getMechMod(self, drive_out, drive_in, dof='pos', fit=False):
         """Get the radiation pressure modifications to drives
@@ -182,10 +181,6 @@ class OpticklePlant:
         """
         if dof not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
-
-        if fit:
-            tf = self.getMechMod(drive_out, drive_in, dof=dof)
-            return ctrl.FitTF(self.ff, tf)
 
         # figure out which raw output matrix to use
         if dof in ['pos', 'drive', 'amp', 'phase']:
@@ -203,7 +198,11 @@ class OpticklePlant:
         driveInNum = self._getDriveIndex(drive_in, dof)
         driveOutNum = self._getDriveIndex(drive_out, dof)
 
-        return mMech[driveOutNum, driveInNum]
+        if fit:
+            tf = self.getMechMod(drive_out, drive_in, dof=dof)
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return mMech[driveOutNum, driveInNum]
 
     def getMechTF(self, outDrives, inDrives, dof='pos', fit=False):
         """Compute a mechanical transfer function
@@ -222,10 +221,6 @@ class OpticklePlant:
         """
         if dof not in ['pos', 'pitch', 'yaw']:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
-
-        if fit:
-            tf = self.getMechTF(outDrives, inDrives, dof=dof)
-            return ctrl.FitTF(self.ff, tf)
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
@@ -250,7 +245,11 @@ class OpticklePlant:
                 mmech = self.getMechMod(outDrive, inDrive, dof=dof)
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
-        return tf
+        if fit:
+            tf = self.getMechTF(outDrives, inDrives, dof=dof)
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
     def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
                    dof='pos', **kwargs):
@@ -264,7 +263,7 @@ class OpticklePlant:
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig
 
-    def getQuantumNoise(self, probeName, dof='pos'):
+    def getQuantumNoise(self, probeName, dof='pos', fit=False):
         """Compute the quantum noise at a probe
 
         Returns the quantum noise at a given probe in [W/rtHz]
@@ -274,7 +273,11 @@ class OpticklePlant:
             qnoise = self._noiseAC[dof][probeNum, :]
         except IndexError:
             qnoise = self._noiseAC[dof][probeNum]
-        return qnoise
+
+        if fit:
+            return ctrl.FitTF(self.ff, qnoise)
+        else:
+            return qnoise
 
     def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
                dof='pos', optOnly=False, **kwargs):
@@ -685,9 +688,6 @@ class FinessePlant:
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
 
-        if fit:
-            tf = self.getTF(probes, drives, dof=dof)
-            return ctrl.FitTF(self.ff, tf)
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
@@ -709,7 +709,10 @@ class FinessePlant:
                 # add the contribution from this drive
                 tf += pc * drive_pos * self._freqresp[dof][probe][drive]
 
-        return tf
+        if fit:
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
     def getMechMod(self, drive_out, drive_in, dof='pos', fit=False):
         """Get the radiation pressure modifications to drives
@@ -724,15 +727,15 @@ class FinessePlant:
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
 
-        if fit:
-            tf = self.getMechMod(drive_out, drive_in, dof=dof)
-            return ctrl.FitTF(self.ff, tf)
-
         out_det = '_' + drive_out + '_' + dof
         if out_det not in self.pos_detectors:
             raise ValueError(out_det + ' is not a detector in this model')
 
-        return self._mechmod[dof][out_det][drive_in]
+        if fit:
+            tf = self.getMechMod(drive_out, drive_in, dof=dof)
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return self._mechmod[dof][out_det][drive_in]
 
     def getMechTF(self, outDrives, inDrives, dof='pos', fit=False):
         """Compute a mechanical transfer function
@@ -751,10 +754,6 @@ class FinessePlant:
         """
         if dof not in ['pos', 'pitch', 'yaw']:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
-
-        if fit:
-            tf = self.getMechTF(outDrives, inDrives, dof=dof)
-            return ctrl.FitTF(self.ff, tf)
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
@@ -779,9 +778,13 @@ class FinessePlant:
                 mmech = self.getMechMod(outDrive, inDrive, dof=dof)
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
-        return tf
+        if fit:
+            tf = self.getMechTF(outDrives, inDrives, dof=dof)
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
-    def getQuantumNoise(self, probeName, dof='pos'):
+    def getQuantumNoise(self, probeName, dof='pos', fit=False):
         """Compute the quantum noise at a probe
 
         Returns the quantum noise at a given probe in [W/rtHz]
@@ -798,7 +801,11 @@ class FinessePlant:
 
         if np.any(np.iscomplex(qnoise)):
             print('Warning: some quantum noise spectra are complex')
-        return np.real(qnoise)
+
+        if fit:
+            return ctrl.FitTF(self.ff, np.real(qnoise))
+        else:
+            return np.real(qnoise)
 
     def getSigDC(self, probeName):
         """Get the DC signal from a probe

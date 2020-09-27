@@ -975,13 +975,15 @@ class ControlSystem:
         except ValueError:
             raise ValueError(drive + ' does not have a compensation filter')
 
-    def getOLTF(self, sig_to, sig_from, tstpnt):
+    def getOLTF(self, sig_to, sig_from, tstpnt, fit=False):
         """Compute an OLTF
 
         Inputs:
           sig_to: output signal
           sig_from: input signal
           tstpnt: which test point to compute the TF for
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
         """
         oltf = self._oltf[tstpnt]
         if sig_from:
@@ -990,15 +992,21 @@ class ControlSystem:
         if sig_to:
             to_ind = self._getIndex(sig_to, tstpnt)
             oltf = oltf[to_ind]
-        return oltf
 
-    def getCLTF(self, sig_to, sig_from, tstpnt):
+        if fit:
+            return FitTF(self.ff, oltf)
+        else:
+            return oltf
+
+    def getCLTF(self, sig_to, sig_from, tstpnt, fit=False):
         """Compute a CLTF
 
         Inputs:
           sig_to: output signal
           sig_from: input signal
           tstpnt: which test point to compute the TF for
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
         """
         cltf = self._cltf[tstpnt]
         if sig_from:
@@ -1007,7 +1015,11 @@ class ControlSystem:
         if sig_to:
             to_ind = self._getIndex(sig_to, tstpnt)
             cltf = cltf[to_ind]
-        return cltf
+
+        if fit:
+            return FitTF(self.ff, cltf)
+        else:
+            return cltf
 
     def compute_margins(self, sig_to, sig_from, tstpnt):
         """Compute stability margins for a loop
