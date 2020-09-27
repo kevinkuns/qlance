@@ -1198,7 +1198,7 @@ class KatFR(plant.FinessePlant):
         for all of them. (Default: True)
     """
     def __init__(self, kat, all_drives=True):
-        plant.FinessePlant.__init__(self)
+        super().__init__()
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'fr')
         self._lambda0 = self.kat.lambda0

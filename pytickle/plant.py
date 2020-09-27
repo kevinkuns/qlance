@@ -72,7 +72,7 @@ class OpticklePlant:
         """
         return self._ff
 
-    def getTF(self, probes, drives, dof='pos', optOnly=False):
+    def getTF(self, probes, drives, dof='pos', optOnly=False, fit=False):
         """Compute a transfer function
 
         Inputs:
@@ -80,6 +80,8 @@ class OpticklePlant:
           drives: names of the drives from which the TF is calculated
           dof: degree of freedom of the drives (Default: pos)
           optOnly: if True, only return the optical TF with no mechanics
+            (Default: False)
+          fit: if True, returns a FitTF fit to the transfer function
             (Default: False)
 
         Returns:
@@ -114,6 +116,10 @@ class OpticklePlant:
         """
         if dof not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+
+        if fit:
+            tf = self.getTF(probes, drives, dof=dof, optOnly=optOnly)
+            return ctrl.FitTF(self.ff, tf)
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
@@ -164,16 +170,22 @@ class OpticklePlant:
 
         return tf
 
-    def getMechMod(self, drive_out, drive_in, dof='pos'):
+    def getMechMod(self, drive_out, drive_in, dof='pos', fit=False):
         """Get the radiation pressure modifications to drives
 
         Inputs:
           drive_out: name of the output drive
           drive_in: name of the input drive
           dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
         """
         if dof not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+
+        if fit:
+            tf = self.getMechMod(drive_out, drive_in, dof=dof)
+            return ctrl.FitTF(self.ff, tf)
 
         # figure out which raw output matrix to use
         if dof in ['pos', 'drive', 'amp', 'phase']:
@@ -193,13 +205,15 @@ class OpticklePlant:
 
         return mMech[driveOutNum, driveInNum]
 
-    def getMechTF(self, outDrives, inDrives, dof='pos'):
+    def getMechTF(self, outDrives, inDrives, dof='pos', fit=False):
         """Compute a mechanical transfer function
 
         Inputs:
           outDrives: name of the output drives
           inDrives: name of the input drives
           dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
 
         Returns:
           tf: the transfer function
@@ -208,6 +222,10 @@ class OpticklePlant:
         """
         if dof not in ['pos', 'pitch', 'yaw']:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+
+        if fit:
+            tf = self.getMechTF(outDrives, inDrives, dof=dof)
+            return ctrl.FitTF(self.ff, tf)
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
@@ -627,13 +645,15 @@ class FinessePlant:
         """
         return self._lambda0
 
-    def getTF(self, probes, drives, dof='pos'):
+    def getTF(self, probes, drives, dof='pos', fit=False):
         """Compute a transfer function
 
         Inputs:
           probes: name of the probes at which the TF is calculated
           drives: names of the drives from which the TF is calculated
           dof: degree of freedom of the drives (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
 
         Returns:
           tf: the transfer function
@@ -665,6 +685,10 @@ class FinessePlant:
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
 
+        if fit:
+            tf = self.getTF(probes, drives, dof=dof)
+            return ctrl.FitTF(self.ff, tf)
+
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
             # TF is at a single frequency
@@ -687,16 +711,22 @@ class FinessePlant:
 
         return tf
 
-    def getMechMod(self, drive_out, drive_in, dof='pos'):
+    def getMechMod(self, drive_out, drive_in, dof='pos', fit=False):
         """Get the radiation pressure modifications to drives
 
         Inputs:
           drive_out: name of the output drive
           drive_in: name of the input drive
           dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
         """
         if dof not in self._dofs:
             raise ValueError('Unrecognized dof ' + dof)
+
+        if fit:
+            tf = self.getMechMod(drive_out, drive_in, dof=dof)
+            return ctrl.FitTF(self.ff, tf)
 
         out_det = '_' + drive_out + '_' + dof
         if out_det not in self.pos_detectors:
@@ -704,13 +734,15 @@ class FinessePlant:
 
         return self._mechmod[dof][out_det][drive_in]
 
-    def getMechTF(self, outDrives, inDrives, dof='pos'):
+    def getMechTF(self, outDrives, inDrives, dof='pos', fit=False):
         """Compute a mechanical transfer function
 
         Inputs:
           outDrives: name of the output drives
           inDrives: name of the input drives
           dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
 
         Returns:
           tf: the transfer function
@@ -719,6 +751,10 @@ class FinessePlant:
         """
         if dof not in ['pos', 'pitch', 'yaw']:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(dof))
+
+        if fit:
+            tf = self.getMechTF(outDrives, inDrives, dof=dof)
+            return ctrl.FitTF(self.ff, tf)
 
         # figure out the shape of the TF
         if isinstance(self.ff, Number):
