@@ -430,6 +430,20 @@ class Filter:
                   + ' and gain at a specific frequency'
             raise ValueError(msg)
 
+    @property
+    def is_stable(self):
+        """True if the filter is stable
+        (the real part of all poles are negative)
+        """
+        return np.all(np.real(self._ps < 0))
+
+    @property
+    def is_mindelay(self):
+        """True if the filter has minimum delay
+        (the real part of all zeros are negative)
+        """
+        return np.all(np.real(self._zs < 0))
+
     def __call__(self, ff):
         ss = 2j*np.pi*ff
         return self._filt(ss)
