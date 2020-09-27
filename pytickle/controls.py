@@ -431,7 +431,8 @@ class Filter:
             raise ValueError(msg)
 
     def __call__(self, ff):
-        return self.computeFilter(ff)
+        ss = 2j*np.pi*ff
+        return self._filt(ss)
 
     def computeFilter(self, ff):
         """Compute the filter
@@ -439,8 +440,7 @@ class Filter:
         Inputs:
           ff: frequency vector at which to compute the filter [Hz]
         """
-        ss = 2j*np.pi*ff
-        return self._filt(ss)
+        return self.__call__(ff)
 
     def get_zpk(self, Hz=False, as_dict=False):
         """Get the zeros, poles, and gain of this filter
@@ -509,6 +509,74 @@ class Filter:
         io.possible_none_to_hdf5(zs, path + '/zs', h5file)
         io.possible_none_to_hdf5(ps, path + '/ps', h5file)
         h5file[path + '/k'] = k
+
+
+class FitTF(Filter):
+    """Filter class to fit transfer functions
+
+    Inputs:
+      ff: frequency vector of data to be fit [Hz]
+      data: transfer function data
+    """
+    def __init__(self, ff, data):
+        super().__init__([], [], 0)
+        self._ff = ff
+        self._data = data
+        self._fit = AAA.tfAAA(ff, data)
+        zs, ps, k = self.fit.zpk
+        a = 2*np.pi
+        exc = len(ps) - len(zs)  # excess number of poles of zeros
+        # convert to s-plane
+        self._zs = a * zs
+        self._ps = a * ps
+        self._k = (2*np.pi)**exc * k  # convert IIRrational's gain convention
+        self._filt = partial(zpk, self._zs, self._ps, self._k)
+
+    @property
+    def fit(self):
+        """IIRrational AAA fit results
+        """
+        return self._fit
+
+    @property
+    def ff(self):
+        """Frequency vector used for the fit
+        """
+        return self._ff
+
+    @property
+    def data(self):
+        """Fit data
+        """
+        return self._data
+
+    def __call__(self, ff):
+        return self.fit(ff)
+
+    def check_fit(self, ff, fit_first=True):
+        """Plot data along with the interpolated fit
+
+        Inputs:
+          ff: frequency vector for interpolation [Hz]
+          fit_first:
+            if True, the data is plotted on top of the fit
+            if False, the fit is plotted on top of the data
+            (Default: True)
+
+        Returns:
+          fig: the figure
+        """
+        if fit_first:
+            fig = self.plotFilter(ff, label='Fit')
+            plotting.plotTF(
+                self.ff, self.data, *fig.axes, ls='-.', label='Data')
+
+        else:
+            fig = plotting.plotTF(self.ff, self.data, label='Data')
+            self.plotFilter(ff, *fig.axes, ls='-.', label='Fit')
+
+        fig.axes[0].legend()
+        return fig
 
 
 class ControlSystem:
