@@ -507,6 +507,52 @@ class Filter:
             dB=dB, **kwargs)
         return fig
 
+    def plot_poles(self, Hz=True):
+        """Plot the poles of the filter
+
+        Plots the poles of the filter in the complex plane
+
+        Inputs:
+          Hz: if true the poles are plotted in Hz, however stable
+            poles are still plotted in the LHP (Default: True)
+        """
+        a = (2*np.pi)**Hz
+        ps = self._ps / a
+        fig = plt.figure()
+        fig.gca().plot(ps.real, ps.imag, '.')
+
+        if Hz:
+            freq_label = 'Frequency [Hz]'
+        else:
+            freq_label = 'Frequency [rad/s]'
+        fig.gca().set_xlabel(freq_label)
+        fig.gca().set_ylabel(freq_label)
+
+        return fig
+
+    def plot_zeros(self, Hz=True):
+        """Plot the zeros of the filter
+
+        Plots the zeros of the filter in the complex plane
+
+        Inputs:
+          Hz: if true the zeros are plotted in Hz, however minimum delay
+            zeros are still plotted in the LHP (Default: True)
+        """
+        a = (2*np.pi)**Hz
+        zs = self._zs / a
+        fig = plt.figure()
+        fig.gca().plot(zs.real, zs.imag, '.')
+
+        if Hz:
+            freq_label = 'Frequency [Hz]'
+        else:
+            freq_label = 'Frequency [rad/s]'
+        fig.gca().set_xlabel(freq_label)
+        fig.gca().set_ylabel(freq_label)
+
+        return fig
+
     def to_hdf5(self, path, h5file):
         """Save a filter to an hdf5 file
 
