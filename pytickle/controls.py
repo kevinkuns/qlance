@@ -584,12 +584,16 @@ class FitTF(Filter):
         self._data = data
         self._fit = AAA.tfAAA(ff, data)
         zs, ps, k = self.fit.zpk
-        a = 2*np.pi
-        exc = len(ps) - len(zs)  # excess number of poles of zeros
+
         # convert to s-plane
+        a = 2*np.pi
         self._zs = a * zs
         self._ps = a * ps
-        self._k = (2*np.pi)**exc * k  # convert IIRrational's gain convention
+
+        # convert IIRrational's gain convention
+        exc = len(ps) - len(zs)  # excess number of poles over zeros
+        self._k = (2*np.pi)**exc * k
+
         self._filt = partial(zpk, self._zs, self._ps, self._k)
 
     @property
@@ -1138,11 +1142,19 @@ class ControlSystem:
                                'display.max_columns', None):
             display(margins)
 
-    def getTF(self, sig_to, tp_to, sig_from, tp_from, closed=True):
+    def getTF(self, sig_to, tp_to, sig_from, tp_from, closed=True, fit=False):
         """Get a transfer function between two test points in a loop
 
         If sig_to is the empty string '', the vector to all signals is returned
         If sig_from is the empty string '', the vector of all signals is returned
+
+        Inputs:
+          sig_to: output signal
+          sig_from: input signal
+          tp_to: output test point
+          tp_from: input test point
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
         """
         def cltf_or_unity(tp_to):
             """Returns the CLTF if a closed loop TF is necessary and the identity
@@ -1219,7 +1231,15 @@ class ControlSystem:
             to_ind = self._getIndex(sig_to, tp_to)
             tf = tf[to_ind]
 
-        return tf
+        # Return the TF fitting it if necessary
+        if fit:
+            if not (sig_to and sig_from):
+                raise ValueError(
+                    'Fits can only be returned for single transfer functions')
+            else:
+                return FitTF(self.ff, tf)
+        else:
+            return tf
 
     def getTotalNoiseTo(self, sig_to, tp_to, tp_from, noiseASDs, closed=True):
         """Compute the total noise at a test point due to multiple sources
