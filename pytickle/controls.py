@@ -223,6 +223,54 @@ def compute_stability_margin(ff, tf):
     return fms, sm
 
 
+def _plot_zp(zps, zp_type, Hz=True, fig=None):
+    """Plots zeros or poles in the complex plane
+
+    Inputs:
+      zps: an array of the zeros or poles in the s-domain
+      zp_type: 'zero' for zeros and 'pole' for poles
+      Hz: whether the zeros and poles should be plotted in
+        Hz (True) or rad/s (False)
+      fig: if not None, existing figure to plot on
+
+    Returns:
+      fig: the figure
+    """
+    if fig is None:
+        fig = plt.figure()
+        w, h = fig.get_size_inches()
+        dd = min([w, h])
+        fig.set_size_inches(dd, dd)
+        ax = fig.add_subplot(111)
+    else:
+        ax = fig.gca()
+
+    a = (2*np.pi)**Hz
+    zps = zps / a
+
+    kwargs = dict(fillstyle='none', linestyle='none', markeredgewidth=3)
+    if zp_type == 'zero':
+        kwargs['marker'] = 'o'
+        kwargs['color'] = 'xkcd:cerulean'
+        kwargs['fillstyle'] = 'none'
+    elif zp_type == 'pole':
+        kwargs['marker'] = 'x'
+        kwargs['color'] = 'xkcd:brick red'
+    else:
+        raise ValueError('the zp_type should only be pole or zero')
+
+    ax.plot(zps.real, zps.imag, **kwargs)
+
+    if Hz:
+        freq_label = 'Frequency [Hz]'
+    else:
+        freq_label = 'Frequency [rad/s]'
+    ax.set_xlabel(freq_label)
+    ax.set_ylabel(freq_label)
+
+    return fig
+
+
 def plotNyquist(oltf, rmax=3):
     """Make a Nyquist plot
 
@@ -515,19 +563,11 @@ class Filter:
         Inputs:
           Hz: if true the poles are plotted in Hz, however stable
             poles are still plotted in the LHP (Default: True)
+
+        Returns:
+          fig: the figure
         """
-        a = (2*np.pi)**Hz
-        ps = self._ps / a
-        fig = plt.figure()
-        fig.gca().plot(ps.real, ps.imag, '.')
-
-        if Hz:
-            freq_label = 'Frequency [Hz]'
-        else:
-            freq_label = 'Frequency [rad/s]'
-        fig.gca().set_xlabel(freq_label)
-        fig.gca().set_ylabel(freq_label)
-
+        fig = _plot_zp(self._ps, 'pole', Hz=Hz)
         return fig
 
     def plot_zeros(self, Hz=True):
@@ -538,19 +578,29 @@ class Filter:
         Inputs:
           Hz: if true the zeros are plotted in Hz, however minimum delay
             zeros are still plotted in the LHP (Default: True)
+
+        Returns:
+          fig: the figure
         """
-        a = (2*np.pi)**Hz
-        zs = self._zs / a
-        fig = plt.figure()
-        fig.gca().plot(zs.real, zs.imag, '.')
+        fig = _plot_zp(self._zs, 'zero', Hz=Hz)
+        return fig
 
-        if Hz:
-            freq_label = 'Frequency [Hz]'
-        else:
-            freq_label = 'Frequency [rad/s]'
-        fig.gca().set_xlabel(freq_label)
-        fig.gca().set_ylabel(freq_label)
+    def plot_zp(self, Hz=True):
+        """Plot the zeros and poles of the filter
 
+        Plots the zeros of the filter as blue circles and the poles as
+        red crosses in the complex plane
+
+        Inputs:
+          Hz: if true the zeros and poles are plotted in Hz, however
+            unstable poles and minimum delay zeros are still plotted in
+            the LHP (Default: True)
+
+        Returns:
+          fig: the figure
+        """
+        fig = _plot_zp(self._zs, 'zero', Hz=Hz)
+        _plot_zp(self._ps, 'pole', Hz=Hz, fig=fig)
         return fig
 
     def to_hdf5(self, path, h5file):
