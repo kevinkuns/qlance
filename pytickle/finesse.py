@@ -893,21 +893,30 @@ def get_drive_dof(kat, drive, dof, force=False):
             return kat.components[drive].L
 
 
-def has_dof(kat, drive, dof):
+def has_dof(kat, drive, doftype):
     """Check whether a component has a given degree of freedom
     """
     comp = kat.components[drive]
-    if dof in ['pos', 'pitch', 'yaw']:
+    if doftype in ['pos', 'pitch', 'yaw']:
         if isinstance(comp, (kcmp.mirror, kcmp.beamSplitter)):
             return True
         else:
             return False
 
-    elif dof in ['amp', 'freq']:
+    elif doftype in ['amp', 'freq']:
         if isinstance(comp, kcmp.laser):
             return True
         else:
             return False
+
+    elif doftype == 'len':
+        if isinstance(comp, kcmp.space):
+            return True
+        else:
+            return False
+
+    else:
+        raise ValueError('Unrecognized doftype ' + doftype)
 
 
 def extract_zpk(comp, dof):

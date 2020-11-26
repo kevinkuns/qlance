@@ -572,7 +572,7 @@ class FinessePlant:
     """A Finesse Optomechanical plant
     """
     def __init__(self):
-        self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq']
+        self._dofs = ['pos', 'pitch', 'yaw', 'amp', 'freq', 'len']
         self._drives = []
         self._probes = []
         self._amp_detectors = []
