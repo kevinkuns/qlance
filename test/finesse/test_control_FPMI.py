@@ -9,21 +9,12 @@ import scipy.signal as sig
 import pytickle.noise as pytnoise
 import parFPMI
 import katFPMI
+import close
 import pytest
 
 
 data_ref = np.load(
     'data/finesse_control_FPMI_data.npz', allow_pickle=True)['data'][()]
-
-
-def check_dicts(dict1, dict2):
-    if len(dict1) != len(dict2):
-        raise ValueError('dictionaries are definitely not the same')
-
-    equal = []
-    for key, val1 in dict1.items():
-        equal.append(np.allclose(val1, dict2[key]))
-    return equal
 
 
 data = {}
@@ -299,24 +290,25 @@ data['residuals'] = dict(
 
 
 def test_oltfs():
-    assert check_dicts(data_ref['oltfs'], data['oltfs'])
+    assert all(close.check_dicts(data_ref['oltfs'], data['oltfs']))
 
 
 def test_cltfs():
-    assert check_dicts(data_ref['cltfs'], data['cltfs'])
+    assert all(close.check_dicts(data_ref['cltfs'], data['cltfs']))
 
 
 def test_cross_couplings():
-    assert check_dicts(data_ref['cross_couplings'], data['cross_couplings'])
+    assert all(close.check_dicts(
+        data_ref['cross_couplings'], data['cross_couplings']))
 
 
 def test_cal():
-    assert check_dicts(data_ref['cal'], data['cal'])
+    assert all(close.check_dicts(data_ref['cal'], data['cal']))
 
 
 def test_noise():
-    assert check_dicts(data_ref['noise'], data['noise'])
+    assert all(close.check_dicts(data_ref['noise'], data['noise']))
 
 
 def test_residuals():
-    assert check_dicts(data_ref['residuals'], data['residuals'])
+    assert all(close.check_dicts(data_ref['residuals'], data['residuals']))

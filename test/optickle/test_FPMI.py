@@ -5,6 +5,7 @@ Unit tests for optickle FPMI frequency response and sweeps
 import matlab.engine
 import numpy as np
 import pytickle.optickle as pyt
+import close
 import pytest
 
 eng = matlab.engine.start_matlab()
@@ -64,15 +65,15 @@ class TestFreqResp:
 
     def test_tfQ_EM(self):
         tfQ_EM = self.opt.getTF('AS_Q', {'EX': 0.5, 'EY': -0.5})
-        assert np.allclose(tfQ_EM, data['tfQ_EM'])
+        assert close.allclose(tfQ_EM, data['tfQ_EM'])
 
     def test_tfI_EM(self):
         tfI_EM = self.opt.getTF('AS_I', {'EX': 0.5, 'EY': -0.5})
-        assert np.allclose(tfI_EM, data['tfI_EM'])
+        assert close.allclose(tfI_EM, data['tfI_EM'])
 
     def test_tfQ_IM(self):
         tfQ_IM = self.opt.getTF('AS_Q', {'IX': 0.5, 'IY': -0.5})
-        assert np.allclose(tfQ_IM, data['tfQ_IM'])
+        assert close.allclose(tfQ_IM, data['tfQ_IM'])
 
 
 class TestSchnupp:
@@ -99,13 +100,13 @@ class TestSchnupp:
         powfl[ii] = optAsy.getDCpower('BS', 'AS', -fmod)
 
     def test_powf0(self):
-        assert np.allclose(self.powf0, data['powf0'])
+        assert close.allclose(self.powf0, data['powf0'])
 
     def test_powfu(self):
-        assert np.allclose(self.powfu, data['powfu'])
+        assert close.allclose(self.powfu, data['powfu'])
 
     def test_powfl(self):
-        assert np.allclose(self.powfl, data['powfl'])
+        assert close.allclose(self.powfl, data['powfl'])
 
 
 def computeSweep(ePos):
@@ -137,7 +138,7 @@ def assert_power(optic, ePos, powers_ref):
     # opt = computeSweep({optic: 180 * 1064e-9/360})
     opt = computeSweep(ePos)
     _, powers = getSweepPowers(opt, optic)
-    rslt = [np.allclose(powers[key]['f0'], powers_ref[key]['f0'])
+    rslt = [close.allclose(powers[key]['f0'], powers_ref[key]['f0'])
             for key in powers.keys()]
     return rslt
 

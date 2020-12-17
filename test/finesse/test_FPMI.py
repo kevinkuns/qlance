@@ -8,6 +8,7 @@ import pykat
 import pykat.components as kcmp
 import pykat.detectors as kdet
 import pykat.commands as kcmd
+import close
 import pytest
 
 
@@ -67,15 +68,15 @@ class TestFreqResp:
 
     def test_tfQ_EM(self):
         tfQ_EM = self.katTF.getTF('AS_Q', {'EX': 0.5, 'EY': -0.5})
-        assert np.allclose(tfQ_EM, data['tfQ_EM'])
+        assert close.allclose(tfQ_EM, data['tfQ_EM'])
 
     def test_tfI_EM(self):
         tfI_EM = self.katTF.getTF('AS_I', {'EX': 0.5, 'EY': -0.5})
-        assert np.allclose(tfI_EM, data['tfI_EM'])
+        assert close.allclose(tfI_EM, data['tfI_EM'])
 
     def test_tfQ_IM(self):
         tfQ_IM = self.katTF.getTF('AS_Q', {'IX': 0.5, 'IY': -0.5})
-        assert np.allclose(tfQ_IM, data['tfQ_IM'])
+        assert close.allclose(tfQ_IM, data['tfQ_IM'])
 
 
 def runAsy(ls):
@@ -105,13 +106,13 @@ class TestSchnupp:
         powfl[li] = outAsy['AS_fl']**2
 
     def test_powf0(self):
-        assert np.allclose(self.powf0, data['powf0'])
+        assert close.allclose(self.powf0, data['powf0'])
 
     def test_powfu(self):
-        assert np.allclose(self.powfu, data['powfu'])
+        assert close.allclose(self.powfu, data['powfu'])
 
     def test_powfl(self):
-        assert np.allclose(self.powfl, data['powfl'])
+        assert close.allclose(self.powfl, data['powfl'])
 
 
 def add_ads(kat, name, node):
@@ -151,12 +152,12 @@ def katSweep2(drives, spos, epos, dp=0, verbose=False):
 
 
 def assert_amp(out, sweep, key):
-    return np.allclose(out[key], data[sweep][()][key])
+    return close.allclose(out[key], data[sweep][()][key])
 
 
 def assert_amp2(kat, probe, sweep):
     _, sig = kat.getSweepSignal(probe, 'EX')
-    return np.allclose(sig, data[sweep][()][probe])
+    return close.allclose(sig, data[sweep][()][probe])
 
 
 class TestSweep:
