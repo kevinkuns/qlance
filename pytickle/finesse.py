@@ -1208,7 +1208,7 @@ class KatFR(plant.FinessePlant):
     """
     def __init__(self, kat, all_drives=True):
         plant.FinessePlant.__init__(self)
-        self.kat = kat.deepcopy()
+        self._kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'fr')
         self._lambda0 = self.kat.lambda0
         self.kat.noxaxis = False
@@ -1233,6 +1233,18 @@ class KatFR(plant.FinessePlant):
         # populate the list of beam parameter detectors
         self._bp_detectors = [name for name, det in kat.detectors.items()
                               if isinstance(det, kdet.bp)]
+
+        # get the finesse version used to compute this plant
+        try:
+            self._finesse_version = self.kat.finesse_version()
+        except:
+            self._finesse_version = '?.?.?'
+
+    @property
+    def kat(self):
+        """The Finesse model
+        """
+        return self._kat
 
     def runDC(self, verbose=False):
         """Compute the DC signals

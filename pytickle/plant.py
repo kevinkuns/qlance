@@ -35,6 +35,7 @@ class OpticklePlant:
         self._sigDC_sweep = None
         self._fDC_sweep = None
         self._qq = None
+        self._optickle_sha = '???'
 
     @property
     def vRF(self):
@@ -71,6 +72,12 @@ class OpticklePlant:
         """Frequency vector [Hz]
         """
         return self._ff
+
+    @property
+    def optickle_sha(self):
+        """Optickle commit SHA used to compute
+        """
+        return self._optickle_sha
 
     def getTF(self, probes, drives, dof='pos', optOnly=False):
         """Compute a transfer function
@@ -436,6 +443,7 @@ class OpticklePlant:
         io.possible_none_to_hdf5(self._noiseAC, 'noiseAC', data)
         _mech_plants_to_hdf5(self._mech_plants, 'mech_plants', data)
         io.possible_none_to_hdf5(self._qq, 'qq', data)
+        data['optickle_sha'] = self.optickle_sha
         data.close()
 
     def load(self, fname):
@@ -460,6 +468,10 @@ class OpticklePlant:
         self._noiseAC = io.hdf5_to_possible_none('noiseAC', data)
         self._mech_plants = _mech_plants_from_hdf5(data['mech_plants'], data)
         self._qq = io.hdf5_to_possible_none('qq', data)
+        try:
+            self._optickle_sha = data['optickle_sha'][()]
+        except KeyError:
+            self._optickle_sha = '???'
         data.close()
 
     def _getDriveIndex(self, name, dof):
@@ -584,6 +596,7 @@ class FinessePlant:
         self._mech_plants = {}
         self._ff = None
         self._lambda0 = None
+        self._finesse_version = '?.?.?'
 
     @property
     def drives(self):
@@ -626,6 +639,12 @@ class FinessePlant:
         """Wavelength [m]
         """
         return self._lambda0
+
+    @property
+    def finesse_version(self):
+        """Finesse version used to compute
+        """
+        return self._finesse_version
 
     def getTF(self, probes, drives, dof='pos'):
         """Compute a transfer function
@@ -935,6 +954,7 @@ class FinessePlant:
             io.none_to_hdf5('dcsigs', 'dict', data)
         data['ff'] = self.ff
         data['lambda0'] = self.lambda0
+        data['finesse_version'] = self.finesse_version
         data.close()
 
     def load(self, fname):
@@ -959,6 +979,10 @@ class FinessePlant:
         self._dcsigs = io.hdf5_to_possible_none('dcsigs', data)
         self._ff = data['ff'][()]
         self._lambda0 = data['lambda0'][()]
+        try:
+            self._finesse_version = data['finesse_version'][()]
+        except KeyError:
+            self._finesse_version = '?.?.?'
         data.close()
 
 

@@ -46,7 +46,9 @@ def addOpticklePath(eng, path=None):
             if a string, adds that string to the path
     """
     if path is None:
-        cmd = "addpath(genpath(getenv('OPTICKLE_PATH')));"
+        cmd1 = "OPTICKLE_PATH__ = getenv('OPTICKLE_PATH');"
     else:
-        cmd = "addpath(genpath({:s}));".format(str2mat(path))
-    eng.eval(cmd, nargout=0)
+        cmd1 = "OPTICKLE_PATH__ = {:s};".format(str2mat(path))
+    cmd2 = "addpath(genpath(OPTICKLE_PATH__));"
+    eng.eval(cmd1, nargout=0)
+    eng.eval(cmd2, nargout=0)

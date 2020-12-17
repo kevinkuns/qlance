@@ -11,6 +11,7 @@ from collections import OrderedDict
 import pandas as pd
 from . import utils
 from .matlab import mat2py, py2mat, str2mat, addOpticklePath
+import subprocess
 
 
 class PyTickle(plant.OpticklePlant):
@@ -59,6 +60,16 @@ class PyTickle(plant.OpticklePlant):
         # If it has, do not let a matlab model be associated with this
         # PyTickle instance to avoid potentially confusing results
         self._tickled = False
+
+        # get the commit SHA used to compute this plant
+        try:
+            gitdir = self.eng.workspace['OPTICKLE_PATH__'] + '/.git'
+            gitdir = '--git-dir=' + gitdir
+            gitsha = subprocess.check_output(
+                ['git', gitdir, 'rev-parse', 'HEAD'])
+            self._optickle_sha = str(gitsha, 'utf-8').rstrip()
+        except:
+            self._optickle_sha = '???'
 
     @property
     def optName(self):
