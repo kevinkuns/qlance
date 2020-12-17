@@ -7,15 +7,16 @@ import pytickle.controls as ctrl
 import scipy.signal as sig
 import h5py
 import os
+import close
 import pytest
 
 
 def check_zpk_equality(zpk1, zpk2):
     z1, p1, k1 = zpk1
     z2, p2, k2 = zpk2
-    c1 = np.all(np.isclose(np.sort(z1), np.sort(z2)))
-    c2 = np.all(np.isclose(np.sort(p1), np.sort(p2)))
-    c3 = np.isclose(k1, k2)
+    c1 = np.all(close.isclose(np.sort(z1), np.sort(z2)))
+    c2 = np.all(close.isclose(np.sort(p1), np.sort(p2)))
+    c3 = close.isclose(k1, k2)
     return c1, c2, c3
 
 
@@ -93,7 +94,7 @@ class TestFilters:
         data1 = self.filt2a.computeFilter(self.ff)
         # data2 = self.filt2b.computeFilter(self.ff)
         data2 = filt2b.computeFilter(self.ff)
-        assert np.allclose(data1, data2)
+        assert close.allclose(data1, data2)
 
     def test_cat1(self):
         assert check_filter_equality(self.filt3a, self.filt3b)
@@ -110,29 +111,29 @@ class TestFilters:
         data1 = self.filt3a.computeFilter(self.ff)
         # data2 = self.filt3d.computeFilter(self.ff)
         data2 = filt3d.computeFilter(self.ff)
-        assert np.allclose(data1, data2)
+        assert close.allclose(data1, data2)
 
     def test_gain(self):
         mag = np.abs(self.filt4.computeFilter(self.f4))
-        assert np.isclose(mag, self.g4)
+        assert close.isclose(mag, self.g4)
 
     def test_ss1(self):
         ss = self.filt1a.get_state_space()
         data1 = self.filt1a.computeFilter(self.ff)
         _, data2 = sig.freqresp(ss, 2*np.pi*self.ff)
-        assert np.allclose(data1, data2)
+        assert close.allclose(data1, data2)
 
     def test_ss2(self):
         ss = self.filt2a.get_state_space()
         data1 = self.filt2a.computeFilter(self.ff)
         _, data2 = sig.freqresp(ss, 2*np.pi*self.ff)
-        assert np.allclose(data1, data2)
+        assert close.allclose(data1, data2)
 
     def test_ss3(self):
         ss = self.filt3a.get_state_space()
         data1 = self.filt3a.computeFilter(self.ff)
         _, data2 = sig.freqresp(ss, 2*np.pi*self.ff)
-        assert np.allclose(data1, data2)
+        assert close.allclose(data1, data2)
 
     def test_1r(self):
         zpk1 = self.filt1a.get_zpk()

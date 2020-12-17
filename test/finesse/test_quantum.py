@@ -6,6 +6,7 @@ import numpy as np
 import pytickle.finesse as fin
 import pykat
 from pytickle.controls import resRoots
+import close
 import pytest
 
 
@@ -128,7 +129,7 @@ def get_data(sqAng, sqdB, phi):
 
 
 def get_results(tst_data, chk_data):
-    return [np.allclose(chk_data[key], val) for key, val in tst_data.items()]
+    return [close.allclose(chk_data[key], val) for key, val in tst_data.items()]
 
 
 class Test90_15_0:
@@ -199,15 +200,17 @@ class Test45_10_160_carrier_only:
     def test_lo(self):
         qnoise = self.kat_lo.getQuantumNoise('AS_DIFF')
         tf = self.kat_lo.getTF('AS_DIFF', DARM)
-        rslt1 = np.allclose(qnoise, self.chk_data['lo']['qnoise_DIFF'])
-        rslt2 = np.allclose(
+        rslt1 = close.allclose(
+            qnoise, self.chk_data['lo']['qnoise_DIFF'], rtol=1e-2, atol=1e-2)
+        rslt2 = close.allclose(
             tf, self.chk_data['lo']['tf_DIFF'], rtol=1e-2, atol=1e-2)
         assert all([rslt1, rslt2])
 
     def test_po(self):
         qnoise = self.kat_po.getQuantumNoise('AS_DIFF')
         tf = self.kat_po.getTF('AS_DIFF', DARM)
-        rslt1 = np.allclose(qnoise, self.chk_data['po']['qnoise_DIFF'])
-        rslt2 = np.allclose(
+        rslt1 = close.allclose(
+            qnoise, self.chk_data['po']['qnoise_DIFF'], rtol=1e-2, atol=1e-2)
+        rslt2 = close.allclose(
             tf, self.chk_data['po']['tf_DIFF'], rtol=1e-2, atol=1e-2)
         assert all([rslt1, rslt2])

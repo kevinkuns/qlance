@@ -9,6 +9,7 @@ import pykat.components as kcmp
 import pykat.commands as kcom
 import pytickle.plant as plant
 import os
+import close
 import pytest
 
 
@@ -59,99 +60,99 @@ class TestFreqResp:
 
     def test_tfI(self):
         tfI = self.katFR.getTF('REFL_I', 'EX')
-        assert np.allclose(tfI, data['tfI'])
+        assert close.allclose(tfI, data['tfI'])
 
     def test_tfQ(self):
         tfQ = self.katFR.getTF('REFL_Q', 'EX')
-        assert np.allclose(tfQ, data['tfQ'])
+        assert close.allclose(tfQ, data['tfQ'])
 
     def test_qnI(self):
         qnI = self.katFR.getQuantumNoise('REFL_I')
-        assert np.allclose(qnI, data['qnI'])
+        assert close.allclose(qnI, data['qnI'])
 
     def test_qnQ(self):
         qnQ = self.katFR.getQuantumNoise('REFL_Q')
-        assert np.allclose(qnQ, data['qnQ'])
+        assert close.allclose(qnQ, data['qnQ'])
 
     def test_qnDC(self):
         qnDC = self.katFR.getQuantumNoise('REFL_DC')
-        assert np.allclose(qnDC, data['qnDC'])
+        assert close.allclose(qnDC, data['qnDC'])
 
     def test_freqI(self):
         tf = self.katFR.getTF('REFL_I', 'Laser', dof='freq')
-        assert np.allclose(tf, data['tfI_freq'])
+        assert close.allclose(tf, data['tfI_freq'])
 
     def test_freqQ(self):
         tf = self.katFR.getTF('REFL_Q', 'Laser', dof='freq')
-        assert np.allclose(tf, data['tfQ_freq'])
+        assert close.allclose(tf, data['tfQ_freq'])
 
     def test_ampI(self):
         tf = self.katFR.getTF('REFL_I', 'Laser', dof='amp')
-        assert np.allclose(tf, data['tfI_amp'])
+        assert close.allclose(tf, data['tfI_amp'])
 
     def test_ampQ(self):
         tf = self.katFR.getTF('REFL_Q', 'Laser', dof='amp')
-        assert np.allclose(tf, data['tfQ_amp'])
+        assert close.allclose(tf, data['tfQ_amp'])
 
     def test_DC_DC(self):
         sig = self.katFR.getSigDC('REFL_DC')
-        assert np.isclose(sig, data['dcDC'])
+        assert close.isclose(sig, data['dcDC'])
 
     def test_DC_I(self):
         sig = self.katFR.getSigDC('REFL_I')
-        assert np.isclose(sig, data['dcI'])
+        assert close.isclose(sig, data['dcI'])
 
     def test_DC_Q(self):
         sig = self.katFR.getSigDC('REFL_Q')
-        assert np.isclose(sig, data['dcQ'])
+        assert close.isclose(sig, data['dcQ'])
 
     def test_reload_tfI(self):
         tfI = self.katFR2.getTF('REFL_I', 'EX')
-        assert np.allclose(tfI, data['tfI'])
+        assert close.allclose(tfI, data['tfI'])
 
     def test_reload_tfQ(self):
         tfQ = self.katFR2.getTF('REFL_Q', 'EX')
-        assert np.allclose(tfQ, data['tfQ'])
+        assert close.allclose(tfQ, data['tfQ'])
 
     def test_reload_qnI(self):
         qnI = self.katFR2.getQuantumNoise('REFL_I')
-        assert np.allclose(qnI, data['qnI'])
+        assert close.allclose(qnI, data['qnI'])
 
     def test_reload_qnQ(self):
         qnQ = self.katFR2.getQuantumNoise('REFL_Q')
-        assert np.allclose(qnQ, data['qnQ'])
+        assert close.allclose(qnQ, data['qnQ'])
 
     def test_reload_qnDC(self):
         qnDC = self.katFR2.getQuantumNoise('REFL_DC')
-        assert np.allclose(qnDC, data['qnDC'])
+        assert close.allclose(qnDC, data['qnDC'])
 
     def test_reload_freqI(self):
         tf = self.katFR2.getTF('REFL_I', 'Laser', dof='freq')
-        assert np.allclose(tf, data['tfI_freq'])
+        assert close.allclose(tf, data['tfI_freq'])
 
     def test_reload_freqQ(self):
         tf = self.katFR2.getTF('REFL_Q', 'Laser', dof='freq')
-        assert np.allclose(tf, data['tfQ_freq'])
+        assert close.allclose(tf, data['tfQ_freq'])
 
     def test_reload_ampI(self):
         tf = self.katFR2.getTF('REFL_I', 'Laser', dof='amp')
-        assert np.allclose(tf, data['tfI_amp'])
+        assert close.allclose(tf, data['tfI_amp'])
 
     def test_reload_ampQ(self):
         tf = self.katFR2.getTF('REFL_Q', 'Laser', dof='amp')
-        assert np.allclose(tf, data['tfQ_amp'])
+        assert close.allclose(tf, data['tfQ_amp'])
 
     def test_reload_DC_DC(self):
         sig = self.katFR2.getSigDC('REFL_DC')
-        assert np.isclose(sig, data['dcDC'])
+        assert close.isclose(sig, data['dcDC'])
 
     def test_reload_DC_I(self):
         sig = self.katFR2.getSigDC('REFL_I')
-        assert np.isclose(sig, data['dcI'])
+        assert close.isclose(sig, data['dcI'])
 
     def test_reload_DC_Q(self):
         sig = self.katFR2.getSigDC('REFL_Q')
-        assert np.isclose(sig, data['dcQ'])
+        assert close.isclose(sig, data['dcQ'])
 
 
 class TestSweep:
@@ -167,11 +168,11 @@ class TestSweep:
 
     def test_sweepI(self):
         _, sweepI = self.katSweep.getSweepSignal('REFL_I', 'EX')
-        assert np.allclose(sweepI, data['sweepI'])
+        assert close.allclose(sweepI, data['sweepI'])
 
     def test_sweepQ(self):
         _, sweepQ = self.katSweep.getSweepSignal('REFL_Q', 'EX')
-        assert np.allclose(sweepQ, data['sweepQ'])
+        assert close.allclose(sweepQ, data['sweepQ'])
 
 
 class TestFreqRespSetProbe:
@@ -187,11 +188,11 @@ class TestFreqRespSetProbe:
 
     def test_tfI(self):
         tfI = self.katFR.getTF('REFL_I', 'EX')
-        assert np.allclose(tfI, data['tfI'])
+        assert close.allclose(tfI, data['tfI'])
 
     def test_tfQ(self):
         tfQ = self.katFR.getTF('REFL_Q', 'EX')
-        assert np.allclose(tfQ, data['tfQ'])
+        assert close.allclose(tfQ, data['tfQ'])
 
 
 class TestSweepSetProbe:
@@ -211,8 +212,8 @@ class TestSweepSetProbe:
 
     def test_sweepI(self):
         _, sweepI = self.katSweep.getSweepSignal('REFL_I', 'EX')
-        assert np.allclose(sweepI, data['sweepI'])
+        assert close.allclose(sweepI, data['sweepI'])
 
     def test_sweepQ(self):
         _, sweepQ = self.katSweep.getSweepSignal('REFL_Q', 'EX')
-        assert np.allclose(sweepQ, data['sweepQ'])
+        assert close.allclose(sweepQ, data['sweepQ'])

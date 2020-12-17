@@ -7,6 +7,7 @@ import numpy as np
 import pytickle.optickle as pyt
 import pytickle.plant as plant
 import os
+import close
 import pytest
 
 eng = matlab.engine.start_matlab()
@@ -63,99 +64,99 @@ class TestFreqResp:
 
     def test_tfI(self):
         tfI = self.opt.getTF('REFL_I', 'EX')
-        assert np.allclose(tfI, data['tfI'])
+        assert close.allclose(tfI, data['tfI'])
 
     def test_tfQ(self):
         tfQ = self.opt.getTF('REFL_Q', 'EX')
-        assert np.allclose(tfQ, data['tfQ'])
+        assert close.allclose(tfQ, data['tfQ'])
 
     def test_qnI(self):
         qnI = self.opt.getQuantumNoise('REFL_I')
-        assert np.allclose(qnI, data['qnI'])
+        assert close.allclose(qnI, data['qnI'])
 
     def test_qnQ(self):
         qnQ = self.opt.getQuantumNoise('REFL_Q')
-        assert np.allclose(qnQ, data['qnQ'])
+        assert close.allclose(qnQ, data['qnQ'])
 
     def test_qnDC(self):
         qnDC = self.opt.getQuantumNoise('REFL_DC')
-        assert np.allclose(qnDC, data['qnDC'])
+        assert close.allclose(qnDC, data['qnDC'])
 
     def test_phaseI(self):
         tf = self.opt.getTF('REFL_I', 'PM', dof='drive')
-        assert np.allclose(tf, data['tfI_phase'])
+        assert close.allclose(tf, data['tfI_phase'])
 
     def test_phaseQ(self):
         tf = self.opt.getTF('REFL_Q', 'PM', dof='drive')
-        assert np.allclose(tf, data['tfQ_phase'])
+        assert close.allclose(tf, data['tfQ_phase'])
 
     def test_ampI(self):
         tf = self.opt.getTF('REFL_I', 'AM', dof='drive')
-        assert np.allclose(tf, data['tfI_amp'])
+        assert close.allclose(tf, data['tfI_amp'])
 
     def test_ampQ(self):
         tf = self.opt.getTF('REFL_Q', 'AM', dof='drive')
-        assert np.allclose(tf, data['tfQ_amp'])
+        assert close.allclose(tf, data['tfQ_amp'])
 
     def test_DC_DC(self):
         sig = self.opt.getSigDC('REFL_DC')
-        assert np.isclose(sig, data['dcDC'])
+        assert close.isclose(sig, data['dcDC'])
 
     def test_DC_I(self):
         sig = self.opt.getSigDC('REFL_I')
-        assert np.isclose(sig, data['dcI'])
+        assert close.isclose(sig, data['dcI'])
 
     def test_DC_Q(self):
         sig = self.opt.getSigDC('REFL_Q')
-        assert np.isclose(sig, data['dcQ'])
+        assert close.isclose(sig, data['dcQ'])
 
     def test_reload_tfI(self):
         tfI = self.opt2.getTF('REFL_I', 'EX')
-        assert np.allclose(tfI, data['tfI'])
+        assert close.allclose(tfI, data['tfI'])
 
     def test_reload_tfQ(self):
         tfQ = self.opt2.getTF('REFL_Q', 'EX')
-        assert np.allclose(tfQ, data['tfQ'])
+        assert close.allclose(tfQ, data['tfQ'])
 
     def test_reload_qnI(self):
         qnI = self.opt2.getQuantumNoise('REFL_I')
-        assert np.allclose(qnI, data['qnI'])
+        assert close.allclose(qnI, data['qnI'])
 
     def test_reload_qnQ(self):
         qnQ = self.opt2.getQuantumNoise('REFL_Q')
-        assert np.allclose(qnQ, data['qnQ'])
+        assert close.allclose(qnQ, data['qnQ'])
 
     def test_reload_qnDC(self):
         qnDC = self.opt2.getQuantumNoise('REFL_DC')
-        assert np.allclose(qnDC, data['qnDC'])
+        assert close.allclose(qnDC, data['qnDC'])
 
     def test_reload_phaseI(self):
         tf = self.opt2.getTF('REFL_I', 'PM', dof='drive')
-        assert np.allclose(tf, data['tfI_phase'])
+        assert close.allclose(tf, data['tfI_phase'])
 
     def test_reload_phaseQ(self):
         tf = self.opt2.getTF('REFL_Q', 'PM', dof='drive')
-        assert np.allclose(tf, data['tfQ_phase'])
+        assert close.allclose(tf, data['tfQ_phase'])
 
     def test_reload_ampI(self):
         tf = self.opt2.getTF('REFL_I', 'AM', dof='drive')
-        assert np.allclose(tf, data['tfI_amp'])
+        assert close.allclose(tf, data['tfI_amp'])
 
     def test_reload_ampQ(self):
         tf = self.opt2.getTF('REFL_Q', 'AM', dof='drive')
-        assert np.allclose(tf, data['tfQ_amp'])
+        assert close.allclose(tf, data['tfQ_amp'])
 
     def test_reload_DC_DC(self):
         sig = self.opt2.getSigDC('REFL_DC')
-        assert np.isclose(sig, data['dcDC'])
+        assert close.isclose(sig, data['dcDC'])
 
     def test_reload_DC_I(self):
         sig = self.opt2.getSigDC('REFL_I')
-        assert np.isclose(sig, data['dcI'])
+        assert close.isclose(sig, data['dcI'])
 
     def test_reload_DC_Q(self):
         sig = self.opt2.getSigDC('REFL_Q')
-        assert np.isclose(sig, data['dcQ'])
+        assert close.isclose(sig, data['dcQ'])
 
 
 class TestSweep:
@@ -167,8 +168,8 @@ class TestSweep:
 
     def test_sweepI(self):
         poses, sweepI = self.opt.getSweepSignal('REFL_I', 'EX')
-        assert np.allclose(sweepI, data['sweepI'])
+        assert close.allclose(sweepI, data['sweepI'])
 
     def test_sweepQ(self):
         poses, sweepQ = self.opt.getSweepSignal('REFL_Q', 'EX')
-        assert np.allclose(sweepQ, data['sweepQ'])
+        assert close.allclose(sweepQ, data['sweepQ'])
