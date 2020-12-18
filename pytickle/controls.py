@@ -642,6 +642,13 @@ class ControlSystem:
             if isinstance(args[0], DegreeOfFreedom):
                 dof = args[0]
                 name = dof.name
+                if len(name) == 0:
+                    raise ValueError(
+                        'the degree of freedom must have a name to be added')
+
+                if dof.probes is None:
+                    raise ValueError('DOF must have probes defined')
+
             else:
                 raise TypeError(
                     'When adding a DOF with a single argument, ' \
@@ -864,30 +871,30 @@ class ControlSystem:
 
         self._filters.append((dof_to, dof_from, filt))
 
-    def addCompensator(self, drive, driveType, filt):
+    def addCompensator(self, drive, doftype, filt):
         """Add a compensation filter
 
         Inputs:
           drive: which drive to compensate
-          driveType: type of drive (pos, pitch, or yaw)
+          doftype: type of drive (pos, pitch, or yaw)
           filt: Filter instance for the filter
         """
-        drive += '.' + driveType
+        drive += '.' + doftype
         if drive in [cf[0] for cf in self._compFilts]:
             raise ValueError(
                 'A compensator is already set for drive {:s}'.format(drive))
 
         self._compFilts.append((drive, filt))
 
-    def setActuator(self, drive, driveType, filt):
+    def setActuator(self, drive, doftype, filt):
         """Set the actuation plant for a drive
 
         Inputs:
           drive: which drive to actuate
-          driveType: type of drive (pos, pitch, or yaw)
+          doftype: type of drive (pos, pitch, or yaw)
           filt: Filter instance for the plant
         """
-        drive += '.' + driveType
+        drive += '.' + doftype
         if drive in [rf[0] for rf in self._actFilts]:
             raise ValueError(
                 'A response is already set for drive {:s}'.format(drive))
@@ -1158,7 +1165,7 @@ class ControlSystem:
         oltf = self.getOLTF(sig_to, sig_from, tstpnt)
         return plotNyquist(oltf, rmax=rmax)
 
-    def _getIndex(self, name, tstpnt):
+    def _getIndex(self, name_or_dof, tstpnt):
         """Get the index of a signal
 
         Inputs:
@@ -1173,6 +1180,29 @@ class ControlSystem:
             sig_list = self.probes
         else:
             raise ValueError('Unrecognized test point ' + tstpnt)
+
+        if isinstance(name_or_dof, DegreeOfFreedom):
+            if tstpnt in ['act', 'drive', 'pos', 'spot']:
+                # the DOF should be a single drive
+                # take the drive instead of the name so that it has the
+                # doftype appended
+                drives_keys = list(name_or_dof.drives.keys())
+                if len(drives_keys) == 1:
+                    name = drives_keys[0]
+                else:
+                    raise ValueError(
+                        tstpnt + ' test point should only have one drive')
+
+            elif tstpnt == 'sens':
+                # probes are never DOFs
+                raise ValueError('sens test point cannot be a DegreeOfFreedom')
+
+            elif tstpnt in ['err', 'ctrl', 'cal']:
+                # the DOF should be a control system DOF
+                name = name_or_dof.name
+
+        else:
+            name = name_or_dof
 
         try:
             ind = sig_list.index(name)

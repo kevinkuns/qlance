@@ -124,10 +124,13 @@ filtFF   = ctrl.Filter([], [], -4.98e-3)
 # Define control system
 cs = ctrl.ControlSystem()
 
+DARM_dof = ctrl.DegreeOfFreedom(DARM, 'pos', probesDARM, 'DARM')
+BS_dof = ctrl.DegreeOfFreedom('BS', name='BS', probes=probesBS)
+
 # define degrees of freedom
-cs.addDOF(ctrl.DegreeOfFreedom(DARM, 'pos', probesDARM, 'DARM'))
-cs.addDOF(ctrl.DegreeOfFreedom(CARM, probes=probesCARM, name='CARM'))
-cs.addDOF('BS', probesBS, 'BS')
+cs.addDOF(DARM_dof)
+cs.addDOF('CARM', probesCARM, CARM)
+cs.addDOF(BS_dof)
 
 # define control filters
 cs.addFilter('DARM', 'DARM', filtDARM)
@@ -165,18 +168,20 @@ cs.run()
 # compute some loops
 ##############################################################################
 
-data['oltfs'] = dict(DARM_DARM_err=cs.getOLTF('DARM', 'DARM', 'err'),
+EX_dof = ctrl.DegreeOfFreedom('EX', doftype='pos')
+
+data['oltfs'] = dict(DARM_DARM_err=cs.getOLTF('DARM', DARM_dof, 'err'),
                      CARM_CARM_err=cs.getOLTF('CARM', 'CARM', 'err'),
                      BS_BS_err=cs.getOLTF('BS', 'BS', 'err'),
-                     EX_EX_drive=cs.getOLTF('EX.pos', 'EX.pos', 'drive'),
+                     EX_EX_drive=cs.getOLTF(EX_dof, 'EX.pos', 'drive'),
                      EY_EY_act=cs.getOLTF('EY.pos', 'EY.pos', 'act'),
-                     DARM_DARM_ctrl=cs.getOLTF('DARM', 'DARM', 'ctrl'),
+                     DARM_DARM_ctrl=cs.getOLTF(DARM_dof, 'DARM', 'ctrl'),
                      REFLQ_REFLQ_sens=cs.getOLTF('REFL_Q', 'REFL_Q', 'sens'))
 
 data['cltfs'] = dict(DARM_DARM_err=cs.getCLTF('DARM', 'DARM', 'err'),
                      CARM_CARM_err=cs.getCLTF('CARM', 'CARM', 'err'),
                      BS_BS_err=cs.getCLTF('BS', 'BS', 'err'),
-                     EX_EX_drive=cs.getCLTF('EX.pos', 'EX.pos', 'drive'),
+                     EX_EX_drive=cs.getCLTF(EX_dof, EX_dof, 'drive'),
                      EY_EY_act=cs.getCLTF('EY.pos', 'EY.pos', 'act'),
                      DARM_DARM_ctrl=cs.getCLTF('DARM', 'DARM', 'ctrl'),
                      REFLQ_REFLQ_sens=cs.getCLTF('REFL_Q', 'REFL_Q', 'sens'))
@@ -187,20 +192,20 @@ data['cross_couplings'] = dict(
     DARM_BS_err=cs.getOLTF('DARM', 'BS', 'err'),
     CARM_BS_ctrl=cs.getOLTF('CARM', 'BS', 'ctrl'),
     EX_BS_drive=cs.getOLTF('EX.pos', 'BS.pos', 'drive'),
-    BS_EY_act=cs.getOLTF('BS.pos', 'EY.pos', 'act'),
-    DARM_BS_ctrl=cs.getCLTF('DARM', 'BS', 'ctrl'),
+    BS_EY_act=cs.getOLTF(BS_dof, 'EY.pos', 'act'),
+    DARM_BS_ctrl=cs.getCLTF('DARM', BS_dof, 'ctrl'),
     REFLQ_REFLI_sens=cs.getCLTF('REFL_Q', 'REFL_I', 'sens'))
 
 data['cal'] = dict(
-    DARM_DARM_closed_err=cs.getTF('DARM', 'err', 'DARM', 'cal'),
-    DARM_DARM_open_err=cs.getTF('DARM', 'err', 'DARM', 'cal', closed=False),
+    DARM_DARM_closed_err=cs.getTF(DARM_dof, 'err', 'DARM', 'cal'),
+    DARM_DARM_open_err=cs.getTF('DARM', 'err', DARM_dof, 'cal', closed=False),
     BS_BS_closed_act=cs.getTF('BS.pos', 'act', 'BS', 'cal'),
     DARM_CARM_closed_err=cs.getTF('DARM', 'err', 'CARM', 'cal'),
     DARM_BS_open_err=cs.getTF('DARM', 'err', 'BS', 'cal', closed=False),
     CARM_BS_open_ctrl=cs.getTF('CARM', 'ctrl', 'BS', 'cal', closed=False),
-    EX_BS_closed_drive=cs.getTF('EX.pos', 'drive', 'BS', 'cal'),
+    EX_BS_closed_drive=cs.getTF(EX_dof, 'drive', 'BS', 'cal'),
     BS_DARM_closed_act=cs.getTF('BS.pos', 'act', 'DARM', 'cal'),
-    DARM_BS_open_ctrl=cs.getTF('DARM', 'ctrl', 'BS', 'cal', closed=False),
+    DARM_BS_open_ctrl=cs.getTF(DARM_dof, 'ctrl', BS_dof, 'cal', closed=False),
     REFLQ_BS_closed_sens=cs.getTF('REFL_Q', 'sens', 'BS', 'cal'))
 
 
@@ -312,3 +317,9 @@ def test_noise():
 
 def test_residuals():
     assert all(close.check_dicts(data_ref['residuals'], data['residuals']))
+
+
+def test_residuals2():
+    res1 = cs.getTotalNoiseTo('EX.pos', 'pos', 'drive', seismic_noise)
+    res2 = cs.getTotalNoiseTo(EX_dof, 'pos', 'drive', seismic_noise)
+    assert close.allclose(res1, res2)
