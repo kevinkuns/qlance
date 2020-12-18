@@ -6,7 +6,8 @@ import numpy as np
 from numpy.linalg import inv
 import pandas as pd
 from collections import OrderedDict
-from .utils import assertType, siPrefix, append_str_if_unique
+from .utils import (assertType, siPrefix, append_str_if_unique,
+                    get_default_kwargs)
 from . import io
 from functools import partial
 from numbers import Number
@@ -261,10 +262,10 @@ class DegreeOfFreedom:
     """A generic degree of freedom
 
     Inputs:
-      name: name of the DOF
-      probes: the probes used to sense the DOF (a dict or single string)
       drives: the drives defining the DOF (a dict or single string)
       doftype: type of DOF: pos, pitch, or yaw (Default: pos)
+      probes: the probes used to sense the DOF (a dict or single string)
+      name: name of the DOF
 
     Example:
       For DARM where L = Lx - Ly and it is sensed by AS_DIFF
@@ -360,7 +361,7 @@ class Filter:
     """A class representing a generic filter
 
     Inputs:
-      The filter can be specified in one of two ways:
+      The filter can be specified in one of four ways:
         1) Giving a callable function that is the s-domain filter
         2) Giving the zeros, poles, and gain
         3) Giving the zeros, poles, and gain at a specific frequency
@@ -619,25 +620,55 @@ class ControlSystem:
         if drive2bsm:
             self._computeBeamSpotMotion()
 
-    def addDOF(self, name, probes, drives, doftype='pos'):
+    def addDOF(self, *args, **kwargs):
         """Add a degree of freedom to the model
 
         Inputs:
-          name: name of the DOF
-          probes: the probes used to sense the DOF
-          drives: the drives used to define the DOF
-          doftype: type of DOF: pos, pitch, or yaw (Default: pos)
+          The DOF can be add in one of two ways
+           1) Specifying the name of the DOF, the probes used to sense it, and
+              the drives that define it. The optional keyword argument doftype
+              defines the doftype (pos, pitch, or yaw) and is 'pos' by default
+           2) Giving a DegreOfFreedom instance
 
         Example:
           For DARM where L = Lx - Ly and it is sensed by AS_DIFF
-          cs.addDOF('DARM', 'AS_DIFF', {'EX': 1, 'EY': -1})
+            cs.addDOF('DARM', 'AS_DIFF', {'EX': 1, 'EY': -1})
+          or equivalently
+            DARM = DegreOfFreedom(
+                name='DARM', probes='AS_DIFF', drives={'EX': 1, 'EY': -1})
+            cs.addDOF(DARM)
         """
+        if len(args) == 1:
+            if isinstance(args[0], DegreeOfFreedom):
+                dof = args[0]
+                name = dof.name
+            else:
+                raise TypeError(
+                    'When adding a DOF with a single argument, ' \
+                    + 'it must be a DegreeOfFreedom instance')
+
+        elif len(args) == 3:
+            name, probes, drives = args
+            doftype = get_default_kwargs(kwargs, doftype='pos')['doftype']
+            dof = DegreeOfFreedom(
+                name=name, probes=probes, drives=drives, doftype=doftype)
+
+        elif len(args) == 4:
+            name, probes, drives, doftype = args
+            dof = DegreeOfFreedom(
+                name=name, probes=probes, drives=drives, doftype=doftype)
+
+        else:
+            msg = 'Incorrect number of arguments. Input can be either\n' \
+                + '1) A single DegreeOfFreedom argument\n' \
+                + '2) Three arguments representing the name, probes,' \
+                + 'and drives with an optional keyword for the doftype'
+            raise TypeError(msg)
+
         if name in self.dofs.keys():
             raise ValueError(
                 'Degree of freedom {:s} already exists'.format(name))
 
-        dof = DegreeOfFreedom(
-            name=name, probes=probes, drives=drives, doftype=doftype)
         self.dofs[name] = dof
         append_str_if_unique(self.probes, dof.probes)
         append_str_if_unique(self.drives, dof.drives)
