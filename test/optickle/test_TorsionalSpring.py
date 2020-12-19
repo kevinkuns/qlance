@@ -80,14 +80,18 @@ opt2 = plant.OpticklePlant()
 opt2.load('test_torsional_spring.hdf5')
 os.remove('test_torsional_spring.hdf5')
 
+
 def test_REFLI_HARD():
     hard = ctrl.DegreeOfFreedom(HARD, 'pitch')
+    hard2 = ctrl.DegreeOfFreedom(HARD, 'pitch', probes='REFL_I')
     tf1 = opt.getTF('REFL_I', HARD, doftype='pitch')
     tf2 = opt.getTF('REFL_I', hard)
+    tf3 = opt.getTF(hard2)
     ref = data['tf_REFLI_HARD']
     c1 = close.allclose(tf1, ref)
     c2 = close.allclose(tf2, ref)
-    assert np.all([c1, c2])
+    c3 = close.allclose(tf3, ref)
+    assert np.all([c1, c2, c3])
 
 
 def test_REFLI_SOFT():
@@ -135,10 +139,14 @@ def test_mMech_EX_EX2():
     ex = ctrl.DegreeOfFreedom('EX', doftype='pitch')
     mMech1 = opt.getMechMod('EX', ex, doftype='pitch')
     mMech2 = opt.getMechMod(ex, 'EX', doftype='pitch')
+    mMech3 = opt.getMechMod(ex, ex, doftype='pitch')
+    mMech4 = opt.getMechMod(ex, ex)
     ref = data['mMech_EX_EX']
     c1 = close.allclose(mMech1, ref)
     c2 = close.allclose(mMech2, ref)
-    assert np.all([c1, c2])
+    c3 = close.allclose(mMech3, ref)
+    c4 = close.allclose(mMech4, ref)
+    assert np.all([c1, c2, c3, c4])
 
 
 def test_mMech_IX_EX():

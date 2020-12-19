@@ -65,18 +65,28 @@ class TestFreqResp:
 
     def test_tfI(self):
         ex = DegreeOfFreedom('EX')
+        ex2 = DegreeOfFreedom('EX', probes='REFL_I')
+        ex3 = DegreeOfFreedom('EX', probes='REFL_DC')
         tfI1 = self.opt.getTF('REFL_I', 'EX')
         tfI2 = self.opt.getTF('REFL_I', ex)
+        tfI3 = self.opt.getTF(ex2)
+        tfI4 = self.opt.getTF('REFL_I', ex3)
         c1 = close.allclose(tfI1, data['tfI'])
         c2 = close.allclose(tfI2, data['tfI'])
-        assert np.all([c1, c2])
+        c3 = close.allclose(tfI3, data['tfI'])
+        c4 = close.allclose(tfI4, data['tfI'])
+        assert np.all([c1, c2, c3, c4])
 
     def test_tfQ(self):
         ex = DegreeOfFreedom(name='EX', drives='EX', doftype='pos')
+        ex2 = DegreeOfFreedom(name='EX', drives='EX', doftype='pos',
+                              probes='REFL_Q')
         tfQ1 = self.opt.getTF('REFL_Q', 'EX')
         tfQ2 = self.opt.getTF('REFL_Q', ex)
+        tfQ3 = self.opt.getTF(ex2)
         c1 = close.allclose(tfQ1, data['tfQ'])
         c2 = close.allclose(tfQ2, data['tfQ'])
+        c3 = close.allclose(tfQ3, data['tfQ'])
         assert np.all([c1, c2])
 
     def test_qnI(self):
@@ -93,11 +103,14 @@ class TestFreqResp:
 
     def test_phaseI(self):
         pm = DegreeOfFreedom('PM', 'drive')
+        pm2 = DegreeOfFreedom('PM', probes='REFL_I', doftype='drive')
         tf1 = self.opt.getTF('REFL_I', 'PM', doftype='drive')
         tf2 = self.opt.getTF('REFL_I', pm)
+        tf3 = self.opt.getTF(pm2)
         c1 = close.allclose(tf1, data['tfI_phase'])
         c2 = close.allclose(tf2, data['tfI_phase'])
-        assert np.all([c1, c2])
+        c3 = close.allclose(tf3, data['tfI_phase'])
+        assert np.all([c1, c2, c3])
 
     def test_phaseQ(self):
         tf = self.opt.getTF('REFL_Q', 'PM', doftype='drive')
@@ -105,11 +118,14 @@ class TestFreqResp:
 
     def test_ampI(self):
         am = DegreeOfFreedom('AM', 'drive')
+        am2 = DegreeOfFreedom('AM', probes='REFL_I', doftype='drive')
         tf1 = self.opt.getTF('REFL_I', 'AM', doftype='drive')
         tf2 = self.opt.getTF('REFL_I', am)
+        tf3 = self.opt.getTF(am2)
         c1 = close.allclose(tf1, data['tfI_amp'])
         c2 = close.allclose(tf2, data['tfI_amp'])
-        assert np.all([c1, c2])
+        c3 = close.allclose(tf3, data['tfI_amp'])
+        assert np.all([c1, c2, c3])
 
     def test_ampQ(self):
         tf = self.opt.getTF('REFL_Q', 'AM', doftype='drive')

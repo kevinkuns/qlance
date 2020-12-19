@@ -10,7 +10,7 @@ from . import utils
 from . import io
 import h5py
 from numbers import Number
-from .utils import beam_properties_from_q
+from .utils import beam_properties_from_q, get_default_kwargs
 
 
 class OpticklePlant:
@@ -73,15 +73,20 @@ class OpticklePlant:
         """
         return self._ff
 
-    def getTF(self, probes, drives, doftype='pos', optOnly=False):
+    def getTF(self, *args, **kwargs):
         """Compute a transfer function
 
         Inputs:
-          probes: name of the probes at which the TF is calculated
-          drives: names of the drives from which the TF is calculated
-          doftype: degree of freedom of the drives (Default: pos)
-          optOnly: if True, only return the optical TF with no mechanics
-            (Default: False)
+          Transfer functions can be computed in one of three ways:
+          1) Specifying
+              probes: name of the probes at which the TF is calculated
+              drives: names of the drives from which the TF is calculated
+              doftype: degree of freedom of the drives (Default: pos)
+              optOnly: if True, only return the optical TF with no mechanics
+                (Default: False)
+           2) Specifying probes and optOnly but using a DegreeOfFreedom to
+              specify the drives and doftype
+           3) Using a DegreeOfFreedom for the probes, drives, and doftype
 
         Returns:
           tf: the transfer function
@@ -103,22 +108,60 @@ class OpticklePlant:
           * If only a single drive is used, the drive name can be a string.
             To compute the phase transfer function in reflection from a FP
             cavity
-              tf = opt.getTF('REFL', 'PM', 'drive')
-            The frequency transfer function is then tf/(1j*ff)
+              tf = opt.getTF('REFL', 'PM', doftype='drive')
+            The frequency transfer function is then tf/(1j*ff). Equivalently
+              PM = DegreeOfFreedom('PM', doftype='drive')
+              tf = opt.getTF('REFL', PM)
 
           * If multiple drives are used, the drive names should be a dict.
             To compute the DARM transfer function to the AS_DIFF homodyne PD
               DARM = {'EX': 1/2, 'EY': -1/2}
               tf = opt.getTF('AS_DIFF', DARM)
+            or equivalently
+              DARM = DegreeOfFreedom({'EX': 1/2, 'EY': -1/2})
+              tf = opt.getTF('AS_DIFF', DARM)
+            or equivalently
+              DARM = DegreeOfFreedom({'EX': 1/2, 'EY': -1/2}, probes='AS_DIFF')
+              tf = opt.getTF(DARM)
             [Note: Since DARM is defined as Lx - Ly, to get 1 m of DARM
             requires 0.5 m of both Lx and Ly]
-        """
-        if isinstance(drives, ctrl.DegreeOfFreedom):
-            doftype = drives.doftype
-            drives = {
-                key.split('.')[0]: val for key, val in drives.drives.items()}
 
-        if doftype not in ['pos', 'pitch', 'yaw', 'drive', 'amp', 'phase']:
+           * Note that if the probes are specified in a DegreeOfFreedom, these are
+             the default probes. If different probes are specified in getTF, those
+             will be used instead.
+        """
+        # figure out the kind of input and extract the probes and drives
+        def get_dof_data(dof):
+            doftype = dof.doftype
+            drives = {
+                key.split('.')[0]: val for key, val in dof.drives.items()}
+            return doftype, drives
+
+        if len(args) == 1:
+            dof = args[0]
+            if isinstance(dof, ctrl.DegreeOfFreedom):
+                probes = dof.probes
+                doftype, drives = get_dof_data(dof)
+            else:
+                raise TypeError(
+                    'Single argument transfer functions must be a DegreeOfFreedom')
+            optOnly = get_default_kwargs(kwargs, optOnly=False)['optOnly']
+
+        elif len(args) == 2:
+            probes, drives = args
+            if isinstance(drives, ctrl.DegreeOfFreedom):
+                doftype, drives = get_dof_data(drives)
+                optOnly = get_default_kwargs(kwargs, optOnly=False)['optOnly']
+            else:
+                kwargs = get_default_kwargs(kwargs, doftype='pos', optOnly=False)
+                doftype = kwargs['doftype']
+                optOnly = kwargs['optOnly']
+
+        else:
+            raise TypeError(
+                'takes 2 positional arguments but ' + str(len(args)) + ' were given')
+
+        if doftype not in self._doftypes:
             raise ValueError('Unrecognized degree of freedom {:s}'.format(doftype))
 
         # figure out the shape of the TF
@@ -408,7 +451,7 @@ class OpticklePlant:
         spotPort = probe_info.split('<-')[-1]
 
         # get TF to monitoring probe power [W/rad]
-        tf = self.getTF(probeName, driveName, doftype)
+        tf = self.getTF(probeName, driveName, doftype=doftype)
 
         # DC power on the monitoring probe
         Pdc = self.getSigDC(probeName)
@@ -668,13 +711,18 @@ class FinessePlant:
         """
         return self._lambda0
 
-    def getTF(self, probes, drives, doftype='pos'):
+    def getTF(self, *args, **kwargs):
         """Compute a transfer function
 
         Inputs:
-          probes: name of the probes at which the TF is calculated
-          drives: names of the drives from which the TF is calculated
-          doftype: degree of freedom of the drives (Default: pos)
+          Transfer functions can be computed in one of three ways:
+          1) Specifying
+              probes: name of the probes at which the TF is calculated
+              drives: names of the drives from which the TF is calculated
+              doftype: degree of freedom of the drives (Default: pos)
+           2) Specifying probes and optOnly but using a DegreeOfFreedom to
+              specify the drives and doftype
+           3) Using a DegreeOfFreedom for the probes, drives, and doftype
 
         Returns:
           tf: the transfer function
@@ -693,20 +741,62 @@ class FinessePlant:
           * If only a single drive is used, the drive name can be a string.
             To compute the frequency transfer function in reflection from a FP
             cavity
-              tf = katFR.getTF('REFL', 'Laser', 'freq')
-            The phase transfer function is then 1j*ff*tf
+              tf = katFR.getTF('REFL', 'Laser', doftype='freq')
+            The phase transfer function is then 1j*ff*tf. Equivalently
+              Laser = DegreeOfFreedom('Laser', doftype='freq')
+              tf = katFR.getTF('REFL', Laser)
 
           * If multiple drives are used, the drive names should be a dict.
             To compute the DARM transfer function to the AS_DIFF homodyne PD
               DARM = {'EX': 1/2, 'EY': -1/2}
               tf = katFR.getTF('AS_DIFF', DARM)
+            or equivalently
+              DARM = DegreeOfFreedom({'EX': 1/2, 'EY': -1/2})
+              tf = katFR.getTF('AS_DIFF', DARM)
+            or equivalently
+              DARM = DegreeOfFreedom({'EX': 1/2, 'EY': -1/2}, probes='AS_DIFF')
+              tf = katFR.getTF(DARM)
             [Note: Since DARM is defined as Lx - Ly, to get 1 m of DARM
             requires 0.5 m of both Lx and Ly]
+
+           * Note that if the probes are specified in a DegreeOfFreedom, these are
+             the default probes. If different probes are specified in getTF, those
+             will be used instead.
         """
-        if isinstance(drives, ctrl.DegreeOfFreedom):
-            doftype = drives.doftype
+        # figure out the kind of input and extract the probes and drives
+        def get_dof_data(dof):
+            doftype = dof.doftype
             drives = {
-                key.split('.')[0]: val for key, val in drives.drives.items()}
+                key.split('.')[0]: val for key, val in dof.drives.items()}
+            return doftype, drives
+
+        doftype_msg = (
+            'When specifying drives with a DegreeOfFreedom, the doftype should' \
+            + 'be specified in the DegreeOfFreedom and not a keyword argument.')
+
+        if len(args) == 1:
+            dof = args[0]
+            if isinstance(dof, ctrl.DegreeOfFreedom):
+                probes = dof.probes
+                doftype, drives = get_dof_data(dof)
+            else:
+                raise TypeError(
+                    'Single argument transfer functions must be a DegreeOfFreedom')
+            if kwargs:
+                raise TypeError(doftype_msg)
+
+        elif len(args) == 2:
+            probes, drives = args
+            if isinstance(drives, ctrl.DegreeOfFreedom):
+                doftype, drives = get_dof_data(drives)
+                if kwargs:
+                    raise TypeError(doftype_msg)
+            else:
+                doftype = get_default_kwargs(kwargs, doftype='pos')['doftype']
+
+        else:
+            raise TypeError(
+                'takes 2 positional arguments but ' + str(len(args)) + ' were given')
 
         if doftype not in self._doftypes:
             raise ValueError('Unrecognized doftype ' + doftype)
@@ -871,7 +961,7 @@ class FinessePlant:
         probeName = '_' + node + '_bsm_' + direction
 
         # get TF to monitoring probe power [W/rad]
-        tf = self.getTF(probeName, driveName, doftype)
+        tf = self.getTF(probeName, driveName, doftype=doftype)
 
         # DC power on the monitoring probe
         Pdc = self.getSigDC('_' + node + '_DC')

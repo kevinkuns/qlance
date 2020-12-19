@@ -62,19 +62,29 @@ class TestFreqResp:
 
     def test_tfI(self):
         ex = DegreeOfFreedom('EX')
+        ex2 = DegreeOfFreedom('EX', probes='REFL_I')
+        ex3 = DegreeOfFreedom('EX', probes='REFL_DC')
         tfI1 = self.katFR.getTF('REFL_I', 'EX')
         tfI2 = self.katFR.getTF('REFL_I', ex)
+        tfI3 = self.katFR.getTF(ex2)
+        tfI4 = self.katFR.getTF('REFL_I', ex3)
         c1 = close.allclose(tfI1, data['tfI'])
         c2 = close.allclose(tfI2, data['tfI'])
-        assert np.all([c1, c2])
+        c3 = close.allclose(tfI3, data['tfI'])
+        c4 = close.allclose(tfI4, data['tfI'])
+        assert np.all([c1, c2, c3, c4])
 
     def test_tfQ(self):
         ex = DegreeOfFreedom(name='EX', drives='EX', doftype='pos')
+        ex2 = DegreeOfFreedom(name='EX', drives='EX', doftype='pos',
+                              probes='REFL_Q')
         tfQ1 = self.katFR.getTF('REFL_Q', 'EX')
         tfQ2 = self.katFR.getTF('REFL_Q', ex)
+        tfQ3 = self.katFR.getTF(ex2)
         c1 = close.allclose(tfQ1, data['tfQ'])
         c2 = close.allclose(tfQ2, data['tfQ'])
-        assert np.all([c1, c2])
+        c3 = close.allclose(tfQ3, data['tfQ'])
+        assert np.all([c1, c2, c3])
 
     def test_qnI(self):
         qnI = self.katFR.getQuantumNoise('REFL_I')
@@ -90,10 +100,13 @@ class TestFreqResp:
 
     def test_freqI(self):
         laser = DegreeOfFreedom('Laser', 'freq')
+        laser2 = DegreeOfFreedom('Laser', probes='REFL_I', doftype='freq')
         tf1 = self.katFR.getTF('REFL_I', 'Laser', doftype='freq')
         tf2 = self.katFR.getTF('REFL_I', laser)
+        tf3 = self.katFR.getTF(laser2)
         c1 = close.allclose(tf1, data['tfI_freq'])
         c2 = close.allclose(tf2, data['tfI_freq'])
+        c3 = close.allclose(tf3, data['tfI_freq'])
         assert np.all([c1, c2])
 
     def test_freqQ(self):
@@ -102,11 +115,14 @@ class TestFreqResp:
 
     def test_ampI(self):
         laser = DegreeOfFreedom('Laser', 'amp')
+        laser2 = DegreeOfFreedom('Laser', probes='REFL_I', doftype='amp')
         tf1 = self.katFR.getTF('REFL_I', 'Laser', doftype='amp')
         tf2 = self.katFR.getTF('REFL_I', laser)
+        tf3 = self.katFR.getTF(laser2)
         c1 = close.allclose(tf1, data['tfI_amp'])
         c2 = close.allclose(tf2, data['tfI_amp'])
-        assert np.all([c1, c2])
+        c3 = close.allclose(tf3, data['tfI_amp'])
+        assert np.all([c1, c2, c3])
 
     def test_ampQ(self):
         tf = self.katFR.getTF('REFL_Q', 'Laser', doftype='amp')
