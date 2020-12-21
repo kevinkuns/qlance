@@ -41,6 +41,8 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, **kwargs):
         plotTF(ff, tf2, mag_ax=fig.axes[0], phase_ax=fig.axes[1], color='C1',
                label='second TF')
         mag_ax.legend()  # need to redraw legend
+    The above can also be achieved with the shortcut
+        plotTF(ff, tf2, *fig.axes, color='C1', label='second TF')
     """
     if not(mag_ax and phase_ax):
         if (mag_ax is not None) or (phase_ax is not None):
@@ -163,3 +165,29 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, **kwargs):
 
 def scale_axis(ax, sf):
     ax.set_major_formatter(FuncFormatter(lambda x, p: '{:0.0f}'.format(sf*x)))
+
+
+def _get_tf_args(*args):
+    if len(args) == 1:
+        # only DOF
+        tf_args = args
+        mag_ax = None
+        phase_ax = None
+    elif len(args) == 2:
+        # probe, DOF/drives
+        tf_args = args
+        mag_ax = None
+        phase_ax = None
+    elif len(args) == 3:
+        # probe, mag, phase
+        tf_args = (args[0],)
+        mag_ax, phase_ax = args[1:]
+    elif len(args) == 4:
+        # probe, DOF/probe, mag, phase
+        tf_args = args[:2]
+        mag_ax, phase_ax = args[2:]
+    else:
+        raise TypeError(
+            'takes 4 positional arguments but ' + len(args) + ' were given')
+
+    return tf_args, mag_ax, phase_ax

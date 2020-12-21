@@ -334,16 +334,48 @@ class OpticklePlant:
             qnoise = self._noiseAC[doftype][probeNum]
         return qnoise
 
-    def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
-               doftype='pos', optOnly=False, **kwargs):
+    def plotTF(self, *args, **kwargs):
         """Plot a transfer function.
 
+        Transfer functions can be plotted by one of the three methods described
+        in plotTF.
+
+        By default a new figure is returned. The axes of an existing figure
+        can be specified to plot multiple transfer functions on the same figure
+
         See documentation for plotTF in plotting
+
+        Examples:
+          Plot a transfer function on new figure specifying probes and drives
+            DARM = {'EX': 1/2, 'EY': -1/2}
+            fig = opt.plotTF('AS_DIFF', DARM)
+
+          Plot on an existing figure 'fig' with a DegreeOfFreedom
+            DARM = DegreeOfFreedom({'EX': 1/2, 'EY': -1/2}, probes='AS_DIFF')
+            opt.plotTF('AS_DIFF', DARM, *fig.axes)
+
+          Plot on an existing axis, using DegreeOfFreedom to specify probes
+          and drives, and specify plot styles
+            opt.plotTF(DARM, *fig.axes, label='DARM', color='xkcd:blue')
+
+          Pass transfer function options with plot styles on an existing figure
+            opt.plotTF('REFL', 'Laser', *fig.axes, doftype='freq', ls='-.')
         """
+        tf_args, mag_ax, phase_ax = plotting._get_tf_args(*args)
+
+        try:
+            tf_kwargs = dict(doftype=kwargs.pop('doftype'))
+        except KeyError:
+            tf_kwargs = {}
+
+        if 'optOnly' in kwargs:
+            tf_kwargs['optOnly'] = kwargs.pop('optOnly')
+
         ff = self.ff
-        tf = self.getTF(probeName, driveNames, doftype=doftype, optOnly=optOnly)
+        tf = self.getTF(*tf_args, **tf_kwargs)
         fig = plotting.plotTF(
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
+
         return fig
 
     def plotQuantumASD(self, probeName, driveNames, fig=None, **kwargs):
@@ -1002,16 +1034,46 @@ class FinessePlant:
         qq = self.getSigDC('_' + node + '_bp_' + direction)
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
-    def plotTF(self, probeName, driveNames, mag_ax=None, phase_ax=None,
-               doftype='pos', **kwargs):
+    # def plotTF(self, *tf_args, mag_ax=None, phase_ax=None, **kwargs):
+    def plotTF(self, *args, **kwargs):
         """Plot a transfer function.
 
+        Transfer functions can be plotted by one of the three methods described
+        in plotTF.
+
+        By default a new figure is returned. The axes of an existing figure
+        can be specified to plot multiple transfer functions on the same figure
+
         See documentation for plotTF in plotting
+
+        Examples:
+          Plot a transfer function on new figure specifying probes and drives
+            DARM = {'EX': 1/2, 'EY': -1/2}
+            fig = katFR.plotTF('AS_DIFF', DARM)
+
+          Plot on an existing figure 'fig' with a DegreeOfFreedom
+            DARM = DegreeOfFreedom({'EX': 1/2, 'EY': -1/2}, probes='AS_DIFF')
+            katFR.plotTF('AS_DIFF', DARM, *fig.axes)
+
+          Plot on an existing axis, using DegreeOfFreedom to specify probes
+          and drives, and specify plot styles
+            katFR.plotTF(DARM, *fig.axes, label='DARM', color='xkcd:blue')
+
+          Pass transfer function options with plot styles on an existing figure
+            katFR.plotTF('REFL', 'Laser', *fig.axes, doftype='freq', ls='-.')
         """
+        tf_args, mag_ax, phase_ax = plotting._get_tf_args(*args)
+
+        try:
+            tf_kwargs = dict(doftype=kwargs.pop('doftype'))
+        except KeyError:
+            tf_kwargs = {}
+
         ff = self.ff
-        tf = self.getTF(probeName, driveNames, doftype=doftype)
+        tf = self.getTF(*tf_args, **tf_kwargs)
         fig = plotting.plotTF(
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
+
         return fig
 
     def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
