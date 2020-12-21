@@ -166,6 +166,26 @@ def append_str_if_unique(array, elements):
             array.append(element)
 
 
+def get_default_kwargs(kwargs, **default_kwargs):
+    """Get a variable number of keyword arguments specifying defualts
+
+    Inputs:
+      kwargs: a dictionary of the keyword arguments
+      defualt_kwargs: a dictionary of the defualt arguments.
+
+    Returns:
+      default_kwargs replacing values with those specified in kwargs if given
+
+    Any keys in kwargs that are not in default_kwargs results in a TypeError
+    """
+    if not isinstance(kwargs, dict):
+        raise TypeError('kwargs should be a dictionary')
+    for key, kwarg in kwargs.items():
+        if key not in default_kwargs.keys():
+            raise TypeError('got an unexpected keyword argument ' + key)
+        default_kwargs[key] = kwarg
+    return default_kwargs
+
 
 def printLine(arr, pad):
     """Helper function for showfDC

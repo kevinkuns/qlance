@@ -1,5 +1,5 @@
 """
-Unit tests for finesse torsional spring
+Unit tests for optickle torsional spring
 """
 
 import matlab.engine
@@ -8,6 +8,7 @@ import pytickle.optickle as pyt
 import pytickle.controls as ctrl
 import pytickle.plant as plant
 import os
+import close
 import pytest
 
 eng = matlab.engine.start_matlab()
@@ -45,8 +46,8 @@ opt.addLink('EX', 'fr', 'IX', 'fr', Lcav)
 opt.setCavityBasis('IX', 'EX')
 
 # set the pitch response
-opt.setMechTF('EX', [], poles, 1/I, dof='pitch')
-opt.setMechTF('IX', [], poles, 1/I, dof='pitch')
+opt.setMechTF('EX', [], poles, 1/I, doftype='pitch')
+opt.setMechTF('IX', [], poles, 1/I, doftype='pitch')
 
 # add input
 opt.addSource('Laser', np.sqrt(Pin)*(vRF == 0))
@@ -72,59 +73,106 @@ fmin = 1e-1
 fmax = 30
 npts = 1000
 ff = np.logspace(np.log10(fmin), np.log10(fmax), npts)
-opt.run(ff, dof='pitch', noise=False)
+opt.run(ff, doftype='pitch', noise=False)
 
 opt.save('test_torsional_spring.hdf5')
 opt2 = plant.OpticklePlant()
 opt2.load('test_torsional_spring.hdf5')
 os.remove('test_torsional_spring.hdf5')
 
+
 def test_REFLI_HARD():
-    tf = opt.getTF('REFL_I', HARD, dof='pitch')
+    hard = ctrl.DegreeOfFreedom(HARD, 'pitch')
+    hard2 = ctrl.DegreeOfFreedom(HARD, 'pitch', probes='REFL_I')
+    tf1 = opt.getTF('REFL_I', HARD, doftype='pitch')
+    tf2 = opt.getTF('REFL_I', hard)
+    tf3 = opt.getTF(hard2)
     ref = data['tf_REFLI_HARD']
-    assert np.allclose(tf, ref)
+    c1 = close.allclose(tf1, ref)
+    c2 = close.allclose(tf2, ref)
+    c3 = close.allclose(tf3, ref)
+    assert np.all([c1, c2, c3])
 
 
 def test_REFLI_SOFT():
-    tf = opt.getTF('REFL_I', SOFT, dof='pitch')
+    tf = opt.getTF('REFL_I', SOFT, doftype='pitch')
     ref = data['tf_REFLI_SOFT']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_mech_HARD():
-    tf = opt.getMechTF(HARD, HARD, dof='pitch')
+    tf = opt.getMechTF(HARD, HARD, doftype='pitch')
     ref = data['mech_HARD']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
+
+
+def test_mech_HARD2():
+    hard = ctrl.DegreeOfFreedom(HARD, 'pitch')
+    tf = opt.getMechTF(hard, hard)
+    ref = data['mech_HARD']
+    assert close.allclose(tf, ref)
 
 
 def test_mech_SOFT():
-    tf = opt.getMechTF(SOFT, SOFT, dof='pitch')
+    tf = opt.getMechTF(SOFT, SOFT, doftype='pitch')
     ref = data['mech_SOFT']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
+
+
+def test_mech_SOFT2():
+    soft = ctrl.DegreeOfFreedom(SOFT, 'pitch')
+    tf1 = opt.getMechTF(SOFT, soft, doftype='pitch')
+    tf2 = opt.getMechTF(soft, SOFT, doftype='pitch')
+    ref = data['mech_SOFT']
+    c1 = close.allclose(tf1, ref)
+    c2 = close.allclose(tf2, ref)
+    assert np.all([c1, c2])
 
 
 def test_mMech_EX_EX():
-    mMech = opt.getMechMod('EX', 'EX', dof='pitch')
+    mMech = opt.getMechMod('EX', 'EX', doftype='pitch')
     ref = data['mMech_EX_EX']
-    assert np.allclose(mMech, ref)
+    assert close.allclose(mMech, ref)
+
+
+def test_mMech_EX_EX2():
+    ex = ctrl.DegreeOfFreedom('EX', doftype='pitch')
+    mMech1 = opt.getMechMod('EX', ex, doftype='pitch')
+    mMech2 = opt.getMechMod(ex, 'EX', doftype='pitch')
+    mMech3 = opt.getMechMod(ex, ex, doftype='pitch')
+    mMech4 = opt.getMechMod(ex, ex)
+    ref = data['mMech_EX_EX']
+    c1 = close.allclose(mMech1, ref)
+    c2 = close.allclose(mMech2, ref)
+    c3 = close.allclose(mMech3, ref)
+    c4 = close.allclose(mMech4, ref)
+    assert np.all([c1, c2, c3, c4])
 
 
 def test_mMech_IX_EX():
-    mMech = opt.getMechMod('IX', 'EX', dof='pitch')
+    mMech = opt.getMechMod('IX', 'EX', doftype='pitch')
     ref = data['mMech_IX_EX']
-    assert np.allclose(mMech, ref)
+    assert close.allclose(mMech, ref)
+
+
+def test_mMech_IX_EX2():
+    ex = ctrl.DegreeOfFreedom('EX', 'pitch')
+    ix = ctrl.DegreeOfFreedom('IX', 'pitch')
+    mMech = opt.getMechMod(ix, ex)
+    ref = data['mMech_IX_EX']
+    assert close.allclose(mMech, ref)
 
 
 def test_bsm_EX_IX():
     bsm = opt.computeBeamSpotMotion('EX', 'fr', 'IX', 'pitch')
     ref = data['bsm_EX_IX']
-    assert np.allclose(bsm, ref)
+    assert close.allclose(bsm, ref)
 
 
 def test_bsm_EX_EX():
     bsm = opt.computeBeamSpotMotion('EX', 'fr', 'EX', 'pitch')
     ref = data['bsm_EX_EX']
-    assert np.allclose(bsm, ref)
+    assert close.allclose(bsm, ref)
 
 
 ##############################################################################
@@ -132,48 +180,48 @@ def test_bsm_EX_EX():
 ##############################################################################
 
 def test_load_REFLI_HARD():
-    tf = opt2.getTF('REFL_I', HARD, dof='pitch')
+    tf = opt2.getTF('REFL_I', HARD, doftype='pitch')
     ref = data['tf_REFLI_HARD']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_load_REFLI_SOFT():
-    tf = opt2.getTF('REFL_I', SOFT, dof='pitch')
+    tf = opt2.getTF('REFL_I', SOFT, doftype='pitch')
     ref = data['tf_REFLI_SOFT']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_load_mech_HARD():
-    tf = opt2.getMechTF(HARD, HARD, dof='pitch')
+    tf = opt2.getMechTF(HARD, HARD, doftype='pitch')
     ref = data['mech_HARD']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_load_mech_SOFT():
-    tf = opt2.getMechTF(SOFT, SOFT, dof='pitch')
+    tf = opt2.getMechTF(SOFT, SOFT, doftype='pitch')
     ref = data['mech_SOFT']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_load_mMech_EX_EX():
-    mMech = opt2.getMechMod('EX', 'EX', dof='pitch')
+    mMech = opt2.getMechMod('EX', 'EX', doftype='pitch')
     ref = data['mMech_EX_EX']
-    assert np.allclose(mMech, ref)
+    assert close.allclose(mMech, ref)
 
 
 def test_load_mMech_IX_EX():
-    mMech = opt2.getMechMod('IX', 'EX', dof='pitch')
+    mMech = opt2.getMechMod('IX', 'EX', doftype='pitch')
     ref = data['mMech_IX_EX']
-    assert np.allclose(mMech, ref)
+    assert close.allclose(mMech, ref)
 
 
 def test_load_bsm_EX_IX():
     bsm = opt2.computeBeamSpotMotion('EX', 'fr', 'IX', 'pitch')
     ref = data['bsm_EX_IX']
-    assert np.allclose(bsm, ref)
+    assert close.allclose(bsm, ref)
 
 
 def test_load_bsm_EX_EX():
     bsm = opt2.computeBeamSpotMotion('EX', 'fr', 'EX', 'pitch')
     ref = data['bsm_EX_EX']
-    assert np.allclose(bsm, ref)
+    assert close.allclose(bsm, ref)

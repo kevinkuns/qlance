@@ -8,6 +8,7 @@ import pytickle.optickle as pyt
 import pytickle.plant as plant
 import optSagnac
 import os
+import close
 import pytest
 
 eng = matlab.engine.start_matlab()
@@ -50,32 +51,32 @@ qn45 = opt45.getQuantumNoise('AS_DIFF')
 
 
 def test_DARM():
-    assert np.allclose(tfDARM, data['tfDARM'])
+    assert close.allclose(tfDARM, data['tfDARM'])
 
 
 def test_CARM():
-    assert np.allclose(tfCARM, data['tfCARM'])
+    assert close.allclose(tfCARM, data['tfCARM'])
 
 
 def test_qn00():
-    assert np.allclose(qn00, data['qn00'])
+    assert close.allclose(qn00, data['qn00'])
 
 
 def test_qn45():
-    assert np.allclose(qn45, data['qn45'])
+    assert close.allclose(qn45, data['qn45'])
 
 
 def test_reload_DARM():
-    assert np.allclose(tfDARM, opt2.getTF('AS_DIFF', DARM))
+    assert close.allclose(tfDARM, opt2.getTF('AS_DIFF', DARM))
 
 
 def test_reload_CARM():
-    assert np.allclose(tfCARM, opt2.getTF('REFL_I', CARM))
+    assert close.allclose(tfCARM, opt2.getTF('REFL_I', CARM))
 
 
 def test_reload_qn00():
-    assert np.allclose(qn00, opt00_2.getQuantumNoise('AS_DIFF'))
+    assert close.allclose(qn00, opt00_2.getQuantumNoise('AS_DIFF'))
 
 
 def test_reload_qn45():
-    assert np.allclose(qn45, opt45_2.getQuantumNoise('AS_DIFF'))
+    assert close.allclose(qn45, opt45_2.getQuantumNoise('AS_DIFF'))

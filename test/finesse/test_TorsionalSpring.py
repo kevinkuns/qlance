@@ -8,6 +8,7 @@ import pytickle.controls as ctrl
 import pytickle.plant as plant
 import pykat
 import os
+import close
 import pytest
 
 data = np.load('data/finesse_TorsionalSpring_data.npz')
@@ -38,8 +39,8 @@ fin.addSpace(kat, 'IX_fr', 'EX_fr', Lcav)
 fin.setCavityBasis(kat, 'IX_fr', 'EX_fr')
 
 # set the pitch response
-fin.setMechTF(kat, 'EX', [], poles, 1/I, dof='pitch')
-fin.setMechTF(kat, 'IX', [], poles, 1/I, dof='pitch')
+fin.setMechTF(kat, 'EX', [], poles, 1/I, doftype='pitch')
+fin.setMechTF(kat, 'IX', [], poles, 1/I, doftype='pitch')
 
 # add input
 fin.addLaser(kat, 'Laser', Pin)
@@ -48,10 +49,10 @@ fin.addSpace(kat, 'Laser_out', 'Mod_in', 0)
 fin.addSpace(kat, 'Mod_out', 'IX_bk', 0)
 
 # add DC and RF photodiodes
-fin.addReadout(kat, 'REFL', 'IX_bk', fmod, 0, dof='pitch')
+fin.addReadout(kat, 'REFL', 'IX_bk', fmod, 0, doftype='pitch')
 
-fin.monitorMotion(kat, 'EX', dof='pitch')
-fin.monitorMotion(kat, 'IX', dof='pitch')
+fin.monitorMotion(kat, 'EX', doftype='pitch')
+fin.monitorMotion(kat, 'IX', doftype='pitch')
 
 fin.monitorBeamSpotMotion(kat, 'EX_fr')
 fin.monitorBeamSpotMotion(kat, 'IX_fr')
@@ -67,7 +68,7 @@ SOFT = {'IX': r, 'EX': 1}
 fmin = 1e-1
 fmax = 30
 npts = 1000
-katTF.run(fmin, fmax, npts, dof='pitch')
+katTF.run(fmin, fmax, npts, doftype='pitch')
 katTF.runDC()
 
 katTF.save('test_torsional_spring.hdf5')
@@ -75,52 +76,99 @@ katTF2 = plant.FinessePlant()
 katTF2.load('test_torsional_spring.hdf5')
 os.remove('test_torsional_spring.hdf5')
 
+
 def test_REFLI_HARD():
-    tf = katTF.getTF('REFL_I', HARD, dof='pitch')
+    hard = ctrl.DegreeOfFreedom(HARD, 'pitch')
+    hard2 = ctrl.DegreeOfFreedom(HARD, 'pitch', probes='REFL_I')
+    tf1 = katTF.getTF('REFL_I', HARD, doftype='pitch')
+    tf2 = katTF.getTF('REFL_I', hard)
+    tf3 = katTF.getTF(hard2)
     ref = data['tf_REFLI_HARD']
-    assert np.allclose(tf, ref)
+    c1 = close.allclose(tf1, ref)
+    c2 = close.allclose(tf2, ref)
+    c3 = close.allclose(tf3, ref)
+    assert np.all([c1, c2, c3])
 
 
 def test_REFLI_SOFT():
-    tf = katTF.getTF('REFL_I', SOFT, dof='pitch')
+    tf = katTF.getTF('REFL_I', SOFT, doftype='pitch')
     ref = data['tf_REFLI_SOFT']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_mech_HARD():
-    tf = katTF.getMechTF(HARD, HARD, dof='pitch')
+    tf = katTF.getMechTF(HARD, HARD, doftype='pitch')
     ref = data['mech_HARD']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
+
+
+def test_mech_HARD2():
+    hard = ctrl.DegreeOfFreedom(HARD, 'pitch')
+    tf = katTF.getMechTF(hard, hard)
+    ref = data['mech_HARD']
+    assert close.allclose(tf, ref)
 
 
 def test_mech_SOFT():
-    tf = katTF.getMechTF(SOFT, SOFT, dof='pitch')
+    tf = katTF.getMechTF(SOFT, SOFT, doftype='pitch')
     ref = data['mech_SOFT']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
+
+
+def test_mech_SOFT2():
+    soft = ctrl.DegreeOfFreedom(SOFT, 'pitch')
+    tf1 = katTF.getMechTF(SOFT, soft, doftype='pitch')
+    tf2 = katTF.getMechTF(soft, SOFT, doftype='pitch')
+    ref = data['mech_SOFT']
+    c1 = close.allclose(tf1, ref)
+    c2 = close.allclose(tf2, ref)
+    assert np.all([c1, c2])
 
 
 def test_mMech_EX_EX():
-    mMech = katTF.getMechMod('EX', 'EX', dof='pitch')
+    mMech = katTF.getMechMod('EX', 'EX', doftype='pitch')
     ref = data['mMech_EX_EX']
-    assert np.allclose(mMech, ref)
+    assert close.allclose(mMech, ref)
+
+
+def test_mMech_EX_EX2():
+    ex = ctrl.DegreeOfFreedom('EX', doftype='pitch')
+    mMech1 = katTF.getMechMod('EX', ex, doftype='pitch')
+    mMech2 = katTF.getMechMod(ex, 'EX', doftype='pitch')
+    mMech3 = katTF.getMechMod(ex, ex, doftype='pitch')
+    mMech4 = katTF.getMechMod(ex, ex)
+    ref = data['mMech_EX_EX']
+    c1 = close.allclose(mMech1, ref)
+    c2 = close.allclose(mMech2, ref)
+    c3 = close.allclose(mMech3, ref)
+    c4 = close.allclose(mMech4, ref)
+    assert np.all([c1, c2, c3, c4])
 
 
 def test_mMech_IX_EX():
-    mMech = katTF.getMechMod('IX', 'EX', dof='pitch')
+    mMech = katTF.getMechMod('IX', 'EX', doftype='pitch')
     ref = data['mMech_IX_EX']
-    assert np.allclose(mMech, ref)
+    assert close.allclose(mMech, ref)
+
+
+def test_mMech_IX_EX2():
+    ex = ctrl.DegreeOfFreedom('EX', 'pitch')
+    ix = ctrl.DegreeOfFreedom('IX', 'pitch')
+    mMech = katTF.getMechMod(ix, ex)
+    ref = data['mMech_IX_EX']
+    assert close.allclose(mMech, ref)
 
 
 def test_bsm_EX_IX():
     bsm = katTF.computeBeamSpotMotion('EX_fr', 'IX', 'pitch')
     ref = data['bsm_EX_IX']
-    assert np.allclose(bsm, ref)
+    assert close.allclose(bsm, ref)
 
 
 def test_bsm_EX_EX():
     bsm = katTF.computeBeamSpotMotion('EX_fr', 'EX', 'pitch')
     ref = data['bsm_EX_EX']
-    assert np.allclose(bsm, ref)
+    assert close.allclose(bsm, ref)
 
 
 ##############################################################################
@@ -128,48 +176,48 @@ def test_bsm_EX_EX():
 ##############################################################################
 
 def test_load_REFLI_HARD():
-    tf = katTF2.getTF('REFL_I', HARD, dof='pitch')
+    tf = katTF2.getTF('REFL_I', HARD, doftype='pitch')
     ref = data['tf_REFLI_HARD']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_load_REFLI_SOFT():
-    tf = katTF2.getTF('REFL_I', SOFT, dof='pitch')
+    tf = katTF2.getTF('REFL_I', SOFT, doftype='pitch')
     ref = data['tf_REFLI_SOFT']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_load_mech_HARD():
-    tf = katTF2.getMechTF(HARD, HARD, dof='pitch')
+    tf = katTF2.getMechTF(HARD, HARD, doftype='pitch')
     ref = data['mech_HARD']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_load_mech_SOFT():
-    tf = katTF2.getMechTF(SOFT, SOFT, dof='pitch')
+    tf = katTF2.getMechTF(SOFT, SOFT, doftype='pitch')
     ref = data['mech_SOFT']
-    assert np.allclose(tf, ref)
+    assert close.allclose(tf, ref)
 
 
 def test_load_mMech_EX_EX():
-    mMech = katTF2.getMechMod('EX', 'EX', dof='pitch')
+    mMech = katTF2.getMechMod('EX', 'EX', doftype='pitch')
     ref = data['mMech_EX_EX']
-    assert np.allclose(mMech, ref)
+    assert close.allclose(mMech, ref)
 
 
 def test_load_mMech_IX_EX():
-    mMech = katTF2.getMechMod('IX', 'EX', dof='pitch')
+    mMech = katTF2.getMechMod('IX', 'EX', doftype='pitch')
     ref = data['mMech_IX_EX']
-    assert np.allclose(mMech, ref)
+    assert close.allclose(mMech, ref)
 
 
 def test_load_bsm_EX_IX():
     bsm = katTF2.computeBeamSpotMotion('EX_fr', 'IX', 'pitch')
     ref = data['bsm_EX_IX']
-    assert np.allclose(bsm, ref)
+    assert close.allclose(bsm, ref)
 
 
 def test_load_bsm_EX_EX():
     bsm = katTF2.computeBeamSpotMotion('EX_fr', 'EX', 'pitch')
     ref = data['bsm_EX_EX']
-    assert np.allclose(bsm, ref)
+    assert close.allclose(bsm, ref)

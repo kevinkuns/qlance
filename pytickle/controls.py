@@ -6,7 +6,8 @@ import numpy as np
 from numpy.linalg import inv
 import pandas as pd
 from collections import OrderedDict
-from .utils import assertType, siPrefix, append_str_if_unique
+from .utils import (assertType, siPrefix, append_str_if_unique,
+                    get_default_kwargs)
 from . import io
 from functools import partial
 from numbers import Number
@@ -310,26 +311,32 @@ class DegreeOfFreedom:
     """A generic degree of freedom
 
     Inputs:
-      name: name of the DOF
-      probes: the probes used to sense the DOF (a dict or single string)
       drives: the drives defining the DOF (a dict or single string)
-      dofType: type of DOF: pos, pitch, or yaw (Default: pos)
+      doftype: type of DOF: pos, pitch, or yaw (Default: pos)
+      probes: the probes used to sense the DOF (a dict or single string)
+      name: name of the DOF
 
     Example:
       For DARM where L = Lx - Ly and it is sensed by AS_DIFF
-        DegreeOfFreedom('DARM', 'AS_DIFF', {'EX.pos': 1, 'EY.pos': -1})
+        DegreeOfFreedom('DARM', 'AS_DIFF', {'EX': 1, 'EY': -1})
     """
 
-    def __init__(self, name, probes, drives, dofType='pos'):
+    def __init__(self, drives=None, doftype='pos', probes=None, name=''):
+        if drives is None:
+            raise ValueError('drives must either be a string or a dictionary')
         self._name = name
-        self._probes = assertType(probes, dict).copy()
+        self._doftype = doftype
+
+        if probes is None:
+            self._probes = None
+        else:
+            self._probes = assertType(probes, dict).copy()
         # self._drives = OrderedDict()
-        self._dofType = dofType
 
         # append the type of dof to the names of the drives
         in_drives = assertType(drives, dict).copy()
         self._drives = OrderedDict(
-            {k + '.' + dofType: v for k, v in in_drives.items()})
+            {k + '.' + doftype: v for k, v in in_drives.items()})
 
     @property
     def name(self):
@@ -350,10 +357,18 @@ class DegreeOfFreedom:
         return self._drives
 
     @property
-    def dofType(self):
+    def doftype(self):
         """Type of DOF
         """
-        return self._dofType
+        return self._doftype
+
+    def dofs(self):
+        """Iterator over the drives returned as DegreeOfFreedom instances
+        """
+        for drive, cc in self.drives.items():
+            name = drive.split('.')[0]
+            dof = DegreeOfFreedom(drives=name, doftype=self.doftype, name=name)
+            yield dof, cc
 
     def probes2dof(self, probeList):
         """Make a vector of probes
@@ -395,7 +410,7 @@ class Filter:
     """A class representing a generic filter
 
     Inputs:
-      The filter can be specified in one of two ways:
+      The filter can be specified in one of four ways:
         1) Giving a callable function that is the s-domain filter
         2) Giving the zeros, poles, and gain
         3) Giving the zeros, poles, and gain at a specific frequency
@@ -791,23 +806,62 @@ class ControlSystem:
         if drive2bsm:
             self._computeBeamSpotMotion()
 
-    def addDOF(self, name, probes, drives, dofType='pos'):
+    def addDOF(self, *args, **kwargs):
         """Add a degree of freedom to the model
 
         Inputs:
-          name: name of the DOF
-          probes: the probes used to sense the DOF
-          drives: the drives used to define the DOF
+          The DOF can be add in one of two ways
+           1) Specifying the name of the DOF, the probes used to sense it, and
+              the drives that define it. The optional keyword argument doftype
+              defines the doftype (pos, pitch, or yaw) and is 'pos' by default
+           2) Giving a DegreOfFreedom instance
 
         Example:
           For DARM where L = Lx - Ly and it is sensed by AS_DIFF
-          cs.addDOF('DARM', 'AS_DIFF', {'EX.pos': 1, 'EY.pos': -1})
+            cs.addDOF('DARM', 'AS_DIFF', {'EX': 1, 'EY': -1})
+          or equivalently
+            DARM = DegreOfFreedom(
+                name='DARM', probes='AS_DIFF', drives={'EX': 1, 'EY': -1})
+            cs.addDOF(DARM)
         """
+        if len(args) == 1:
+            if isinstance(args[0], DegreeOfFreedom):
+                dof = args[0]
+                name = dof.name
+                if len(name) == 0:
+                    raise ValueError(
+                        'the degree of freedom must have a name to be added')
+
+                if dof.probes is None:
+                    raise ValueError('DOF must have probes defined')
+
+            else:
+                raise TypeError(
+                    'When adding a DOF with a single argument, ' \
+                    + 'it must be a DegreeOfFreedom instance')
+
+        elif len(args) == 3:
+            name, probes, drives = args
+            doftype = get_default_kwargs(kwargs, doftype='pos')['doftype']
+            dof = DegreeOfFreedom(
+                name=name, probes=probes, drives=drives, doftype=doftype)
+
+        elif len(args) == 4:
+            name, probes, drives, doftype = args
+            dof = DegreeOfFreedom(
+                name=name, probes=probes, drives=drives, doftype=doftype)
+
+        else:
+            msg = 'Incorrect number of arguments. Input can be either\n' \
+                + '1) A single DegreeOfFreedom argument\n' \
+                + '2) Three arguments representing the name, probes,' \
+                + 'and drives with an optional keyword for the doftype'
+            raise TypeError(msg)
+
         if name in self.dofs.keys():
             raise ValueError(
                 'Degree of freedom {:s} already exists'.format(name))
 
-        dof = DegreeOfFreedom(name, probes, drives, dofType=dofType)
         self.dofs[name] = dof
         append_str_if_unique(self.probes, dof.probes)
         append_str_if_unique(self.drives, dof.drives)
@@ -828,8 +882,8 @@ class ControlSystem:
             for di, drive in enumerate(self.drives):
                 driveData = drive.split('.')
                 driveName = driveData[0]
-                dofType = driveData[-1]
-                tf = self.plant_model.getTF(probe, driveName, dof=dofType)
+                doftype = driveData[-1]
+                tf = self.plant_model.getTF(probe, driveName, doftype=doftype)
                 plant[pi, di, :] = tf
         return plant
 
@@ -932,10 +986,10 @@ class ControlSystem:
             for di, drive in enumerate(self.drives):
                 driveData = drive.split('.')
                 driveName = driveData[0]
-                dofType = driveData[-1]
+                doftype = driveData[-1]
                 # FIXME: make work with finesse and non-front surfaces
                 drive2bsm[si, di] = self.plant_model.computeBeamSpotMotion(
-                    opticName, 'fr', driveName, dofType)
+                    opticName, 'fr', driveName, doftype)
 
         self._drive2bsm = drive2bsm
 
@@ -1003,30 +1057,30 @@ class ControlSystem:
 
         self._filters.append((dof_to, dof_from, filt))
 
-    def addCompensator(self, drive, driveType, filt):
+    def addCompensator(self, drive, doftype, filt):
         """Add a compensation filter
 
         Inputs:
           drive: which drive to compensate
-          driveType: type of drive (pos, pitch, or yaw)
+          doftype: type of drive (pos, pitch, or yaw)
           filt: Filter instance for the filter
         """
-        drive += '.' + driveType
+        drive += '.' + doftype
         if drive in [cf[0] for cf in self._compFilts]:
             raise ValueError(
                 'A compensator is already set for drive {:s}'.format(drive))
 
         self._compFilts.append((drive, filt))
 
-    def setActuator(self, drive, driveType, filt):
+    def setActuator(self, drive, doftype, filt):
         """Set the actuation plant for a drive
 
         Inputs:
           drive: which drive to actuate
-          driveType: type of drive (pos, pitch, or yaw)
+          doftype: type of drive (pos, pitch, or yaw)
           filt: Filter instance for the plant
         """
-        drive += '.' + driveType
+        drive += '.' + doftype
         if drive in [rf[0] for rf in self._actFilts]:
             raise ValueError(
                 'A response is already set for drive {:s}'.format(drive))
@@ -1341,7 +1395,7 @@ class ControlSystem:
         oltf = self.getOLTF(sig_to, sig_from, tstpnt)
         return plotNyquist(oltf, rmax=rmax)
 
-    def _getIndex(self, name, tstpnt):
+    def _getIndex(self, name_or_dof, tstpnt):
         """Get the index of a signal
 
         Inputs:
@@ -1356,6 +1410,29 @@ class ControlSystem:
             sig_list = self.probes
         else:
             raise ValueError('Unrecognized test point ' + tstpnt)
+
+        if isinstance(name_or_dof, DegreeOfFreedom):
+            if tstpnt in ['act', 'drive', 'pos', 'spot']:
+                # the DOF should be a single drive
+                # take the drive instead of the name so that it has the
+                # doftype appended
+                drives_keys = list(name_or_dof.drives.keys())
+                if len(drives_keys) == 1:
+                    name = drives_keys[0]
+                else:
+                    raise ValueError(
+                        tstpnt + ' test point should only have one drive')
+
+            elif tstpnt == 'sens':
+                # probes are never DOFs
+                raise ValueError('sens test point cannot be a DegreeOfFreedom')
+
+            elif tstpnt in ['err', 'ctrl', 'cal']:
+                # the DOF should be a control system DOF
+                name = name_or_dof.name
+
+        else:
+            name = name_or_dof
 
         try:
             ind = sig_list.index(name)

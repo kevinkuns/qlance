@@ -6,6 +6,7 @@ import matlab.engine
 import numpy as np
 import pytickle.optickle as pyt
 import pytickle.controls as ctrl
+import close
 import pytest
 
 data = np.load('data/optickle_lsc_data.npz', allow_pickle=True)
@@ -71,7 +72,7 @@ def test_oltfs():
     rslt = []
     for dof_to in dofs:
         for dof_from in dofs:
-            rslt.append(np.allclose(cs.getOLTF(dof_to, dof_from, 'err'),
+            rslt.append(close.allclose(cs.getOLTF(dof_to, dof_from, 'err'),
                                     data['oltfs'][()][dof_to][dof_from]))
     assert all(rslt)
 
@@ -80,7 +81,7 @@ def test_cltfs():
     rslt = []
     for dof_to in dofs:
         for dof_from in dofs:
-            rslt.append(np.allclose(cs.getCLTF(dof_to, dof_from, 'err'),
+            rslt.append(close.allclose(cs.getCLTF(dof_to, dof_from, 'err'),
                                     data['cltfs'][()][dof_to][dof_from]))
     assert all(rslt)
 
@@ -90,7 +91,7 @@ def test_sense_closed():
     for dof_to in dofs:
         for probe in cs.probes:
             tf = cs.getTF(dof_to, 'err', probe, 'sens', closed=True)
-            rslt.append(np.allclose(
+            rslt.append(close.allclose(
                 tf, data['sense_closed'][()][dof_to][probe]))
     assert all(rslt)
 
@@ -100,7 +101,7 @@ def test_sense_open():
     for dof_to in dofs:
         for probe in cs.probes:
             tf = cs.getTF(dof_to, 'err', probe, 'sens', closed=False)
-            rslt.append(np.allclose(
+            rslt.append(close.allclose(
                 tf, data['sense_open'][()][dof_to][probe]))
     assert all(rslt)
 
@@ -110,7 +111,7 @@ def test_drive_closed():
     for dof_to in dofs:
         for drive in cs.drives:
             tf = cs.getTF(dof_to, 'err', drive, 'drive', closed=True)
-            rslt.append(np.allclose(
+            rslt.append(close.allclose(
                 tf, data['drive_closed'][()][dof_to][drive]))
     assert all(rslt)
 
@@ -120,7 +121,7 @@ def test_drive_open():
     for dof_to in dofs:
         for drive in cs.drives:
             tf = cs.getTF(dof_to, 'err', drive, 'drive', closed=False)
-            rslt.append(np.allclose(
+            rslt.append(close.allclose(
                 tf, data['drive_open'][()][dof_to][drive]))
     assert all(rslt)
 
@@ -130,7 +131,7 @@ def test_cal_closed():
     for dof_to in dofs:
         for dof_from in dofs:
             tf = cs.getTF(dof_to, 'err', dof_from, 'cal', closed=True)
-            rslt.append(np.allclose(
+            rslt.append(close.allclose(
                 tf, data['calTFs_closed'][()][dof_to][dof_from]))
     assert all(rslt)
 
@@ -140,7 +141,7 @@ def test_cal_open():
     for dof_to in dofs:
         for dof_from in dofs:
             tf = cs.getTF(dof_to, 'err', dof_from, 'cal', closed=False)
-            rslt.append(np.allclose(
+            rslt.append(close.allclose(
                 tf, data['calTFs_open'][()][dof_to][dof_from]))
     assert all(rslt)
 
@@ -153,6 +154,6 @@ def test_sensing_noise():
     for probe, sn in shotNoise.items():
         tf = cs.getTF('DARM', 'err', probe, 'sens')/cltfDARM
         sensingNoise[probe] = np.abs(tf*sn/calDARM)
-    rslt = [np.allclose(noise, data['sensingNoise'][()][probe])
+    rslt = [close.allclose(noise, data['sensingNoise'][()][probe])
             for probe, noise in sensingNoise.items()]
     assert all(rslt)
