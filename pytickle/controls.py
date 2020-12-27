@@ -352,7 +352,7 @@ class DegreeOfFreedom:
 
     @property
     def drives(self):
-        """Dictionary of probes defining the DOF
+        """Dictionary of drives defining the DOF
         """
         return self._drives
 
@@ -643,7 +643,7 @@ class FitTF(Filter):
       ff: frequency vector of data to be fit [Hz]
       data: transfer function data
     """
-    def __init__(self, ff, data):
+    def __init__(self, ff, data, **kwargs):
         super().__init__([], [], 0)
         self._ff = ff
         self._data = data

@@ -859,7 +859,6 @@ class FinessePlant:
                 'takes 2 positional arguments but ' + str(len(args)) + ' were given')
 
         if doftype not in self._doftypes:
-
             raise ValueError('Unrecognized doftype ' + doftype)
 
         # figure out the shape of the TF
