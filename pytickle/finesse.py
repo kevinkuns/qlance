@@ -21,7 +21,7 @@ from pykat.external.peakdetect import peakdetect
 
 def addMirror(
         kat, name, Chr=0, Thr=0, Lhr=0, Rar=0, Lmd=0, Nmd=1.45, phi=0,
-        pitch=0, yaw=0, dh=0, comp=False):
+        pitch=0, yaw=0, dh=0, r_ap=np.inf, comp=False):
     """Add a mirror to a finesse model
 
     Adds a mirror with nodes name_fr and name_bk
@@ -39,6 +39,7 @@ def addMirror(
       pitch: pitch tuning [deg] (Default: 0)
       yaw: yaw tuning [deg] (Default: 0)
       dh: optic thickness [m] (Default: 0)
+      r_ap: aperture radius [m] (Default: infinite)
       comp: whether to use a real compound mirror (Default: False)
 
     Examples:
@@ -59,6 +60,9 @@ def addMirror(
         Rcx = 1/Chr
         Rcy = 1/Chr
 
+    if not np.isfinite(r_ap):
+        r_ap = None
+
     # phi = 2*np.pi * pos/kat.lambda0
     fr = name + '_fr'
     bk = name + '_bk'
@@ -69,24 +73,24 @@ def addMirror(
     if comp:
         # HR surface
         kat.add(kcmp.mirror(
-            name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
+            name, fr, fr_s, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy, r_ap=r_ap))
 
         # AR surface
         # FIXME: this treats AR as loss instead of reflection
         kat.add(kcmp.mirror(
-            name + '_AR', bk_s, bk, R=0, L=Rar, phi=phi))
+            name + '_AR', bk_s, bk, R=0, L=Rar, phi=phi, r_ap=r_ap))
 
         # connect the AR and HR surfaces
         kat.add(kcmp.space(name + '_sub', bk_s, fr_s, dh, Nmd))
 
     else:
         kat.add(kcmp.mirror(
-            name, fr, bk, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy))
+            name, fr, bk, T=Thr, L=Lhr, phi=phi, Rcx=Rcx, Rcy=Rcy, r_ap=r_ap))
 
 
 def addBeamSplitter(
         kat, name, aoi=45, Chr=0, Thr=0.5, Lhr=0, Rar=0, Lmd=0, Nmd=1.45,
-        phi=0, dh=0, comp=False):
+        phi=0, dh=0, r_ap=np.inf, comp=False):
 
     """Add a beamsplitter to a finesse model
 
@@ -112,6 +116,7 @@ def addBeamSplitter(
       pitch: pitch tuning [deg] (Default: 0)
       yaw: yaw tuning [deg] (Default: 0)
       dh: optic thickness [m] (Default: 0)
+      r_ap: aperture radius [m] (Default: infinite)
       comp: whether to use a real compound mirror (Default: False)
 
     Example:
@@ -126,6 +131,9 @@ def addBeamSplitter(
     else:
         Rcx = 1/Chr
         Rcy = 1/Chr
+
+    if not np.isfinite(r_ap):
+        r_ap = None
 
     # phi = 2*np.pi * pos/kat.lambda0
     frI = name + '_frI'
@@ -153,17 +161,17 @@ def addBeamSplitter(
         # HR surface
         kat.add(kcmp.beamSplitter(
             name, frI, frR, frT_s, frO_s, T=Thr, L=Lhr, alpha=aoi, phi=phi,
-            Rcx=Rcx, Rcy=Rcy))
+            Rcx=Rcx, Rcy=Rcy, r_ap=r_ap))
 
         # AR transmission
         kat.add(kcmp.beamSplitter(
             name + '_AR_T', bkT_s, poT, bkT, piT, R=0, L=Rar, alpha=alpha_sub,
-            phi=phi))
+            phi=phi, r_ap=r_ap))
 
         # AR open
         kat.add(kcmp.beamSplitter(
             name + '_AR_O', bkO_s, poO, bkO, piO, R=0, L=Rar, alpha=alpha_sub,
-            phi=phi))
+            phi=phi, r_ap=r_ap))
 
         # connect the HR and AR surfaces
         kat.add(kcmp.space(name + '_subT', frT_s, bkT_s, dl, Nmd))
@@ -172,7 +180,7 @@ def addBeamSplitter(
     else:
         kat.add(kcmp.beamSplitter(
             name, frI, frR, bkT, bkO, T=Thr, L=Lhr, alpha=aoi, phi=phi,
-            Rcx=Rcx, Rcy=Rcy))
+            Rcx=Rcx, Rcy=Rcy, r_ap=r_ap))
 
 
 def addSpace(kat, node1, node2, length, n=1, new_comp=None):
