@@ -11,9 +11,9 @@ with open('README.md', 'r') as fh:
 
 
 setuptools.setup(
-    name='PyTickle',
+    name='QLANCE',
     version=version,
-    url='https://github.com/kevinkuns/pytickle',
+    url='https://github.com/kevinkuns/qlance',
     author='Kevin Kuns',
     author_email='kkuns@mit.edu',
     description='Optomechanical, quantum noise, and control loop simulations',

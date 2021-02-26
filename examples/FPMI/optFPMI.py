@@ -3,7 +3,7 @@ Make a basic Optickle FPMI model
 """
 
 import numpy as np
-import pytickle.optickle as pyt
+import qlance.optickle as pyt
 
 
 def optFPMI(eng, opt_name, par):
@@ -22,7 +22,7 @@ def optFPMI(eng, opt_name, par):
 
     vRF = np.array([-fmod, 0, fmod])
 
-    opt = pyt.PyTickle(eng, opt_name, vRF=vRF, lambda0=par['lambda0'])
+    opt = pyt.Optickle(eng, opt_name, vRF=vRF, lambda0=par['lambda0'])
 
     # Add optics and set mechanical plants
     mirrors = ['EX', 'IX', 'EY', 'IY']

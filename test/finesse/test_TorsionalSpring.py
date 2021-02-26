@@ -3,9 +3,9 @@ Unit tests for finesse torsional spring
 """
 
 import numpy as np
-import pytickle.finesse as fin
-import pytickle.controls as ctrl
-import pytickle.plant as plant
+import qlance.finesse as fin
+import qlance.controls as ctrl
+import qlance.plant as plant
 import pykat
 import os
 import close

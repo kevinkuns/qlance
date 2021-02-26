@@ -3,8 +3,8 @@ Basic Optickle Fabry Perot models
 """
 
 import numpy as np
-import pytickle.optickle as pyt
-from pytickle.controls import resRoots
+import qlance.optickle as pyt
+from qlance.controls import resRoots
 
 
 def optFP(eng, opt_name, par):
@@ -23,7 +23,7 @@ def optFP(eng, opt_name, par):
 
     vRF = np.array([-fmod, 0, fmod])
 
-    opt = pyt.PyTickle(eng, opt_name, vRF=vRF, lambda0=par['lambda0'])
+    opt = pyt.Optickle(eng, opt_name, vRF=vRF, lambda0=par['lambda0'])
 
     # Make the cavity
     # In this case it's very simple, but in more complicated models you can

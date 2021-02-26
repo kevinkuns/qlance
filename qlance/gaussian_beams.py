@@ -261,7 +261,7 @@ class GaussianPropagation:
         return np.arccos(self.getStability()) * 180/np.pi
 
     def _eval(self, cmd, nargout=0):
-        """Evaluate a matlab command using the pytickle model's engine
+        """Evaluate a matlab command using the matlab model's engine
 
         Inputs:
           cmd: the matlab command string

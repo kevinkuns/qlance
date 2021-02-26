@@ -1,11 +1,11 @@
 """
-Unit tests for pytickle controls
+Unit tests for qlance controls
 """
 
 import matlab.engine
 import numpy as np
-import pytickle.optickle as pyt
-import pytickle.controls as ctrl
+import qlance.optickle as pyt
+import qlance.controls as ctrl
 import close
 import pytest
 
@@ -15,7 +15,7 @@ eng = matlab.engine.start_matlab()
 pyt.addOpticklePath(eng)
 eng.eval("addpath(genpath('data'));", nargout=0)
 
-opt = pyt.PyTickle(eng, 'opt')
+opt = pyt.Optickle(eng, 'opt')
 eng.eval("par = struct;", nargout=0)
 eng.eval("par = paramCE1;", nargout=0)
 eng.eval("par.PR.Thr = 0.01;", nargout=0)

@@ -13,10 +13,10 @@ cd "matlabroot/extern/engines/python"
 python setup.py install --prefix="~/anaconda3"
 ```
 (To find the `matlabroot` path, open a matlab terminal and enter `matlabroot`.)
-Or, to install in an environment named `pytickle`, for example, the path is probably something like
+Or, to install in an environment named `qlance`, for example, the path is probably something like
 ```console
 cd "matlabroot/extern/engines/python"
-python setup.py install --prefix="~/anaconda3/envs/pytickle"
+python setup.py install --prefix="~/anaconda3/envs/qlance"
 ```
 
 To double check the correct paths, open a python terminal and enter
@@ -25,5 +25,5 @@ To double check the correct paths, open a python terminal and enter
 >>> sys.path
 ```
 In the first case of the base environment, `~/anaconda3/lib/python3.7/site-packages` should be one of the entries.
-In the second case of an environment named `pytickle`, `~/anaconda3/envs/pytickle/lib/python3.7/site-packages` should be one of the entries.
+In the second case of an environment named `qlance`, `~/anaconda3/envs/qlance/lib/python3.7/site-packages` should be one of the entries.
 If the paths are slightly different, change the paths specified by `prefix` by analogy.

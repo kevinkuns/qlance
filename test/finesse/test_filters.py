@@ -3,7 +3,7 @@ Unit tests for control systems
 """
 
 import numpy as np
-import pytickle.controls as ctrl
+import qlance.controls as ctrl
 import scipy.signal as sig
 import h5py
 import os

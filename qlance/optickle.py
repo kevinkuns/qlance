@@ -1,5 +1,5 @@
 '''
-Provides code for calling Optickle from within PyTickle
+Provides code for calling Optickle from within QLANCE
 '''
 
 import numpy as np
@@ -14,7 +14,7 @@ from .matlab import mat2py, py2mat, str2mat, addOpticklePath
 import subprocess
 
 
-class PyTickle(plant.OpticklePlant):
+class Optickle(plant.OpticklePlant):
     """An Optickle model
 
     Inputs:
@@ -47,7 +47,7 @@ class PyTickle(plant.OpticklePlant):
         self._eval(
             self._optName + " = Optickle(vRF, lambda0, pol);", nargout=0)
 
-        # initialize pytickle class variables
+        # initialize optickle class variables
         self._lambda0 = mat2py(self.eng.eval(self._optName + ".lambda"))
         self._vRF = mat2py(self._eval(self._optName + ".vFrf", 1))
         self._pol = np.array(pol)
@@ -58,7 +58,7 @@ class PyTickle(plant.OpticklePlant):
 
         # Track whether tickle or sweepLinear has been run on this model
         # If it has, do not let a matlab model be associated with this
-        # PyTickle instance to avoid potentially confusing results
+        # Optickle instance to avoid potentially confusing results
         self._tickled = False
 
         # get the commit SHA used to compute this plant
@@ -81,17 +81,17 @@ class PyTickle(plant.OpticklePlant):
         """Loads a matlab model with the same name as this class
 
         Execute the necessary commands to make the model in the matlab engine
-        and then call loadMatModel to load it into pytickle.
+        and then call loadMatModel to load it into qlance.
 
         For example if the optFP.m script makes a model specified by the
-        parameters in parFP.m, to make a pytickle model named opt1:
-            opt1 = PyTickle(eng, 'opt1')
+        parameters in parFP.m, to make a qlance optickle model named opt1:
+            opt1 = Optickle(eng, 'opt1')
             eng.eval("par = parFP;", nargout=0)
             eng.eval("opt1 = optFP(par);", nargout=0)
             opt1.loadMatModel()
         """
         if self._tickled:
-            msg = 'This pytickle model has already been run\n'
+            msg = 'This optickle model has already been run\n'
             msg += 'Initialize a new model and load the Matlab model again'
             raise RuntimeError(msg)
         self._lambda0 = mat2py(self.eng.eval(self.optName + ".lambda"))
@@ -257,7 +257,7 @@ class PyTickle(plant.OpticklePlant):
         """Add a polarizing beamsplitter.
 
         Need to make this function a bit more general to handle the case
-        of dichroic pytickle models
+        of dichroic optickle models
 
         Inputs:
           reflS: power reflectivity of S-pol (default: 0)
@@ -407,7 +407,7 @@ class PyTickle(plant.OpticklePlant):
         """Add a waveplate
 
         Need to make this function a bit more general to handle the case
-        of dichroic pytickle models
+        of dichroic optickle models
 
         Inputs:
           name: name of the waveplate
@@ -1251,7 +1251,7 @@ class PyTickle(plant.OpticklePlant):
           linkEnd: name of the end of the link
 
         Returns:
-          linkNum: the link number converted to pytickle's 0-based system
+          linkNum: the link number converted to optickle's 0-based system
         """
         linkStart = str2mat(linkStart)
         linkEnd = str2mat(linkEnd)
@@ -1266,14 +1266,14 @@ class PyTickle(plant.OpticklePlant):
         return linkNum
 
     def _updateNames(self):
-        """Refresh the pytickle model's list of probe and drive names
+        """Refresh the optickle model's list of probe and drive names
         """
         self._probes = self._eval(self.optName + ".getProbeName", 1)
         self._drives = self._eval(self.optName + ".getDriveNames", 1)
         self._topology.update(*build_dicts(self))
 
     def _eval(self, cmd, nargout=0):
-        """Evaluate a matlab command using the pytickle model's engine
+        """Evaluate a matlab command using the optickle model's engine
 
         Inputs:
           cmd: the matlab command string

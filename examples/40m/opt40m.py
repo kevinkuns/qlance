@@ -3,7 +3,7 @@ Create a 40m Optickle model.
 '''
 
 import numpy as np
-import pytickle.optickle as pyt
+import qlance.optickle as pyt
 
 
 def opt40m(eng, opt, par, phi=0, zeta=0, Pin=1):
@@ -26,7 +26,7 @@ def opt40m(eng, opt, par, phi=0, zeta=0, Pin=1):
         zeta = 90 deg is the amplitude quadrature (i.e. b1)
     """
 
-    opt = pyt.PyTickle(eng, opt)
+    opt = pyt.Optickle(eng, opt)
 
     ##########################################################################
     # Add optics.

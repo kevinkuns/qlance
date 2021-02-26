@@ -4,9 +4,9 @@ Unit tests for optickle torsional spring
 
 import matlab.engine
 import numpy as np
-import pytickle.optickle as pyt
-import pytickle.controls as ctrl
-import pytickle.plant as plant
+import qlance.optickle as pyt
+import qlance.controls as ctrl
+import qlance.plant as plant
 import os
 import close
 import pytest
@@ -35,8 +35,8 @@ poles = np.array(ctrl.resRoots(2*np.pi*f0, Q, Hz=False))
 
 vRF = np.array([-fmod, 0, fmod])
 
-opt = pyt.PyTickle(eng, 'opt', vRF)
-# opt = pyt.PyTickle(eng, 'opt')
+opt = pyt.Optickle(eng, 'opt', vRF)
+# opt = pyt.Optickle(eng, 'opt')
 
 # make the cavity
 opt.addMirror('EX', Chr=1/Re)

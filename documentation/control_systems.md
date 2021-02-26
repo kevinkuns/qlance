@@ -1,6 +1,6 @@
 # Control System Overview
 
-*__Note: the PyTickle convention is that control signals are directly summed into the error point without an explicit minus sign.__ Loops thus go unstable when open-loop transfer functions (OLTFs) are +1 and the Nyquist criteria requires the Nyquist contour to circle the point +1 clockwise the same number of times as there are right half plane poles in the OLTF.*
+*__Note: the QLANCE convention is that control signals are directly summed into the error point without an explicit minus sign.__ Loops thus go unstable when open-loop transfer functions (OLTFs) are +1 and the Nyquist criteria requires the Nyquist contour to circle the point +1 clockwise the same number of times as there are right half plane poles in the OLTF.*
 
 Here is a detailed overview of the architecture of the control systems for reference. The Optickle and Finesse examples for controlling a Fabry Perot Michelson interferometer ([available here](../examples/FPMI/)) show a detailed example and explain the optomechanical plant and related test points in more detail.
 
@@ -32,6 +32,6 @@ Here is a detailed overview of the architecture of the control systems for refer
 
 * Test points. These are the points along the loop where signals can be probed or injected and are marked as arrows going into or out of the loop.
     * The difference between the `drive` and `pos` test points is described in detail in the examples, but can be understood simply as follows. The effects of radiation pressure can be thought of as a feedback loop. The block R is the closed loop transfer function of this radiation pressure loop, `drive` is the input signal to the loop, and `pos` is the output signal from the loop.
-    * The name used in PyTickle to refer to each test point is the same as the subscript in the figure. So, for example, to compute the transfer function from `err` to `pos`, you'd use `cs.getTF(sig_to, pos, sig_from, err)`
+    * The name used in QLANCE to refer to each test point is the same as the subscript in the figure. So, for example, to compute the transfer function from `err` to `pos`, you'd use `cs.getTF(sig_to, pos, sig_from, err)`
     * The test point `spot` is not shown in the diagram but exists for angular DOFs to convert the test point `drive` into beamspot motion on an optic.
     * With the exception of `pos` (which only probes a signal) and `cal` (which only injects a signal), all test points can both probe and inject signals.

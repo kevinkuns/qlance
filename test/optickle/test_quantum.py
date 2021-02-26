@@ -4,8 +4,8 @@ Unit tests for optickle quantum noise: homodyne detectors and squeezers
 
 import matlab.engine
 import numpy as np
-import pytickle.optickle as pyt
-from pytickle.controls import resRoots
+import qlance.optickle as pyt
+from qlance.controls import resRoots
 import close
 import pytest
 
@@ -43,7 +43,7 @@ def optFPMI(eng, opt_name, sqAng, sqdB, rf=True):
         vRF = np.array([-fmod, 0, fmod])
     else:
         vRF = 0
-    opt = pyt.PyTickle(eng, opt_name, vRF=vRF)
+    opt = pyt.Optickle(eng, opt_name, vRF=vRF)
 
     opt.addMirror('EX')
     opt.addMirror('EY')

@@ -3,9 +3,9 @@ Basic Finesse Fabry Perot models
 """
 
 import numpy as np
-import pytickle.finesse as fin
+import qlance.finesse as fin
 import pykat
-from pytickle.controls import resRoots
+from qlance.controls import resRoots
 
 
 def katFP(par):

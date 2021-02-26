@@ -1,5 +1,5 @@
 """
-Provides code for calling Finesse from within PyTickle
+Provides code for calling Finesse from within QLANCE
 """
 
 import numpy as np

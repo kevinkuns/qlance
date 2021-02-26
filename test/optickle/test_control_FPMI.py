@@ -4,10 +4,10 @@ Unit tests for Optickle MIMO control of FPMI
 
 import matlab.engine
 import numpy as np
-import pytickle.optickle as pyt
-import pytickle.controls as ctrl
+import qlance.optickle as pyt
+import qlance.controls as ctrl
 import scipy.signal as sig
-import pytickle.noise as pytnoise
+import qlance.noise as pytnoise
 import matlab
 import parFPMI
 import optFPMI
@@ -75,7 +75,7 @@ zpk_tst = ss_tst.to_zpk()
 zpk_pum = ss_pum.to_zpk()
 zpk_sus = ss_sus.to_zpk()
 
-# convert to PyTickle Filters
+# convert to QLANCE Filters
 tst2tst = define_filt(zpk_tst)  # test mass force to position
 pum2tst = define_filt(zpk_pum)  # PUM force to test mass position
 sus2tst = define_filt(zpk_sus)  # sus point position to test mass position

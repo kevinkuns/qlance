@@ -4,8 +4,8 @@ Unit tests for an Optickle polarization Sagnac
 
 import matlab.engine
 import numpy as np
-import pytickle.optickle as pyt
-import pytickle.plant as plant
+import qlance.optickle as pyt
+import qlance.plant as plant
 import optSagnac
 import os
 import close

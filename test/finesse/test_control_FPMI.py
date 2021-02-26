@@ -3,10 +3,10 @@ Unit tests for Finesse MIMO control of FPMI
 """
 
 import numpy as np
-import pytickle.finesse as fin
-import pytickle.controls as ctrl
+import qlance.finesse as fin
+import qlance.controls as ctrl
 import scipy.signal as sig
-import pytickle.noise as pytnoise
+import qlance.noise as pytnoise
 import parFPMI
 import katFPMI
 import close

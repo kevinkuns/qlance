@@ -3,7 +3,7 @@ Unit tests for finesse FPMI frequency response and sweeps
 """
 
 import numpy as np
-import pytickle.finesse as fin
+import qlance.finesse as fin
 import pykat
 import pykat.components as kcmp
 import pykat.detectors as kdet

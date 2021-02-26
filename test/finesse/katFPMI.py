@@ -3,7 +3,7 @@ Make a basic Finesse FPMI model
 """
 
 import numpy as np
-import pytickle.finesse as fin
+import qlance.finesse as fin
 import pykat
 
 

@@ -681,7 +681,7 @@ class ControlSystem:
         append_str_if_unique(self.drives, dof.drives)
 
     def _computePlant(self):
-        """Compute the PyTickle plant from drives to probes
+        """Compute the qlance plant from drives to probes
 
         Returns:
           plant: The plant a (nProbes, nDrives, nFreq) array
@@ -734,7 +734,7 @@ class ControlSystem:
           ctrlMat: a (nDOF, nDOF, nff) array
         """
         if self.ss is None:
-            raise RuntimeError('There is no associated PyTickle model')
+            raise RuntimeError('There is no associated qlance model')
         nDOF = len(self.dofs)
         ctrlMat = np.zeros((nDOF, nDOF, len(self.ss)), dtype=complex)
         for (dof_to, dof_from, filt) in self._filters:

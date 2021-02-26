@@ -3,12 +3,10 @@ Unit tests for finesse PDH frequency response and sweeps
 """
 
 import numpy as np
-import pytickle.finesse as fin
-from pytickle.controls import DegreeOfFreedom
+import qlance.finesse as fin
+from qlance.controls import DegreeOfFreedom
 import pykat
-import pykat.components as kcmp
-import pykat.commands as kcom
-import pytickle.plant as plant
+import qlance.plant as plant
 import os
 import close
 import pytest

@@ -3,9 +3,9 @@ Unit tests for finesse quantum noise: homodyne detectors and squeezers
 """
 
 import numpy as np
-import pytickle.finesse as fin
+import qlance.finesse as fin
 import pykat
-from pytickle.controls import resRoots
+from qlance.controls import resRoots
 import close
 import pytest
 

@@ -4,7 +4,7 @@ Unit tests for optickle FPMI frequency response and sweeps
 
 import matlab.engine
 import numpy as np
-import pytickle.optickle as pyt
+import qlance.optickle as pyt
 import close
 import pytest
 
@@ -27,7 +27,7 @@ ly = lm - ls/2
 
 
 def optMI(opt_name):
-    opt = pyt.PyTickle(eng, opt_name, vRF)
+    opt = pyt.Optickle(eng, opt_name, vRF)
 
     opt.addMirror('EX', Thr=0)
     opt.addMirror('EY', Thr=0)

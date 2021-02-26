@@ -2,11 +2,11 @@
 Create a Sagnac model with polarization.
 
 This is copied almost exactly from the optPolSag.m example from Optickle
-in order to test pytickle
+in order to test qlance
 """
 
 import numpy as np
-import pytickle.optickle as pyt
+import qlance.optickle as pyt
 import scipy.constants as scc
 
 
@@ -21,7 +21,7 @@ def optSagnac(eng, opt, sqzAng=0, sqdB=0, antidB=0):
       antidB: anti-squeezing in dB
 
     Returns:
-      opt: the pytickle model
+      opt: the optickle model
     """
     lambda0 = 1064e-9
     Pin = 100
@@ -41,7 +41,7 @@ def optSagnac(eng, opt, sqzAng=0, sqdB=0, antidB=0):
     vRF = np.concatenate((vRF, vRF))
     pol = np.array(['S']*3 + ['P']*3)
 
-    opt = pyt.PyTickle(eng, opt, vRF, lambda0, pol)
+    opt = pyt.Optickle(eng, opt, vRF, lambda0, pol)
 
     ######################################################################
     # Add components

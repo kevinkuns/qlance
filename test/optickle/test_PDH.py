@@ -4,9 +4,9 @@ Unit tests for optickle PDH frequency response and sweeps
 
 import matlab.engine
 import numpy as np
-import pytickle.optickle as pyt
-import pytickle.plant as plant
-from pytickle.controls import DegreeOfFreedom
+import qlance.optickle as pyt
+import qlance.plant as plant
+from qlance.controls import DegreeOfFreedom
 import os
 import close
 import pytest
@@ -26,7 +26,7 @@ data = np.load('data/optickle_PDH_data.npz')
 
 
 def optFP(opt_name):
-    opt = pyt.PyTickle(eng, opt_name, vRF)
+    opt = pyt.Optickle(eng, opt_name, vRF)
 
     opt.addMirror('IX', Thr=Ti)
     opt.addMirror('EX', Thr=0)
