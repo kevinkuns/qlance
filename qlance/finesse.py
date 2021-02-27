@@ -1097,6 +1097,27 @@ def setCavityBasis(kat, node_name1, node_name2):
     kat.add(kcmd.cavity(cav_name, mirr1, node1, mirr2, node2))
 
 
+def applyMirrorMap(kat, name, map_file_name, save_name=None, binary=True):
+    """Apply a mirror map to an optic
+
+    Inputs:
+      kat: the finesse model
+      name: name of the optic
+      map_file_name: name of the file containing the map to be applied
+      save_name: if not None, the prefix of the files to save the coupling
+        coefficients to. (Default: None)
+      binary: whether to save the coupling coefficients to binary (True) or
+        ASCII (False). (Default: True)
+
+    Note: if multiple maps are going to be applied to the same optic, saving
+    the coupling coefficients only needs to be specified for the last map added.
+    """
+    kat.parse('map {:s} {:s}'.format(name, map_file_name))
+    if save_name:
+        kat.parse('knm {:s} {:s}'.format(name, save_name))
+        kat.parse('conf {:s} save_knm_binary {:b}'.format(name, binary))
+
+
 def add_lock(kat, name, probe, drive, gain, tol, offset=0, doftype='pos'):
     """Add a lock to a finesse model
 
