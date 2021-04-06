@@ -780,7 +780,7 @@ class FinessePlant:
             * In units of [W/m] if drive is an optic with doftype pos
             * In units of [W/rad] if drive is an optic with doftype pitch or yaw
             * In units of [W/Hz] if drive is a laser with drive freq
-            * In units of [W/RIN] if dirve is a laser with drive amp
+            * In units of [W/RIN] if drive is a laser with drive amp
 
         Note:
           * To convert frequency noise in [W/Hz] to phase noise in [W/rad],

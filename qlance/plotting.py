@@ -92,9 +92,9 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, **kwargs):
     phase_ax.set_xlabel('Frequency [Hz]')
     plt.setp(mag_ax.get_xticklabels(), visible=False)
     mag_ax.grid(True, which='both', alpha=0.5)
-    mag_ax.grid(alpha=0.25, which='minor')
+    mag_ax.grid(True, alpha=0.25, which='minor')
     phase_ax.grid(True, which='both', alpha=0.5)
-    phase_ax.grid(alpha=0.25, which='minor')
+    phase_ax.grid(True, alpha=0.25, which='minor')
     if newFig:
         return fig
 
