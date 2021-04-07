@@ -32,11 +32,12 @@ class TestFilters:
     p1 = np.array([8, 3 + 2j, 3 - 2j])
     k1 = 4
     z2 = []
-    p2 = ctrl.resRoots(42, 238)
+    p2 = ctrl.resRoots(42, 23)
     k2 = 6
     f4 = 10  # reference frequency
     g4 = 3  # gain at reference frequency
     ff = np.logspace(0, 4, 500)
+    ff0 = np.logspace(0, 4, 20)
 
     filt1a = ctrl.Filter(z1, p1, k1)
     filt1b = ctrl.Filter(-2*np.pi*z1, -2*np.pi*p1, k1, Hz=False)
@@ -86,6 +87,16 @@ class TestFilters:
         zpk2 = self.filt1d.get_zpk()
         assert np.all(check_zpk_equality(zpk1, zpk2))
 
+    def test_1compute(self):
+        tf1 = self.filt1a.computeFilter(self.ff)
+        tf2 = self.filt1a(self.ff)
+        assert close.allclose(tf1, tf2)
+
+    def test_1fit(self):
+        data = self.filt1a.computeFilter(self.ff0)
+        fit = ctrl.FitTF(self.ff0, data)
+        assert check_filter_equality(fit, self.filt1a)
+
     def test_2(self):
         k2 = self.k2
         p2 = self.p2
@@ -95,6 +106,16 @@ class TestFilters:
         # data2 = self.filt2b.computeFilter(self.ff)
         data2 = filt2b.computeFilter(self.ff)
         assert close.allclose(data1, data2)
+
+    def test_2fit_zpk(self):
+        data = self.filt2a.computeFilter(self.ff0)
+        fit = ctrl.FitTF(self.ff0, data)
+        assert check_filter_equality(fit, self.filt2a)
+
+    def test_2fit(self):
+        data = self.filt2a.computeFilter(self.ff0)
+        fit = ctrl.FitTF(self.ff0, data)
+        assert close.allclose(fit(self.ff), self.filt2a(self.ff))
 
     def test_cat1(self):
         assert check_filter_equality(self.filt3a, self.filt3b)

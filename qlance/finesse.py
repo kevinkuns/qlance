@@ -1236,7 +1236,7 @@ class KatFR(plant.FinessePlant):
         for all of them. (Default: True)
     """
     def __init__(self, kat, all_drives=True):
-        plant.FinessePlant.__init__(self)
+        super().__init__()
         self._kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'fr')
         self._lambda0 = self.kat.lambda0
@@ -1471,19 +1471,28 @@ class KatSweep:
     def __init__(self, kat, drives, doftype='pos', relative=True):
         self.kat = kat.deepcopy()
         set_all_probe_response(self.kat, 'dc')
-        self._drives = drives
-        if isinstance(self._drives, str):
-            self._drives = {self._drives: 1}
+
+        if isinstance(drives, ctrl.DegreeOfFreedom):
+            self._drives = {
+                drive.split('.')[0]: cc for drive, cc in drives.drives.items()}
+            doftype = drives.doftype
+
+        elif isinstance(drives, str):
+            self._drives = {drives: 1}
+
+        else:
+            self._drives = drives
+
         self._doftype = doftype
         self._sigs = dict.fromkeys(kat.detectors)
         self._lock_sigs = {}
         for cmd in self.kat.commands.values():
             if isinstance(cmd, kcmd.lock):
                 self._lock_sigs[cmd.name] = None
-        self._poses = dict.fromkeys(assertType(drives, dict))
+        self._poses = dict.fromkeys(self._drives)
         self._poses[''] = None
         self._relative = relative
-        self._offsets = dict.fromkeys(assertType(drives, dict))
+        self._offsets = dict.fromkeys(self._drives)
 
     @property
     def drives(self):
@@ -1648,7 +1657,7 @@ class KatSweep:
             except ValueError as exc:
                 print(exc)
                 print('pos ' + str(pos))
-                print('dp ' + str(pos))
+                print('dp ' + str(dp))
             dp = self._poses[''][1] - self._poses[''][0]
         return pos, peak
 

@@ -4,6 +4,7 @@ Unit tests for finesse FPMI frequency response and sweeps
 
 import numpy as np
 import qlance.finesse as fin
+from qlance.controls import DegreeOfFreedom
 import pykat
 import pykat.components as kcmp
 import pykat.detectors as kdet
@@ -180,10 +181,51 @@ class TestSweep:
         assert all(rslts)
 
 
+# class TestSweep2:
+
+#     katXARM = katSweep2('EX', -180, 180, -90)
+#     # outXARM = katXARM.run()
+
+#     katIX = katSweep2('IX', -180, 180, 90)
+#     # outIX = katIX.run()
+
+#     keys = ['AS_f0', 'XARM_f0', 'YARM_f0', 'BSX_f0', 'BSY_f0']
+
+#     def test_amps_XARM(self):
+#         rslts = [assert_amp(self.outXARM, 'sweep_XARM', key)
+#                  for key in self.keys]
+#         assert all(rslts)
+
+#     def test_amps_IX(self):
+#         rslts = [assert_amp(self.outIX, 'sweep_IX', key) for key in self.keys]
+#         assert all(rslts)
+
+
 class TestSweepXARM:
 
     katXARM_DIFF = katSweep2({'EX': 1, 'IX': 1}, -180, 180)
     katXARM_COMM = katSweep2({'EX': 1, 'IX': -1}, -180, 180)
+
+    keys = list(data['sweep_XARM_DIFF'][()].keys())
+
+    def test_amps_XARM_DIFF(self):
+        rslts = [assert_amp2(self.katXARM_DIFF, key, 'sweep_XARM_DIFF')
+                 for key in self.keys]
+        assert all(rslts)
+
+    def test_amps_XARM_COMM(self):
+        rslts = [assert_amp2(self.katXARM_COMM, key, 'sweep_XARM_COMM')
+                 for key in self.keys]
+        assert all(rslts)
+
+
+class TestSweepXARM_DOF:
+
+    DIFF = DegreeOfFreedom({'EX': 1, 'IX': 1})
+    COMM = DegreeOfFreedom({'EX': 1, 'IX': -1})
+
+    katXARM_DIFF = katSweep2(DIFF, -180, 180)
+    katXARM_COMM = katSweep2(COMM, -180, 180)
 
     keys = list(data['sweep_XARM_DIFF'][()].keys())
 

@@ -91,6 +91,8 @@ class OpticklePlant:
               doftype: degree of freedom of the drives (Default: pos)
               optOnly: if True, only return the optical TF with no mechanics
                 (Default: False)
+              fit: if True, returns a FitTF fit to the transfer function
+                (Default: False)
            2) Specifying probes and optOnly but using a DegreeOfFreedom to
               specify the drives and doftype
            3) Using a DegreeOfFreedom for the probes, drives, and doftype
@@ -152,17 +154,23 @@ class OpticklePlant:
             else:
                 raise TypeError(
                     'Single argument transfer functions must be a DegreeOfFreedom')
-            optOnly = get_default_kwargs(kwargs, optOnly=False)['optOnly']
+            kwargs = get_default_kwargs(kwargs, optOnly=False, fit=False)
+            optOnly = kwargs['optOnly']
+            fit = kwargs['fit']
 
         elif len(args) == 2:
             probes, drives = args
             if isinstance(drives, ctrl.DegreeOfFreedom):
                 doftype, drives = get_dof_data(drives)
-                optOnly = get_default_kwargs(kwargs, optOnly=False)['optOnly']
+                kwargs = get_default_kwargs(kwargs, optOnly=False, fit=False)
+                optOnly = kwargs['optOnly']
+                fit = kwargs['fit']
             else:
-                kwargs = get_default_kwargs(kwargs, doftype='pos', optOnly=False)
+                kwargs = get_default_kwargs(
+                    kwargs, doftype='pos', optOnly=False, fit=False)
                 doftype = kwargs['doftype']
                 optOnly = kwargs['optOnly']
+                fit = kwargs['fit']
 
         else:
             raise TypeError(
@@ -218,15 +226,20 @@ class OpticklePlant:
                 except IndexError:
                     tf += pc * drive_pos * tfData[driveNum]
 
-        return tf
+        if fit:
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
-    def getMechMod(self, drive_out, drive_in, doftype='pos'):
+    def getMechMod(self, drive_out, drive_in, doftype='pos', fit=False):
         """Get the radiation pressure modifications to drives
 
         Inputs:
           drive_out: name of the output drive
           drive_in: name of the input drive
           doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
         """
         err_msg = ('Mechanical modifications can only be calculated for '
                    + 'degrees of freedom with one drive')
@@ -270,15 +283,21 @@ class OpticklePlant:
         driveInNum = self._getDriveIndex(drive_in, doftype_in)
         driveOutNum = self._getDriveIndex(drive_out, doftype_out)
 
-        return mMech[driveOutNum, driveInNum]
+        tf = mMech[driveOutNum, driveInNum]
+        if fit:
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
-    def getMechTF(self, outDrives, inDrives, doftype='pos'):
+    def getMechTF(self, outDrives, inDrives, doftype='pos', fit=False):
         """Compute a mechanical transfer function
 
         Inputs:
           outDrives: name of the output drives
           inDrives: name of the input drives
           doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
 
         Returns:
           tf: the transfer function
@@ -315,7 +334,10 @@ class OpticklePlant:
                 mmech = self.getMechMod(outDrive, inDrive)
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
-        return tf
+        if fit:
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
     def plotMechTF(self, outDrives, inDrives, mag_ax=None, phase_ax=None,
                    doftype='pos', **kwargs):
@@ -329,8 +351,14 @@ class OpticklePlant:
             ff, tf, mag_ax=mag_ax, phase_ax=phase_ax, **kwargs)
         return fig
 
-    def getQuantumNoise(self, probeName, doftype='pos'):
+    def getQuantumNoise(self, probeName, doftype='pos', fit=False):
         """Compute the quantum noise at a probe
+
+        Inputs:
+          probeName: name of the probe
+          doftype: degree of freedom (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
 
         Returns the quantum noise at a given probe in [W/rtHz]
         """
@@ -339,7 +367,11 @@ class OpticklePlant:
             qnoise = self._noiseAC[doftype][probeNum, :]
         except IndexError:
             qnoise = self._noiseAC[doftype][probeNum]
-        return qnoise
+
+        if fit:
+            return ctrl.FitTF(self.ff, qnoise)
+        else:
+            return qnoise
 
     def plotTF(self, *args, **kwargs):
         """Plot a transfer function.
@@ -771,6 +803,8 @@ class FinessePlant:
               probes: name of the probes at which the TF is calculated
               drives: names of the drives from which the TF is calculated
               doftype: degree of freedom of the drives (Default: pos)
+              fit: if True, returns a FitTF fit to the transfer function
+                (Default: False)
            2) Specifying probes and optOnly but using a DegreeOfFreedom to
               specify the drives and doftype
            3) Using a DegreeOfFreedom for the probes, drives, and doftype
@@ -833,17 +867,17 @@ class FinessePlant:
             else:
                 raise TypeError(
                     'Single argument transfer functions must be a DegreeOfFreedom')
-            if kwargs:
-                raise TypeError(doftype_msg)
+            fit = get_default_kwargs(kwargs, fit=False)['fit']
 
         elif len(args) == 2:
             probes, drives = args
             if isinstance(drives, ctrl.DegreeOfFreedom):
                 doftype, drives = get_dof_data(drives)
-                if kwargs:
-                    raise TypeError(doftype_msg)
+                fit = get_default_kwargs(kwargs, fit=False)['fit']
             else:
-                doftype = get_default_kwargs(kwargs, doftype='pos')['doftype']
+                kwargs = get_default_kwargs(kwargs, doftype='pos', fit=False)
+                doftype = kwargs['doftype']
+                fit = kwargs['fit']
 
         else:
             raise TypeError(
@@ -872,15 +906,23 @@ class FinessePlant:
                 # add the contribution from this drive
                 tf += pc * drive_pos * self._freqresp[doftype][probe][drive]
 
-        return tf
+        if fit:
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
-    def getMechMod(self, drive_out, drive_in, doftype='pos'):
+    def getMechMod(self, drive_out, drive_in, doftype='pos', fit=False):
         """Get the radiation pressure modifications to drives
 
         Inputs:
           drive_out: name of the output drive
           drive_in: name of the input drive
+          dof: degree of freedom: pos, pitch, or yaw (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
+
           doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
+
         """
         err_msg = ('Mechanical modifications can only be calculated for '
                    + 'degrees of freedom with one drive')
@@ -909,15 +951,21 @@ class FinessePlant:
         if out_det not in self.pos_detectors:
             raise ValueError(out_det + ' is not a detector in this model')
 
-        return self._mechmod[doftype_in][out_det][drive_in]
+        tf = self._mechmod[doftype_in][out_det][drive_in]
+        if fit:
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
-    def getMechTF(self, outDrives, inDrives, doftype='pos'):
+    def getMechTF(self, outDrives, inDrives, doftype='pos', fit=False):
         """Compute a mechanical transfer function
 
         Inputs:
           outDrives: name of the output drives
           inDrives: name of the input drives
           doftype: degree of freedom: pos, pitch, or yaw (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
 
         Returns:
           tf: the transfer function
@@ -949,10 +997,19 @@ class FinessePlant:
                 mmech = self.getMechMod(outDrive, inDrive)
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
-        return tf
+        if fit:
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
-    def getQuantumNoise(self, probeName, doftype='pos'):
+    def getQuantumNoise(self, probeName, doftype='pos', fit=False):
         """Compute the quantum noise at a probe
+
+        Inputs:
+          probeName: name of the probe
+          doftype: degree of freedom (Default: pos)
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
 
         Returns the quantum noise at a given probe in [W/rtHz]
         """
@@ -968,7 +1025,11 @@ class FinessePlant:
 
         if np.any(np.iscomplex(qnoise)):
             print('Warning: some quantum noise spectra are complex')
-        return np.real(qnoise)
+
+        if fit:
+            return ctrl.FitTF(self.ff, np.real(qnoise))
+        else:
+            return np.real(qnoise)
 
     def getSigDC(self, probeName):
         """Get the DC signal from a probe

@@ -25,7 +25,7 @@ class Optickle(plant.OpticklePlant):
       pol: polarization (Default: 'S')
     """
     def __init__(self, eng, optName, vRF=0, lambda0=1064e-9, pol='S'):
-        plant.OpticklePlant.__init__(self)
+        super().__init__()
         # convert RF and polarization information
         if isinstance(vRF, Number):
             vRF = np.array([vRF])

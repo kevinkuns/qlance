@@ -13,6 +13,7 @@ from functools import partial
 from numbers import Number
 from itertools import cycle, zip_longest
 import scipy.signal as sig
+import IIRrational.AAA as AAA
 import matplotlib.pyplot as plt
 from . import plotting
 
@@ -223,6 +224,54 @@ def compute_stability_margin(ff, tf):
     return fms, sm
 
 
+def _plot_zp(zps, zp_type, Hz=True, fig=None):
+    """Plots zeros or poles in the complex plane
+
+    Inputs:
+      zps: an array of the zeros or poles in the s-domain
+      zp_type: 'zero' for zeros and 'pole' for poles
+      Hz: whether the zeros and poles should be plotted in
+        Hz (True) or rad/s (False)
+      fig: if not None, existing figure to plot on
+
+    Returns:
+      fig: the figure
+    """
+    if fig is None:
+        fig = plt.figure()
+        w, h = fig.get_size_inches()
+        dd = min([w, h])
+        fig.set_size_inches(dd, dd)
+        ax = fig.add_subplot(111)
+    else:
+        ax = fig.gca()
+
+    a = (2*np.pi)**Hz
+    zps = zps / a
+
+    kwargs = dict(fillstyle='none', linestyle='none', markeredgewidth=3)
+    if zp_type == 'zero':
+        kwargs['marker'] = 'o'
+        kwargs['color'] = 'xkcd:cerulean'
+        kwargs['fillstyle'] = 'none'
+    elif zp_type == 'pole':
+        kwargs['marker'] = 'x'
+        kwargs['color'] = 'xkcd:brick red'
+    else:
+        raise ValueError('the zp_type should only be pole or zero')
+
+    ax.plot(zps.real, zps.imag, **kwargs)
+
+    if Hz:
+        freq_label = 'Frequency [Hz]'
+    else:
+        freq_label = 'Frequency [rad/s]'
+    ax.set_xlabel(freq_label)
+    ax.set_ylabel(freq_label)
+
+    return fig
+
+
 def plotNyquist(oltf, rmax=3):
     """Make a Nyquist plot
 
@@ -303,7 +352,7 @@ class DegreeOfFreedom:
 
     @property
     def drives(self):
-        """Dictionary of probes defining the DOF
+        """Dictionary of drives defining the DOF
         """
         return self._drives
 
@@ -444,14 +493,31 @@ class Filter:
                   + ' and gain at a specific frequency'
             raise ValueError(msg)
 
+    @property
+    def is_stable(self):
+        """True if the filter is stable
+        (the real part of all poles are negative)
+        """
+        return np.all(np.real(self._ps < 0))
+
+    @property
+    def is_mindelay(self):
+        """True if the filter has minimum delay
+        (the real part of all zeros are negative)
+        """
+        return np.all(np.real(self._zs < 0))
+
+    def __call__(self, ff):
+        ss = 2j*np.pi*ff
+        return self._filt(ss)
+
     def computeFilter(self, ff):
         """Compute the filter
 
         Inputs:
           ff: frequency vector at which to compute the filter [Hz]
         """
-        ss = 2j*np.pi*ff
-        return self._filt(ss)
+        return self.__call__(ff)
 
     def get_zpk(self, Hz=False, as_dict=False):
         """Get the zeros, poles, and gain of this filter
@@ -504,6 +570,54 @@ class Filter:
             dB=dB, **kwargs)
         return fig
 
+    def plot_poles(self, Hz=True):
+        """Plot the poles of the filter
+
+        Plots the poles of the filter in the complex plane
+
+        Inputs:
+          Hz: if true the poles are plotted in Hz, however stable
+            poles are still plotted in the LHP (Default: True)
+
+        Returns:
+          fig: the figure
+        """
+        fig = _plot_zp(self._ps, 'pole', Hz=Hz)
+        return fig
+
+    def plot_zeros(self, Hz=True):
+        """Plot the zeros of the filter
+
+        Plots the zeros of the filter in the complex plane
+
+        Inputs:
+          Hz: if true the zeros are plotted in Hz, however minimum delay
+            zeros are still plotted in the LHP (Default: True)
+
+        Returns:
+          fig: the figure
+        """
+        fig = _plot_zp(self._zs, 'zero', Hz=Hz)
+        return fig
+
+    def plot_zp(self, Hz=True):
+        """Plot the zeros and poles of the filter
+
+        Plots the zeros of the filter as blue circles and the poles as
+        red crosses in the complex plane
+
+        Inputs:
+          Hz: if true the zeros and poles are plotted in Hz, however
+            unstable poles and minimum delay zeros are still plotted in
+            the LHP (Default: True)
+
+        Returns:
+          fig: the figure
+        """
+        fig = _plot_zp(self._zs, 'zero', Hz=Hz)
+        _plot_zp(self._ps, 'pole', Hz=Hz, fig=fig)
+        return fig
+
     def to_hdf5(self, path, h5file):
         """Save a filter to an hdf5 file
 
@@ -520,6 +634,78 @@ class Filter:
         io.possible_none_to_hdf5(zs, path + '/zs', h5file)
         io.possible_none_to_hdf5(ps, path + '/ps', h5file)
         h5file[path + '/k'] = k
+
+
+class FitTF(Filter):
+    """Filter class to fit transfer functions
+
+    Inputs:
+      ff: frequency vector of data to be fit [Hz]
+      data: transfer function data
+    """
+    def __init__(self, ff, data, **kwargs):
+        super().__init__([], [], 0)
+        self._ff = ff
+        self._data = data
+        self._fit = AAA.tfAAA(ff, data)
+        zs, ps, k = self.fit.zpk
+
+        # convert to s-plane
+        a = 2*np.pi
+        self._zs = a * zs
+        self._ps = a * ps
+
+        # convert IIRrational's gain convention
+        exc = len(ps) - len(zs)  # excess number of poles over zeros
+        self._k = (2*np.pi)**exc * k
+
+        self._filt = partial(zpk, self._zs, self._ps, self._k)
+
+    @property
+    def fit(self):
+        """IIRrational AAA fit results
+        """
+        return self._fit
+
+    @property
+    def ff(self):
+        """Frequency vector used for the fit
+        """
+        return self._ff
+
+    @property
+    def data(self):
+        """Fit data
+        """
+        return self._data
+
+    def __call__(self, ff):
+        return self.fit(ff)
+
+    def check_fit(self, ff, fit_first=True):
+        """Plot data along with the interpolated fit
+
+        Inputs:
+          ff: frequency vector for interpolation [Hz]
+          fit_first:
+            if True, the data is plotted on top of the fit
+            if False, the fit is plotted on top of the data
+            (Default: True)
+
+        Returns:
+          fig: the figure
+        """
+        if fit_first:
+            fig = self.plotFilter(ff, label='Fit')
+            plotting.plotTF(
+                self.ff, self.data, *fig.axes, ls='-.', label='Data')
+
+        else:
+            fig = plotting.plotTF(self.ff, self.data, label='Data')
+            self.plotFilter(ff, *fig.axes, ls='-.', label='Fit')
+
+        fig.axes[0].legend()
+        return fig
 
 
 class ControlSystem:
@@ -957,13 +1143,15 @@ class ControlSystem:
         except ValueError:
             raise ValueError(drive + ' does not have a compensation filter')
 
-    def getOLTF(self, sig_to, sig_from, tstpnt):
+    def getOLTF(self, sig_to, sig_from, tstpnt, fit=False):
         """Compute an OLTF
 
         Inputs:
           sig_to: output signal
           sig_from: input signal
           tstpnt: which test point to compute the TF for
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
         """
         oltf = self._oltf[tstpnt]
         if sig_from:
@@ -972,15 +1160,21 @@ class ControlSystem:
         if sig_to:
             to_ind = self._getIndex(sig_to, tstpnt)
             oltf = oltf[to_ind]
-        return oltf
 
-    def getCLTF(self, sig_to, sig_from, tstpnt):
+        if fit:
+            return FitTF(self.ff, oltf)
+        else:
+            return oltf
+
+    def getCLTF(self, sig_to, sig_from, tstpnt, fit=False):
         """Compute a CLTF
 
         Inputs:
           sig_to: output signal
           sig_from: input signal
           tstpnt: which test point to compute the TF for
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
         """
         cltf = self._cltf[tstpnt]
         if sig_from:
@@ -989,7 +1183,11 @@ class ControlSystem:
         if sig_to:
             to_ind = self._getIndex(sig_to, tstpnt)
             cltf = cltf[to_ind]
-        return cltf
+
+        if fit:
+            return FitTF(self.ff, cltf)
+        else:
+            return cltf
 
     def compute_margins(self, sig_to, sig_from, tstpnt):
         """Compute stability margins for a loop
@@ -1010,6 +1208,22 @@ class ControlSystem:
         ugf, pm = compute_phase_margin(self.ff, oltf)
         fms, sm = compute_stability_margin(self.ff, cltf)
         return ugf, pm, fms, sm
+
+    def check_stability(self, tstpnt):
+        """Check the stability of all of the loops
+
+        Inputs:
+          tstpnt: test point
+        """
+        stability = OrderedDict()
+        for dof in self.dofs.keys():
+            cltf = self.getCLTF(dof, dof, tstpnt)
+            fit = AAA.tfAAA(self.ff, cltf)
+            z, p, k = fit.zpk
+            stability[dof] = np.all(np.real(p) < 0)
+
+        for dof, stab in stability.items():
+            print(dof, stab)
 
     def print_margins(self, tstpnt):
         """Print the stability margins for all loops
@@ -1032,11 +1246,19 @@ class ControlSystem:
                                'display.max_columns', None):
             display(margins)
 
-    def getTF(self, sig_to, tp_to, sig_from, tp_from, closed=True):
+    def getTF(self, sig_to, tp_to, sig_from, tp_from, closed=True, fit=False):
         """Get a transfer function between two test points in a loop
 
         If sig_to is the empty string '', the vector to all signals is returned
         If sig_from is the empty string '', the vector of all signals is returned
+
+        Inputs:
+          sig_to: output signal
+          sig_from: input signal
+          tp_to: output test point
+          tp_from: input test point
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
         """
         def cltf_or_unity(tp_to):
             """Returns the CLTF if a closed loop TF is necessary and the identity
@@ -1113,7 +1335,15 @@ class ControlSystem:
             to_ind = self._getIndex(sig_to, tp_to)
             tf = tf[to_ind]
 
-        return tf
+        # Return the TF fitting it if necessary
+        if fit:
+            if not (sig_to and sig_from):
+                raise ValueError(
+                    'Fits can only be returned for single transfer functions')
+            else:
+                return FitTF(self.ff, tf)
+        else:
+            return tf
 
     def getTotalNoiseTo(self, sig_to, tp_to, tp_from, noiseASDs, closed=True):
         """Compute the total noise at a test point due to multiple sources
