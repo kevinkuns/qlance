@@ -862,9 +862,9 @@ class ControlSystem:
             raise ValueError(
                 'Degree of freedom {:s} already exists'.format(name))
 
-        self.dofs[name] = dof
-        append_str_if_unique(self.probes, dof.probes)
-        append_str_if_unique(self.drives, dof.drives)
+        self._dofs[name] = dof
+        append_str_if_unique(self._probes, dof.probes)
+        append_str_if_unique(self._drives, dof.drives)
 
     def _computePlant(self):
         """Compute the qlance plant from drives to probes

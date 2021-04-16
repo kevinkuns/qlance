@@ -10,7 +10,128 @@ from . import utils
 from . import io
 import h5py
 from numbers import Number
-from .utils import beam_properties_from_q, get_default_kwargs
+from .utils import (beam_properties_from_q, get_default_kwargs,
+                    append_str_if_unique)
+from collections import OrderedDict
+
+
+class Plant:
+    """A generic plant
+    """
+    def __init__(self):
+        self._plants = {}
+        self._callable_plants = []
+        self._plant_data = {}
+        self._probes = []
+        self._drives = []
+        self._ff = None
+        self._data_length = None
+
+    @property
+    def ff(self):
+        """Frequency vector [Hz]
+        """
+        if self._ff is None:
+            raise ValueError('No frequency vector has been defined')
+        else:
+            return self._ff
+
+    @ff.setter
+    def ff(self, ff):
+        # the frequency vector should not be redefined if any plants have been
+        # defined with data
+        if self._data_length and self._ff is not None:
+            raise ValueError(
+                'Can\'t specify a new frequency vector if any plants are '
+                + 'defined by data.')
+
+        # check that the new frequency vector is compatible with existing data
+        if self._data_length and self._data_length != len(ff):
+            raise ValueError('Frequency vector does not have the same length '
+                             + 'as existing data')
+
+        # evaluate any callable plants for these new frequencies
+        for probe, drive, plant in self._callable_plants:
+            self._plants[probe][drive] = plant(ff)
+
+        self._ff = ff
+
+    @property
+    def probes(self):
+        """List of probes
+        """
+        return self._probes
+
+    @property
+    def drives(self):
+        """List of drives
+        """
+        return self._drives
+
+    def addPlant(self, probe, drive, plant):
+        """Add a plant from a drive to a probe
+
+        The plant can be specified in three ways
+        1) Giving an array of data
+        2) Giving a Filter instance
+        3) Giving any callable function
+
+        Inputs:
+          probe: name of the probe
+          drive: name of the drive
+          plant: the plant
+        """
+        if probe in self._plants.keys():
+            if drive in self._plants[probe].keys():
+                raise ValueError(
+                    'There is already a plant from {:s} to {:s}'.format(
+                        drive, probe))
+        else:
+            self._plants[probe] = {}
+
+        if callable(plant):
+            self._callable_plants.append((probe, drive, plant))
+            if self._ff:
+                self._plants[probe][drive] = plant(self.ff)
+            else:
+                self._plants[probe][drive] = None
+
+        else:
+            if self._data_length is None:
+                self._data_length = len(plant)
+            else:
+                if len(plant) != self._data_length:
+                    raise ValueError(
+                        'This data has a different length than existing data')
+            self._plants[probe][drive] = plant
+
+        append_str_if_unique(self._probes, probe)
+        append_str_if_unique(self._drives, drive)
+
+    def getTF(self, probes, drives, fit=False, **kwargs):
+        """Compute a transfer function
+
+        Inputs:
+          probes: names of the probes at which the TF is calculated
+          drives: names of the drives from which the TF is calculated
+          fit: if True, returns a FitTF fit to the transfer function
+            (Default: False)
+        """
+        if isinstance(drives, str):
+            drives = {drives: 1}
+
+        if isinstance(probes, str):
+            probes = {probes: 1}
+
+        tf = np.zeros(len(self.ff), dtype='complex')
+        for probe, pc in probes.items():
+            for drive, dc in drives.items():
+                tf += pc*dc*self._plants[probe][drive]
+
+        if fit:
+            return ctrl.FitTF(self.ff, tf)
+        else:
+            return tf
 
 
 class OpticklePlant:
