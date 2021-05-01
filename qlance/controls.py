@@ -639,15 +639,18 @@ class Filter:
 class FitTF(Filter):
     """Filter class to fit transfer functions
 
+    Fits transfer functions using the AAA algorithm
+
     Inputs:
       ff: frequency vector of data to be fit [Hz]
       data: transfer function data
+      kwargs: keyword arguments to pass to the AAA fit
     """
     def __init__(self, ff, data, **kwargs):
         super().__init__([], [], 0)
         self._ff = ff
         self._data = data
-        self._fit = AAA.tfAAA(ff, data)
+        self._fit = AAA.tfAAA(ff, data, **kwargs)
         zs, ps, k = self.fit.zpk
 
         # convert to s-plane
