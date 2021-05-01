@@ -5,6 +5,7 @@ Unit tests for finesse torsional spring
 import numpy as np
 import qlance.finesse as fin
 import qlance.controls as ctrl
+from qlance.filters import resRoots
 import qlance.plant as plant
 import pykat
 import os
@@ -28,7 +29,7 @@ r = 2/((gi - ge) + np.sqrt((gi - ge)**2 + 4))
 I = 25
 f0 = 1
 Q = 100
-poles = np.array(ctrl.resRoots(2*np.pi*f0, Q, Hz=False))
+poles = np.array(resRoots(2*np.pi*f0, Q, Hz=False))
 
 kat = pykat.finesse.kat()
 

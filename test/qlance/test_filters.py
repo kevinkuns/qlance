@@ -3,7 +3,7 @@ Unit tests for control systems
 """
 
 import numpy as np
-import qlance.controls as ctrl
+import qlance.filters as filt
 import scipy.signal as sig
 import h5py
 import os
@@ -32,34 +32,34 @@ class TestFilters:
     p1 = np.array([8, 3 + 2j, 3 - 2j])
     k1 = 4
     z2 = []
-    p2 = ctrl.resRoots(42, 23)
+    p2 = filt.resRoots(42, 23)
     k2 = 6
     f4 = 10  # reference frequency
     g4 = 3  # gain at reference frequency
     ff = np.logspace(0, 4, 500)
     ff0 = np.logspace(0, 4, 20)
 
-    filt1a = ctrl.Filter(z1, p1, k1)
-    filt1b = ctrl.Filter(-2*np.pi*z1, -2*np.pi*p1, k1, Hz=False)
-    filt1c = ctrl.Filter(dict(zs=z1, ps=p1, k=k1))
-    filt1d = ctrl.Filter(dict(zs=-2*np.pi*z1, ps=-2*np.pi*p1, k=k1), Hz=False)
-    filt2a = ctrl.Filter(z2, p2, k2)
-    # filt2b = ctrl.Filter(
+    filt1a = filt.Filter(z1, p1, k1)
+    filt1b = filt.Filter(-2*np.pi*z1, -2*np.pi*p1, k1, Hz=False)
+    filt1c = filt.Filter(dict(zs=z1, ps=p1, k=k1))
+    filt1d = filt.Filter(dict(zs=-2*np.pi*z1, ps=-2*np.pi*p1, k=k1), Hz=False)
+    filt2a = filt.Filter(z2, p2, k2)
+    # filt2b = filt.Filter(
     #     lambda ss: k2/((ss + 2*np.pi*p2[0])*(ss + 2*np.pi*p2[1])))
-    filt3a = ctrl.Filter(
-        ctrl.catzp(z1, z2), ctrl.catzp(p1, p2), k1*k2)
-    filt3b = ctrl.catfilt(filt1a, filt2a)
-    filt3c = ctrl.catfilt(filt1b, filt2a)
-    # filt3d = ctrl.catfilt(filt1a, filt2b)
-    filt4 = ctrl.Filter(z2, p2, g4, f4)
+    filt3a = filt.Filter(
+        filt.catzp(z1, z2), filt.catzp(p1, p2), k1*k2)
+    filt3b = filt.catfilt(filt1a, filt2a)
+    filt3c = filt.catfilt(filt1b, filt2a)
+    # filt3d = filt.catfilt(filt1a, filt2b)
+    filt4 = filt.Filter(z2, p2, g4, f4)
 
     data1 = h5py.File('test_filters.hdf5', 'w')
     filt1a.to_hdf5('filt1', data1)
     filt2a.to_hdf5('filt2', data1)
     data1.close()
     data2 = h5py.File('test_filters.hdf5', 'r')
-    filt1r = ctrl.filt_from_hdf5('filt1', data2)
-    filt2r = ctrl.filt_from_hdf5('filt2', data2)
+    filt1r = filt.filt_from_hdf5('filt1', data2)
+    filt2r = filt.filt_from_hdf5('filt2', data2)
     data2.close()
     os.remove('test_filters.hdf5')
 
@@ -94,13 +94,13 @@ class TestFilters:
 
     def test_1fit(self):
         data = self.filt1a.computeFilter(self.ff0)
-        fit = ctrl.FitTF(self.ff0, data)
+        fit = filt.FitTF(self.ff0, data)
         assert check_filter_equality(fit, self.filt1a)
 
     def test_2(self):
         k2 = self.k2
         p2 = self.p2
-        filt2b = ctrl.Filter(
+        filt2b = filt.Filter(
             lambda ss: k2/((ss + 2*np.pi*p2[0])*(ss + 2*np.pi*p2[1])))
         data1 = self.filt2a.computeFilter(self.ff)
         # data2 = self.filt2b.computeFilter(self.ff)
@@ -109,12 +109,12 @@ class TestFilters:
 
     def test_2fit_zpk(self):
         data = self.filt2a.computeFilter(self.ff0)
-        fit = ctrl.FitTF(self.ff0, data)
+        fit = filt.FitTF(self.ff0, data)
         assert check_filter_equality(fit, self.filt2a)
 
     def test_2fit(self):
         data = self.filt2a.computeFilter(self.ff0)
-        fit = ctrl.FitTF(self.ff0, data)
+        fit = filt.FitTF(self.ff0, data)
         assert close.allclose(fit(self.ff), self.filt2a(self.ff))
 
     def test_cat1(self):
@@ -126,9 +126,9 @@ class TestFilters:
     def test_cat3(self):
         k2 = self.k2
         p2 = self.p2
-        filt2b = ctrl.Filter(
+        filt2b = filt.Filter(
             lambda ss: k2/((ss + 2*np.pi*p2[0])*(ss + 2*np.pi*p2[1])))
-        filt3d = ctrl.catfilt(self.filt1a, filt2b)
+        filt3d = filt.catfilt(self.filt1a, filt2b)
         data1 = self.filt3a.computeFilter(self.ff)
         # data2 = self.filt3d.computeFilter(self.ff)
         data2 = filt3d.computeFilter(self.ff)

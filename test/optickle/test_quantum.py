@@ -5,7 +5,7 @@ Unit tests for optickle quantum noise: homodyne detectors and squeezers
 import matlab.engine
 import numpy as np
 import qlance.optickle as pyt
-from qlance.controls import resRoots
+from qlance.filters import resRoots
 import close
 import pytest
 

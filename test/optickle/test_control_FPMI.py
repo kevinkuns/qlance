@@ -6,6 +6,7 @@ import matlab.engine
 import numpy as np
 import qlance.optickle as pyt
 import qlance.controls as ctrl
+import qlance.filters as filt
 import scipy.signal as sig
 import qlance.noise as pytnoise
 import matlab
@@ -30,7 +31,7 @@ data = {}
 
 
 def define_filt(zpk):
-    return ctrl.Filter(zpk.zeros, zpk.poles, zpk.gain, Hz=False)
+    return filt.Filter(zpk.zeros, zpk.poles, zpk.gain, Hz=False)
 
 
 # rough starting guesses for resonances and Q's
@@ -110,20 +111,20 @@ probesBS   = {'REFL_Q': 1/np.abs(opt.getTF('REFL_Q', 'BS')[0])}
 ##############################################################################
 
 # define the DOF filters
-filtDARM = ctrl.Filter(
-    ctrl.catzp(ctrl.resRoots(2, 1), ctrl.resRoots(5, 1)),
-    ctrl.catzp(0, 0, 0, ctrl.resRoots(0.5, 1), ctrl.resRoots(110, 1)),
+filtDARM = filt.Filter(
+    filt.catzp(filt.resRoots(2, 1), filt.resRoots(5, 1)),
+    filt.catzp(0, 0, 0, filt.resRoots(0.5, 1), filt.resRoots(110, 1)),
     -1, 20)
 
 filtCARM = filtDARM
 
-filtBS   = ctrl.Filter(
-    ctrl.catzp(ctrl.resRoots(1, 1), ctrl.resRoots(3, 1)),
-    ctrl.catzp(0, 0, 0, ctrl.resRoots(0.3, 1), ctrl.resRoots(90, 1)),
+filtBS   = filt.Filter(
+    filt.catzp(filt.resRoots(1, 1), filt.resRoots(3, 1)),
+    filt.catzp(0, 0, 0, filt.resRoots(0.3, 1), filt.resRoots(90, 1)),
     -1, 15)
 
 # simple constant feedforward filter
-filtFF   = ctrl.Filter([], [], 4.98e-3)
+filtFF   = filt.Filter([], [], 4.98e-3)
 
 
 # Define control system
@@ -140,18 +141,18 @@ cs.addFilter('CARM', 'CARM', filtCARM)
 cs.addFilter('BS', 'BS', filtBS)
 
 # add the feedforward
-cs.addFilter('DARM', 'BS', ctrl.catfilt(filtFF, filtBS))
+cs.addFilter('DARM', 'BS', filt.catfilt(filtFF, filtBS))
 
 # set the optomechanical plant
 cs.setOptomechanicalPlant(opt)
 
 # compensation
 gainf0 = 1/np.abs(pum2tst.computeFilter(10))
-pum2tst_comp = ctrl.Filter(
-    ctrl.catzp(
-        ctrl.resRoots(63e-3, 10),
-        ctrl.resRoots(0.145, 10), ctrl.resRoots(1.12, 15)),
-    ctrl.resRoots(0.13, 10),
+pum2tst_comp = filt.Filter(
+    filt.catzp(
+        filt.resRoots(63e-3, 10),
+        filt.resRoots(0.145, 10), filt.resRoots(1.12, 15)),
+    filt.resRoots(0.13, 10),
     gainf0, 10)
 
 for drive in ['EX', 'EY', 'BS']:

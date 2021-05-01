@@ -6,6 +6,7 @@ import matlab.engine
 import numpy as np
 import qlance.optickle as pyt
 import qlance.controls as ctrl
+import qlance.filters as filt
 import close
 import pytest
 
@@ -29,24 +30,24 @@ opt.run(ff)
 DARM = {'EX': 1, 'EY': -1}
 MICH = {'BS': 1, 'SR': 1/np.sqrt(2), 'PR': -1/np.sqrt(2)}
 
-filtDARM = ctrl.Filter(
-    ctrl.catzp(-2*np.pi*20, -2*np.pi*800),
-    ctrl.catzp(0, 0, -2*np.pi*300*(1 + 1j/2), -2*np.pi*300*(1 - 1j/2)),
+filtDARM = filt.Filter(
+    filt.catzp(-2*np.pi*20, -2*np.pi*800),
+    filt.catzp(0, 0, -2*np.pi*300*(1 + 1j/2), -2*np.pi*300*(1 - 1j/2)),
     -1e-8 * (2*np.pi*300)**2 / (2*np.pi*800), Hz=False)
 
-filtPRCL = ctrl.Filter(
+filtPRCL = filt.Filter(
     -2*np.pi*10,
-    ctrl.catzp(0, -2*np.pi*(20 + 10j), -2*np.pi*(20 - 10j)),
+    filt.catzp(0, -2*np.pi*(20 + 10j), -2*np.pi*(20 - 10j)),
     -1e-5, Hz=False)
 
-filtSRCL = ctrl.Filter([], ctrl.catzp(0, -2*np.pi*20), -4e-5, Hz=False)
+filtSRCL = filt.Filter([], filt.catzp(0, -2*np.pi*20), -4e-5, Hz=False)
 
-filtMICH = ctrl.Filter(
+filtMICH = filt.Filter(
     -2*np.pi*10,
-    ctrl.catzp(0, -2*np.pi*(10 + 10j), -2*np.pi*(10 - 10j), -2*np.pi*300),
+    filt.catzp(0, -2*np.pi*(10 + 10j), -2*np.pi*(10 - 10j), -2*np.pi*300),
     0.25, Hz=False)
 
-filtMICH_FF = ctrl.Filter([], [], 2.5e-3)
+filtMICH_FF = filt.Filter([], [], 2.5e-3)
 
 cs = ctrl.ControlSystem()
 
@@ -59,7 +60,7 @@ cs.addFilter('DARM', 'DARM', filtDARM)
 cs.addFilter('PRCL', 'PRCL', filtPRCL)
 cs.addFilter('SRCL', 'SRCL', filtSRCL)
 cs.addFilter('MICH', 'MICH', filtMICH)
-cs.addFilter('DARM', 'MICH', ctrl.catfilt(filtMICH_FF, filtMICH))
+cs.addFilter('DARM', 'MICH', filt.catfilt(filtMICH_FF, filtMICH))
 
 cs.setOptomechanicalPlant(opt)
 

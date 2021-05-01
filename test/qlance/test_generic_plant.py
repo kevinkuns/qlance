@@ -5,14 +5,15 @@ Unit tests for generic plants
 import numpy as np
 import qlance.plant as qplant
 import qlance.controls as ctrl
+import qlance.filters as filt
 import pytest
 
 
 ff = np.logspace(0, 3, 100)
 wx = -100
 wy = -110
-xfilter = ctrl.Filter([], wx, 1, Hz=False)
-yfilter = ctrl.Filter([], wy, 1, Hz=False)
+xfilter = filt.Filter([], wx, 1, Hz=False)
+yfilter = filt.Filter([], wy, 1, Hz=False)
 xdata = xfilter(ff)
 ydata = yfilter(ff)
 CARM = {'EX': 1, 'EY': 1}
@@ -117,8 +118,8 @@ class TestControls:
     plant.addPlant('AS', 'EY', -ydata)
     plant.ff = ff
 
-    filtDARM = ctrl.Filter([], 1, 100, 1, Hz=True)
-    filtCARM = ctrl.Filter([], 5, 80, 1, Hz=True)
+    filtDARM = filt.Filter([], 1, 100, 1, Hz=True)
+    filtCARM = filt.Filter([], 5, 80, 1, Hz=True)
 
     cs = ctrl.ControlSystem()
     cs.addDOF('CARM', 'REFL', CARM)
