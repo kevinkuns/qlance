@@ -8,6 +8,7 @@ from functools import partial
 from .utils import assertArr
 from . import io
 from itertools import zip_longest
+from collections import OrderedDict
 from numbers import Number
 import scipy.signal as sig
 import matplotlib.pyplot as plt
@@ -111,7 +112,7 @@ def catzp(*args):
     return zp
 
 
-def catfilt(*args):
+def catfilt(*args, as_filter=True):
     """Concatenate a list of Filters
 
     Returns a new Filter instance which is the product of the input filters
@@ -125,6 +126,8 @@ def catfilt(*args):
     # check if any of the filters have not been defined with zpk
     zpk_defined = True
     for filt in args:
+        if not isinstance(filt, Filter):
+            raise ValueError('Can only concatenate filters')
         if filt._ps is None:
             zpk_defined = False
             break
@@ -139,17 +142,31 @@ def catfilt(*args):
             zs.extend(assertArr(zf))
             ps.extend(assertArr(pf))
             k *= kf
-        return Filter(zs, ps, k, Hz=False)
+        if len(args) == 0:
+            k = 0
+        new_filter_func = partial(zpk, zs, ps, k)
+        # return Filter(zs, ps, k, Hz=False)
 
     # otherwise just make a new function
     else:
-        def newFilt(ss):
+        def new_filter_func(ss):
             out = 1
             for filt in args:
                 out *= filt._filt(ss)
             return out
 
-        return Filter(newFilt)
+        zs = None
+        ps = None
+        k = None
+
+    if as_filter:
+        if zpk_defined:
+            return Filter(zs, ps, k, Hz=False)
+        else:
+            return Filter(new_filter_func)
+
+    else:
+        return np.array(zs), np.array(ps), k, new_filter_func
 
 
 def _plot_zp(zps, zp_type, Hz=True, fig=None):
@@ -520,3 +537,79 @@ class FitTF(Filter):
 
         fig.axes[0].legend()
         return fig
+
+
+class FilterBank(Filter):
+    def __init__(self):
+        super().__init__([], [], 0)
+        # self._filter_modules = OrderedDict()
+        self._filter_modules = []
+        self._state = np.array([], dtype=bool)
+
+    @property
+    def filter_modules(self):
+        return self._filter_modules
+
+    @property
+    def nfilters(self):
+        """The number of filters in the filter bank
+        """
+        # return len(self._filter_modules)
+        return len(self._state)
+
+    def get_filter(self, key_or_index):
+        if isinstance(key_or_index, str):
+            return self._filter_modules[key_or_index]
+        elif isinstance(key_or_index, Number):
+            keys = list(self._filter_modules.keys())
+            key = keys[key_or_index]
+            return self._filter_modules[key]
+
+    def addFilterModule(self, filt, name=None):
+        if not isinstance(filt, Filter):
+            raise ValueError('Filter modules must be a type of filter')
+        self._filter_modules.append((name, filt))
+        self._state = np.concatenate((self._state, [False]))
+
+    def turn_on(self, *args):
+        self._state[self._get_filter_inds(*args)] = True
+        # self._update()
+
+    def turn_off(self, *args):
+        self._state[self._get_filter_inds(*args)] = False
+        # self._update()
+
+    def toggle(self, *args):
+        state = self._state.astype(int)
+        state[self._get_filter_inds(*args)] += 1
+        self._state = np.mod(state, 2).astype(bool)
+
+    def _update(self):
+        filters_on = np.array(self._filter_modules)[self._state]
+        filters_on = [filt for _, filt in filters_on]
+        self._zs, self._ps, self._k, self._filt = catfilt(
+            *filters_on, as_filter=False)
+        return filters_on
+
+    def _get_filter_inds(self, *args):
+        if self.nfilters == 0:
+            raise ValueError('There are no filters defined')
+
+        inds = np.array(args)
+
+        if len(inds) == 1:
+            if inds[0] == 'all':
+                return np.ones(self.nfilters, dtype=bool)
+            elif inds.dtype != int:
+                raise ValueError('Unrecognized argument: ' + str(inds[0]))
+
+        if inds.dtype != int:
+            raise ValueError('Invalid arguments')
+
+        if np.any(inds > self.nfilters):
+            raise ValueError('There are only {:d} filters'.format(self.nfilters))
+
+        if np.any(inds < 1):
+            raise ValueError('Filters cannot have index less than 1')
+
+        return inds - 1
