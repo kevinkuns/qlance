@@ -235,6 +235,13 @@ def filt_from_hdf5(path, h5file):
     return Filter(zpk_dict, Hz=False)
 
 
+def filter_from_foton_file(filename, bank_name, ind):
+    filterbanks = io.read_foton_file(filename)
+    filter_module = filterbanks[bank_name][ind]
+    sos_filt = SOSFilter(filter_module['sos_coeffs'], filter_module['fs'])
+    return sos_filt
+
+
 class Filter:
     """A class representing a generic filter
 
