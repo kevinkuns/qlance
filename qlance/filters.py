@@ -3,6 +3,7 @@ Control filters
 """
 
 import numpy as np
+import scipy.signal as sig
 import IIRrational.AAA as AAA
 from functools import partial
 from .utils import assertArr
@@ -462,6 +463,43 @@ class Filter:
         io.possible_none_to_hdf5(zs, path + '/zs', h5file)
         io.possible_none_to_hdf5(ps, path + '/ps', h5file)
         h5file[path + '/k'] = k
+
+
+class SOSFilter:
+    def __init__(self, sos, fs=16384):
+        self._sos = sos
+        self._fs = fs
+
+    @property
+    def fs(self):
+        """Sampling frequency [Hz]
+        """
+        return self._fs
+
+    @fs.setter
+    def fs(self, fs):
+        self._fs = fs
+
+    @property
+    def sos(self):
+        """SOS coefficients
+        """
+        return self._sos
+
+    def __call__(self, ff):
+        _, tf = sig.sosfreqz(self.sos, worN=ff, fs=self.fs)
+        return tf
+
+    def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
+        """Plot the filter
+
+        See documentation for plotting.plotTF
+        """
+        fig = plotting.plotTF(
+            ff, self(ff), mag_ax=mag_ax, phase_ax=phase_ax,
+            dB=dB, **kwargs)
+        return fig
+
 
 
 class FitTF(Filter):
