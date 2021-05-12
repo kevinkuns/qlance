@@ -125,16 +125,22 @@ def catfilt(*args, as_filter=True):
       newFilt: a Filter instance which is the product of the inputs
     """
     # check if any of the filters have not been defined with zpk
-    zpk_defined = True
+    nzpk = 0
+    nsos = 0
+    nfreq = 0
     for filt in args:
         if not isinstance(filt, Filter):
             raise ValueError('Can only concatenate filters')
-        if filt._ps is None:
-            zpk_defined = False
-            break
+        if isinstance(filt, ZPKFilter):
+            nzpk += 1
+        elif isinstance(filt, SOSFilter):
+            nsos += 1
+        elif isinstance(filt, FreqFilter):
+            nfreq += 1
 
-    # if all filters have zpk, define a new one combining this information
-    if zpk_defined:
+    # if all filters are ZPK, define a new one combining this information
+    if nsos == 0 and nfreq == 0:
+        print('zpk')
         zs = []
         ps = []
         k = 1
@@ -145,29 +151,27 @@ def catfilt(*args, as_filter=True):
             k *= kf
         if len(args) == 0:
             k = 0
-        new_filter_func = partial(zpk, zs, ps, k)
-        # return Filter(zs, ps, k, Hz=False)
 
-    # otherwise just make a new function
+        return ZPKFilter(zs, ps, k, Hz=False)
+
+    # if all filters are SOS, define a new one combining this information
+    if nzpk == 0 and nfreq == 0:
+        sos = np.empty((0, 6))
+        for filt in args:
+            sos = np.vstack((filt.sos, sos))
+
+        return SOSFilter(sos, fs=filt.fs)
+
+    # otherwise just make a new Freq
     else:
-        def new_filter_func(ss):
+        print('freq')
+        def new_filter_func(ff):
             out = 1
             for filt in args:
-                out *= filt._filt(ss)
+                out *= filt(ff)
             return out
 
-        zs = None
-        ps = None
-        k = None
-
-    if as_filter:
-        if zpk_defined:
-            return Filter(zs, ps, k, Hz=False)
-        else:
-            return Filter(new_filter_func)
-
-    else:
-        return np.array(zs), np.array(ps), k, new_filter_func
+        return FreqFilter(new_filter_func, Hz=True)
 
 
 def _plot_zp(zps, zp_type, Hz=True, fig=None):

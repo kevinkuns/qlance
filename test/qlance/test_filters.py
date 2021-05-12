@@ -48,9 +48,9 @@ class TestFilters:
     #     lambda ss: k2/((ss + 2*np.pi*p2[0])*(ss + 2*np.pi*p2[1])))
     filt3a = filt.ZPKFilter(
         filt.catzp(z1, z2), filt.catzp(p1, p2), k1*k2)
-    # filt3b = filt.catfilt(filt1a, filt2a)
-    # filt3c = filt.catfilt(filt1b, filt2a)
-    # # filt3d = filt.catfilt(filt1a, filt2b)
+    filt3b = filt.catfilt(filt1a, filt2a)
+    filt3c = filt.catfilt(filt1b, filt2a)
+    # filt3d = filt.catfilt(filt1a, filt2b)
     filt4 = filt.ZPKFilter(z2, p2, g4, f4)
 
     data1 = h5py.File('test_filters.hdf5', 'w')
@@ -127,15 +127,12 @@ class TestFilters:
         fit = filt.FitTF(self.ff0, data)
         assert close.allclose(fit(self.ff), self.filt2a(self.ff))
 
-    @pytest.mark.xfail
     def test_cat1(self):
         assert check_filter_equality(self.filt3a, self.filt3b)
 
-    @pytest.mark.xfail
     def test_cat2(self):
         assert check_filter_equality(self.filt3a, self.filt3c)
 
-    @pytest.mark.xfail
     def test_cat3(self):
         k2 = self.k2
         p2 = self.p2
