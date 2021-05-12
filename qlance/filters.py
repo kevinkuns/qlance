@@ -232,7 +232,7 @@ def filt_from_hdf5(path, h5file):
         zs=np.array(io.hdf5_to_possible_none(path + '/zs', h5file)),
         ps=np.array(io.hdf5_to_possible_none(path + '/ps', h5file)),
         k=h5file[path + '/k'][()])
-    return Filter(zpk_dict, Hz=False)
+    return ZPKFilter(zpk_dict, Hz=False)
 
 
 def filter_from_foton_file(filename, bank_name, ind):
@@ -243,6 +243,30 @@ def filter_from_foton_file(filename, bank_name, ind):
 
 
 class Filter:
+
+    def computeFilter(self, ff):
+        """Compute the filter
+
+        Inputs:
+          ff: frequency vector at which to compute the filter [Hz]
+        """
+        return self(ff)
+
+    def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
+        """Plot the filter
+
+        See documentation for plotting.plotTF
+        """
+        fig = plotting.plotTF(
+            ff, self(ff), mag_ax=mag_ax, phase_ax=phase_ax,
+            dB=dB, **kwargs)
+        return fig
+
+    def fitZPK(self, ff, **kwargs):
+        return FitTF(ff, self(ff), **kwargs)
+
+
+class ZPKFilter(Filter):
     """A class representing a generic filter
 
     Inputs:
@@ -263,31 +287,20 @@ class Filter:
           Filter(lambda s: 1/(s + 2*np.pi))
           Filter(dict(zs=[], ps=1, k=1))
     """
-
-    def __init__(self, *args, **kwargs):
-        if 'Hz' in kwargs:
-            if kwargs['Hz']:
-                a = -2*np.pi
-            else:
-                a = 1
-        else:
+    def __init__(self, *args, Hz=True):
+        if Hz:
             a = -2*np.pi
+        else:
+            a = 1
 
         if len(args) == 1:
             if isinstance(args[0], dict):
                 zs = a*np.array(args[0]['zs'])
                 ps = a*np.array(args[0]['ps'])
                 k = args[0]['k']
-                self._filt = partial(zpk, zs, ps, k)
                 self._zs = zs
                 self._ps = ps
                 self._k = k
-
-            elif callable(args[0]):
-                self._filt = args[0]
-                self._zs = None
-                self._ps = None
-                self._k = None
 
             else:
                 raise ValueError(
@@ -300,7 +313,6 @@ class Filter:
             if not isinstance(k, Number):
                 raise ValueError('The gain should be a scalar')
 
-            self._filt = partial(zpk, zs, ps, k)
             self._zs = zs
             self._ps = ps
             self._k = k
@@ -315,7 +327,6 @@ class Filter:
                     'The gain and reference frequency should be scalars')
 
             k = g / np.abs(zpk(zs, ps, 1, s0))
-            self._filt = partial(zpk, zs, ps, k)
             self._zs = zs
             self._ps = ps
             self._k = k
@@ -345,15 +356,7 @@ class Filter:
 
     def __call__(self, ff):
         ss = 2j*np.pi*ff
-        return self._filt(ss)
-
-    def computeFilter(self, ff):
-        """Compute the filter
-
-        Inputs:
-          ff: frequency vector at which to compute the filter [Hz]
-        """
-        return self.__call__(ff)
+        return zpk(self._zs, self._ps, self._k, ss)
 
     def get_zpk(self, Hz=False, as_dict=False):
         """Get the zeros, poles, and gain of this filter
@@ -395,16 +398,6 @@ class Filter:
         """
         zs, ps, k = self.get_zpk(Hz=False)
         return sig.StateSpace(*sig.zpk2ss(assertArr(zs), assertArr(ps), k))
-
-    def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
-        """Plot the filter
-
-        See documentation for plotting.plotTF
-        """
-        fig = plotting.plotTF(
-            ff, self.computeFilter(ff), mag_ax=mag_ax, phase_ax=phase_ax,
-            dB=dB, **kwargs)
-        return fig
 
     def plot_poles(self, Hz=True):
         """Plot the poles of the filter
@@ -472,7 +465,7 @@ class Filter:
         h5file[path + '/k'] = k
 
 
-class SOSFilter:
+class SOSFilter(Filter):
     def __init__(self, sos, fs=16384):
         self._sos = sos
         self._fs = fs
@@ -497,19 +490,19 @@ class SOSFilter:
         _, tf = sig.sosfreqz(self.sos, worN=ff, fs=self.fs)
         return tf
 
-    def plotFilter(self, ff, mag_ax=None, phase_ax=None, dB=False, **kwargs):
-        """Plot the filter
 
-        See documentation for plotting.plotTF
-        """
-        fig = plotting.plotTF(
-            ff, self(ff), mag_ax=mag_ax, phase_ax=phase_ax,
-            dB=dB, **kwargs)
-        return fig
+class FreqFilter(Filter):
+    def __init__(self, filter_func, Hz=True):
+        if Hz:
+            self._filter_function = lambda ff: filter_func(ff)
+        else:
+            self._filter_function = lambda ff: filter_func(2j*np.pi*ff)
+
+    def __call__(self, ff):
+        return self._filter_function(ff)
 
 
-
-class FitTF(Filter):
+class FitTF(ZPKFilter):
     """Filter class to fit transfer functions
 
     Fits transfer functions using the AAA algorithm
