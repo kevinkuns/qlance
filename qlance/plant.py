@@ -1404,7 +1404,7 @@ def _mech_plants_from_hdf5(h5_group, h5file):
     for key, val in h5_group.items():
         if isinstance(val, h5py.Group):
             if val.attrs['isfilter']:
-                plants[key] = filt.filt_from_hdf5(val.name, h5file)
+                plants[key] = filt.ZPKFilter.from_hdf5(val.name, h5file)
             else:
                 plants[key] = _mech_plants_from_hdf5(val, h5file)
         else:

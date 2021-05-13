@@ -58,8 +58,8 @@ class TestFilters:
     filt2a.to_hdf5('filt2', data1)
     data1.close()
     data2 = h5py.File('test_filters.hdf5', 'r')
-    filt1r = filt.filt_from_hdf5('filt1', data2)
-    filt2r = filt.filt_from_hdf5('filt2', data2)
+    filt1r = filt.ZPKFilter.from_hdf5('filt1', data2)
+    filt2r = filt.ZPKFilter.from_hdf5('filt2', data2)
     data2.close()
     os.remove('test_filters.hdf5')
 

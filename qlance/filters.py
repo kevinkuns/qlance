@@ -221,23 +221,6 @@ def _plot_zp(zps, zp_type, Hz=True, fig=None):
     return fig
 
 
-def filt_from_hdf5(path, h5file):
-    """Define a filter from a dictionary stored in an hdf5 file
-
-    Inputs:
-      path: path to the dictionary
-      h5file: the hdf5 file
-
-    Returns:
-      filt: the filter instance
-    """
-    zpk_dict = dict(
-        zs=np.array(io.hdf5_to_possible_none(path + '/zs', h5file)),
-        ps=np.array(io.hdf5_to_possible_none(path + '/ps', h5file)),
-        k=h5file[path + '/k'][()])
-    return ZPKFilter(zpk_dict, Hz=False)
-
-
 class Filter:
 
     def computeFilter(self, ff):
@@ -459,6 +442,23 @@ class ZPKFilter(Filter):
         io.possible_none_to_hdf5(zs, path + '/zs', h5file)
         io.possible_none_to_hdf5(ps, path + '/ps', h5file)
         h5file[path + '/k'] = k
+
+    @classmethod
+    def from_hdf5(cls, path, h5file):
+        """Define a filter from a dictionary stored in an hdf5 file
+
+        Inputs:
+          path: path to the dictionary
+          h5file: the hdf5 file
+
+        Returns:
+          filt: the filter instance
+        """
+        zpk_dict = dict(
+            zs=np.array(io.hdf5_to_possible_none(path + '/zs', h5file)),
+            ps=np.array(io.hdf5_to_possible_none(path + '/ps', h5file)),
+            k=h5file[path + '/k'][()])
+        return cls(zpk_dict, Hz=False)
 
 
 class SOSFilter(Filter):
