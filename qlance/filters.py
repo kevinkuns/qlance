@@ -12,6 +12,7 @@ from itertools import zip_longest
 from collections import OrderedDict
 from numbers import Number
 import scipy.signal as sig
+from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 from . import plotting
 
@@ -113,7 +114,7 @@ def catzp(*args):
     return zp
 
 
-def catfilt(*args, as_filter=True):
+def catfilt(*args):
     """Concatenate a list of Filters
 
     Returns a new Filter instance which is the product of the input filters
@@ -124,7 +125,7 @@ def catfilt(*args, as_filter=True):
     Returns:
       newFilt: a Filter instance which is the product of the inputs
     """
-    # check if any of the filters have not been defined with zpk
+    # check what kind of filters are to be concatenated
     nzpk = 0
     nsos = 0
     nfreq = 0
@@ -140,7 +141,6 @@ def catfilt(*args, as_filter=True):
 
     # if all filters are ZPK, define a new one combining this information
     if nsos == 0 and nfreq == 0:
-        print('zpk')
         zs = []
         ps = []
         k = 1
@@ -164,7 +164,6 @@ def catfilt(*args, as_filter=True):
 
     # otherwise just make a new Freq
     else:
-        print('freq')
         def new_filter_func(ff):
             out = 1
             for filt in args:
@@ -581,10 +580,8 @@ class FitTF(ZPKFilter):
         return fig
 
 
-class FilterBank(Filter):
+class FilterBank(ABC):
     def __init__(self):
-        super().__init__([], [], 0)
-        # self._filter_modules = OrderedDict()
         self._filter_modules = []
         self._state = np.array([], dtype=bool)
 
@@ -596,16 +593,15 @@ class FilterBank(Filter):
     def nfilters(self):
         """The number of filters in the filter bank
         """
-        # return len(self._filter_modules)
-        return len(self._state)
+        return len(self._filter_modules)
 
-    def get_filter(self, key_or_index):
-        if isinstance(key_or_index, str):
-            return self._filter_modules[key_or_index]
-        elif isinstance(key_or_index, Number):
-            keys = list(self._filter_modules.keys())
-            key = keys[key_or_index]
-            return self._filter_modules[key]
+    @property
+    def engaged_filters(self):
+        """Array of engaged filter modules
+        """
+        engaged_filters = np.array(self._filter_modules)[self._state]
+        engaged_filters = [filt for _, filt in engaged_filters]
+        return engaged_filters
 
     def addFilterModule(self, filt, name=None):
         if not isinstance(filt, Filter):
@@ -615,23 +611,21 @@ class FilterBank(Filter):
 
     def turn_on(self, *args):
         self._state[self._get_filter_inds(*args)] = True
-        # self._update()
+        self._update()
 
     def turn_off(self, *args):
         self._state[self._get_filter_inds(*args)] = False
-        # self._update()
+        self._update()
 
     def toggle(self, *args):
         state = self._state.astype(int)
         state[self._get_filter_inds(*args)] += 1
         self._state = np.mod(state, 2).astype(bool)
+        self._update()
 
+    @abstractmethod
     def _update(self):
-        filters_on = np.array(self._filter_modules)[self._state]
-        filters_on = [filt for _, filt in filters_on]
-        self._zs, self._ps, self._k, self._filt = catfilt(
-            *filters_on, as_filter=False)
-        return filters_on
+        pass
 
     def _get_filter_inds(self, *args):
         if self.nfilters == 0:
@@ -655,3 +649,39 @@ class FilterBank(Filter):
             raise ValueError('Filters cannot have index less than 1')
 
         return inds - 1
+
+
+class ZPKFilterBank(ZPKFilter, FilterBank):
+    def __init__(self):
+        ZPKFilter.__init__(self, [], [], 1)
+        FilterBank.__init__(self)
+
+    def _update(self):
+        new_filt = catfilt(*self.engaged_filters)
+        self._zs = new_filt._zs
+        self._ps = new_filt._ps
+        self._k = new_filt._k
+
+
+class SOSFilterBank(SOSFilter, FilterBank):
+    def __init__(self):
+        SOSFilter.__init__(self, np.array([[1, 0, 0, 1, 0, 0]]))
+        FilterBank.__init__(self)
+
+    # @classmethod
+    # def from_foton_file(cls, fname):
+    #     pass
+
+    def _update(self):
+        new_filt = catfilt(*self.engaged_filters)
+        self._sos = new_filt.sos
+
+
+class FreqFilterBank(FreqFilter, FilterBank):
+    def __init__(self):
+        FreqFilter.__init__(self, lambda ff: np.oneslike(ff))
+        FilterBank.__init__(self)
+
+    def _update(self):
+        new_filt = catfilt(*self.engaged_filters)
+        self._filter_function = lambda ff: new_filt(ff)
