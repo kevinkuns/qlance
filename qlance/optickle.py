@@ -157,7 +157,7 @@ class Optickle(plant.OpticklePlant):
                 drive_name = drive.split('.')[0]
                 # zs, ps, k = self.extract_zpk(drive_name, doftype=doftype)
                 # self._mech_plants[doftype][drive_name] = dict(zs=zs, ps=ps, k=k)
-                self._mech_plants[doftype][drive_name] = filt.Filter(
+                self._mech_plants[doftype][drive_name] = filt.ZPKFilter(
                     *self.extract_zpk(drive_name, doftype=doftype), Hz=False)
 
         # get the field basis if the doftype is pitch or yaw

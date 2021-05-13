@@ -26,7 +26,7 @@ data = {}
 
 
 def define_filt(zpk):
-    return filt.Filter(zpk.zeros, zpk.poles, zpk.gain, Hz=False)
+    return filt.ZPKFilter(zpk.zeros, zpk.poles, zpk.gain, Hz=False)
 
 
 # rough starting guesses for resonances and Q's
@@ -107,20 +107,20 @@ probesBS   = {'REFL_Q': 1/np.abs(katFR.getTF('REFL_Q', 'BS')[0])}
 ##############################################################################
 
 # define the DOF filters
-filtDARM = filt.Filter(
+filtDARM = filt.ZPKFilter(
     filt.catzp(filt.resRoots(2, 1), filt.resRoots(5, 1)),
     filt.catzp(0, 0, 0, filt.resRoots(0.5, 1), filt.resRoots(110, 1)),
     -1, 20)
 
 filtCARM = filtDARM
 
-filtBS   = filt.Filter(
+filtBS   = filt.ZPKFilter(
     filt.catzp(filt.resRoots(1, 1), filt.resRoots(3, 1)),
     filt.catzp(0, 0, 0, filt.resRoots(0.3, 1), filt.resRoots(90, 1)),
     -1, 15)
 
 # simple constant feedforward filter
-filtFF   = filt.Filter([], [], -4.98e-3)
+filtFF   = filt.ZPKFilter([], [], -4.98e-3)
 
 # Define control system
 cs = ctrl.ControlSystem()
@@ -146,7 +146,7 @@ cs.setOptomechanicalPlant(katFR)
 
 # compensation
 gainf0 = 1/np.abs(pum2tst.computeFilter(10))
-pum2tst_comp = filt.Filter(
+pum2tst_comp = filt.ZPKFilter(
     filt.catzp(
         filt.resRoots(63e-3, 10),
         filt.resRoots(0.145, 10), filt.resRoots(1.12, 15)),

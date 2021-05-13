@@ -12,8 +12,8 @@ import pytest
 ff = np.logspace(0, 3, 100)
 wx = -100
 wy = -110
-xfilter = filt.Filter([], wx, 1, Hz=False)
-yfilter = filt.Filter([], wy, 1, Hz=False)
+xfilter = filt.ZPKFilter([], wx, 1, Hz=False)
+yfilter = filt.ZPKFilter([], wy, 1, Hz=False)
 xdata = xfilter(ff)
 ydata = yfilter(ff)
 CARM = {'EX': 1, 'EY': 1}
@@ -118,8 +118,8 @@ class TestControls:
     plant.addPlant('AS', 'EY', -ydata)
     plant.ff = ff
 
-    filtDARM = filt.Filter([], 1, 100, 1, Hz=True)
-    filtCARM = filt.Filter([], 5, 80, 1, Hz=True)
+    filtDARM = filt.ZPKFilter([], 1, 100, 1, Hz=True)
+    filtCARM = filt.ZPKFilter([], 5, 80, 1, Hz=True)
 
     cs = ctrl.ControlSystem()
     cs.addDOF('CARM', 'REFL', CARM)

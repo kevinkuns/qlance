@@ -30,24 +30,24 @@ opt.run(ff)
 DARM = {'EX': 1, 'EY': -1}
 MICH = {'BS': 1, 'SR': 1/np.sqrt(2), 'PR': -1/np.sqrt(2)}
 
-filtDARM = filt.Filter(
+filtDARM = filt.ZPKFilter(
     filt.catzp(-2*np.pi*20, -2*np.pi*800),
     filt.catzp(0, 0, -2*np.pi*300*(1 + 1j/2), -2*np.pi*300*(1 - 1j/2)),
     -1e-8 * (2*np.pi*300)**2 / (2*np.pi*800), Hz=False)
 
-filtPRCL = filt.Filter(
+filtPRCL = filt.ZPKFilter(
     -2*np.pi*10,
     filt.catzp(0, -2*np.pi*(20 + 10j), -2*np.pi*(20 - 10j)),
     -1e-5, Hz=False)
 
-filtSRCL = filt.Filter([], filt.catzp(0, -2*np.pi*20), -4e-5, Hz=False)
+filtSRCL = filt.ZPKFilter([], filt.catzp(0, -2*np.pi*20), -4e-5, Hz=False)
 
-filtMICH = filt.Filter(
+filtMICH = filt.ZPKFilter(
     -2*np.pi*10,
     filt.catzp(0, -2*np.pi*(10 + 10j), -2*np.pi*(10 - 10j), -2*np.pi*300),
     0.25, Hz=False)
 
-filtMICH_FF = filt.Filter([], [], 2.5e-3)
+filtMICH_FF = filt.ZPKFilter([], [], 2.5e-3)
 
 cs = ctrl.ControlSystem()
 

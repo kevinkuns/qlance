@@ -403,7 +403,7 @@ class ControlSystem:
         for (dof_to, dof_from, filt) in self._filters:
             toInd = list(self.dofs.keys()).index(dof_to)
             fromInd = list(self.dofs.keys()).index(dof_from)
-            ctrlMat[toInd, fromInd, :] = filt._filt(self.ss)
+            ctrlMat[toInd, fromInd, :] = filt(self.ff)
         return ctrlMat
 
     def _computeCompensator(self):
@@ -415,7 +415,7 @@ class ControlSystem:
         for di, drive in enumerate(self.drives):
             try:
                 ind = compdrives.index(drive)
-                compMat[di, di, :] = self._compFilts[ind][-1]._filt(self.ss)
+                compMat[di, di, :] = self._compFilts[ind][-1](self.ff)
             except ValueError:
                 compMat[di, di, :] = ones
         return compMat
@@ -429,7 +429,7 @@ class ControlSystem:
         for di, drive in enumerate(self.drives):
             try:
                 ind = actdrives.index(drive)
-                actMat[di, di, :] = self._actFilts[ind][-1]._filt(self.ss)
+                actMat[di, di, :] = self._actFilts[ind][-1](self.ff)
             except ValueError:
                 actMat[di, di, :] = ones
         return actMat

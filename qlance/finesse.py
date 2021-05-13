@@ -1405,11 +1405,11 @@ class KatFR(plant.FinessePlant):
                 # extract the mechanical plant for this drive
                 comp = kat_mech.components[drive]
                 if doftype in ['pos', 'pitch', 'yaw']:
-                    plant = filt.Filter(*extract_zpk(comp, doftype), Hz=False)
+                    plant = filt.ZPKFilter(*extract_zpk(comp, doftype), Hz=False)
                     self._mech_plants[doftype][drive] = plant
                     tf = plant.computeFilter(out.x)
                 else:
-                    self._mech_plants[doftype][drive] = filt.Filter([], [], 1)
+                    self._mech_plants[doftype][drive] = filt.ZPKFilter([], [], 1)
                     tf = np.ones_like(out.x)
 
                 # store the results

@@ -450,7 +450,7 @@ class OpticklePlant:
             if inDrive.doftype in ['drive', 'amp', 'phase']:
                 z, p, k = plant.get_zpk()
                 if k == 0:
-                    plant = filt.Filter([], [], 1)
+                    plant = filt.ZPKFilter([], [], 1)
 
             for outDrive, c_out in outDrives.dofs():
                 mmech = self.getMechMod(outDrive, inDrive)
