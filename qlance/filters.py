@@ -238,13 +238,6 @@ def filt_from_hdf5(path, h5file):
     return ZPKFilter(zpk_dict, Hz=False)
 
 
-def filter_from_foton_file(filename, bank_name, ind):
-    filterbanks = io.read_foton_file(filename)
-    filter_module = filterbanks[bank_name][ind]
-    sos_filt = SOSFilter(filter_module['sos_coeffs'], filter_module['fs'])
-    return sos_filt
-
-
 class Filter:
 
     def computeFilter(self, ff):
@@ -469,6 +462,9 @@ class ZPKFilter(Filter):
 
 
 class SOSFilter(Filter):
+
+    empty_sos = np.array([[1, 0, 0, 1, 0, 0]])
+
     def __init__(self, sos, fs=16384):
         self._sos = sos
         self._fs = fs
@@ -495,6 +491,9 @@ class SOSFilter(Filter):
 
 
 class FreqFilter(Filter):
+
+    empty_filt = lambda ff: np.oneslike(ff)
+
     def __init__(self, filter_func, Hz=True):
         if Hz:
             self._filter_function = lambda ff: filter_func(ff)
@@ -603,7 +602,11 @@ class FilterBank(ABC):
         engaged_filters = [filt for _, filt in engaged_filters]
         return engaged_filters
 
-    def addFilterModule(self, filt, name=None):
+    @property
+    def num_engaged(self):
+        return len(self.engaged_filters)
+
+    def addFilterModule(self, filt, name=''):
         if not isinstance(filt, Filter):
             raise ValueError('Filter modules must be a type of filter')
         self._filter_modules.append((name, filt))
@@ -657,31 +660,54 @@ class ZPKFilterBank(ZPKFilter, FilterBank):
         FilterBank.__init__(self)
 
     def _update(self):
-        new_filt = catfilt(*self.engaged_filters)
-        self._zs = new_filt._zs
-        self._ps = new_filt._ps
-        self._k = new_filt._k
+        if self.num_engaged:
+            new_filt = catfilt(*self.engaged_filters)
+            self._zs = new_filt._zs
+            self._ps = new_filt._ps
+            self._k = new_filt._k
+        else:
+            self._zs = []
+            self._ps = []
+            self._k = 1
 
 
 class SOSFilterBank(SOSFilter, FilterBank):
     def __init__(self):
-        SOSFilter.__init__(self, np.array([[1, 0, 0, 1, 0, 0]]))
+        SOSFilter.__init__(self, SOSFilter.empty_sos)
         FilterBank.__init__(self)
 
-    # @classmethod
-    # def from_foton_file(cls, fname):
-    #     pass
+    @classmethod
+    def from_foton_file(cls, file_name, filterbank_name):
+        foton_filterbanks = io.read_foton_file(file_name)
+        try:
+            foton_filterbank = foton_filterbanks[filterbank_name]
+        except KeyError:
+            msg = filterbank_name + ' is not a filterbank in this file.'
+            raise ValueError(msg)
+
+        filterbank = cls()
+        for filter_module in foton_filterbank.values():
+            filt = SOSFilter(filter_module['sos_coeffs'], filter_module['fs'])
+            filterbank.addFilterModule(filt, name=filter_module['name'])
+
+        return filterbank
 
     def _update(self):
-        new_filt = catfilt(*self.engaged_filters)
-        self._sos = new_filt.sos
+        if self.num_engaged:
+            new_filt = catfilt(*self.engaged_filters)
+            self._sos = new_filt.sos
+        else:
+            self._sos = SOSFilter.empty_sos
 
 
 class FreqFilterBank(FreqFilter, FilterBank):
     def __init__(self):
-        FreqFilter.__init__(self, lambda ff: np.oneslike(ff))
+        FreqFilter.__init__(self, FreqFilter.empty_filt)
         FilterBank.__init__(self)
 
     def _update(self):
-        new_filt = catfilt(*self.engaged_filters)
-        self._filter_function = lambda ff: new_filt(ff)
+        if self.num_engaged:
+            new_filt = catfilt(*self.engaged_filters)
+            self._filter_function = lambda ff: new_filt(ff)
+        else:
+            self._filter_function = FreqFilter.empty_filt
