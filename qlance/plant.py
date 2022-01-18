@@ -656,6 +656,14 @@ class OpticklePlant:
         bsm = w/Pdc * tf
         return bsm
 
+    def getBeamParam(self, name, port):
+        if self._qq is None:
+            raise RuntimeError(
+                'Beam properties cannot be computed if a pitch or yaw response'
+                + ' has not been calculated and an HG basis has not been set.')
+        qq = self._qq[self._topology.get_sink_num(name, port)]
+        return qq
+
     def getBeamProperties(self, name, port):
         """Compute the properties of a Gaussian beam at an optic
 
@@ -675,11 +683,7 @@ class OpticklePlant:
         Example:
           opt.getBeamProperties('EX', 'fr')
         """
-        if self._qq is None:
-            raise RuntimeError(
-                'Beam properties cannot be computed if a pitch or yaw response'
-                + ' has not been calculated and an HG basis has not been set.')
-        qq = self._qq[self._topology.get_sink_num(name, port)]
+        qq = self.getBeamParam(name, port)
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     def save(self, fname):
@@ -1206,6 +1210,17 @@ class FinessePlant:
         bsm = w/Pdc * tf
         return bsm
 
+    def getBeamParam(self, node, doftype='pitch'):
+        if doftype == 'pitch':
+            direction = 'y'
+        elif doftype == 'yaw':
+            direction = 'x'
+        else:
+            raise ValueError('Unrecognized degree of freedom ' + direction)
+
+        qq = self.getSigDC('_' + node + '_bp_' + direction)
+        return qq
+
     def getBeamProperties(self, node, doftype='pitch'):
         """Compute the properties of a Gaussian beam at a node
 
@@ -1225,14 +1240,7 @@ class FinessePlant:
         Example:
           katFR.getBeamProperties('EX_fr')
         """
-        if doftype == 'pitch':
-            direction = 'y'
-        elif doftype == 'yaw':
-            direction = 'x'
-        else:
-            raise ValueError('Unrecognized degree of freedom ' + direction)
-
-        qq = self.getSigDC('_' + node + '_bp_' + direction)
+        qq = self.getBeamParam(node, doftype=doftype)
         return beam_properties_from_q(qq, lambda0=self.lambda0)
 
     # def plotTF(self, *tf_args, mag_ax=None, phase_ax=None, **kwargs):
