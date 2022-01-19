@@ -8,6 +8,7 @@ import pykat.detectors as kdet
 import pykat.commands as kcmd
 from . import plant
 from . import controls as ctrl
+from . import filters as filt
 from . import plotting
 from .utils import (append_str_if_unique, add_conjugates,
                     remove_conjugates, siPrefix, assertType)
@@ -978,9 +979,9 @@ def extract_zpk(comp, doftype):
         zs = []
         ps = []
         for z in tf.zeros:
-            zs.extend(ctrl.resRoots(2*np.pi*z.f, z.Q, Hz=False))
+            zs.extend(filt.resRoots(2*np.pi*z.f, z.Q, Hz=False))
         for p in tf.poles:
-            ps.extend(ctrl.resRoots(2*np.pi*p.f, p.Q, Hz=False))
+            ps.extend(filt.resRoots(2*np.pi*p.f, p.Q, Hz=False))
         zs = np.array(zs)
         ps = np.array(ps)
         k = tf.gain
@@ -1404,11 +1405,11 @@ class KatFR(plant.FinessePlant):
                 # extract the mechanical plant for this drive
                 comp = kat_mech.components[drive]
                 if doftype in ['pos', 'pitch', 'yaw']:
-                    plant = ctrl.Filter(*extract_zpk(comp, doftype), Hz=False)
+                    plant = filt.ZPKFilter(*extract_zpk(comp, doftype), Hz=False)
                     self._mech_plants[doftype][drive] = plant
                     tf = plant.computeFilter(out.x)
                 else:
-                    self._mech_plants[doftype][drive] = ctrl.Filter([], [], 1)
+                    self._mech_plants[doftype][drive] = filt.ZPKFilter([], [], 1)
                     tf = np.ones_like(out.x)
 
                 # store the results

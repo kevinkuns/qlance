@@ -5,6 +5,7 @@ Code for general optomechanical plants
 import numpy as np
 import matplotlib.pyplot as plt
 from . import controls as ctrl
+from . import filters as filt
 from . import plotting
 from . import utils
 from . import io
@@ -129,7 +130,7 @@ class Plant:
                 tf += pc*dc*self._plants[probe][drive]
 
         if fit:
-            return ctrl.FitTF(self.ff, tf)
+            return filt.FitTF(self.ff, tf)
         else:
             return tf
 
@@ -348,7 +349,7 @@ class OpticklePlant:
                     tf += pc * drive_pos * tfData[driveNum]
 
         if fit:
-            return ctrl.FitTF(self.ff, tf)
+            return filt.FitTF(self.ff, tf)
         else:
             return tf
 
@@ -406,7 +407,7 @@ class OpticklePlant:
 
         tf = mMech[driveOutNum, driveInNum]
         if fit:
-            return ctrl.FitTF(self.ff, tf)
+            return filt.FitTF(self.ff, tf)
         else:
             return tf
 
@@ -449,14 +450,14 @@ class OpticklePlant:
             if inDrive.doftype in ['drive', 'amp', 'phase']:
                 z, p, k = plant.get_zpk()
                 if k == 0:
-                    plant = ctrl.Filter([], [], 1)
+                    plant = filt.ZPKFilter([], [], 1)
 
             for outDrive, c_out in outDrives.dofs():
                 mmech = self.getMechMod(outDrive, inDrive)
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
         if fit:
-            return ctrl.FitTF(self.ff, tf)
+            return filt.FitTF(self.ff, tf)
         else:
             return tf
 
@@ -490,7 +491,7 @@ class OpticklePlant:
             qnoise = self._noiseAC[doftype][probeNum]
 
         if fit:
-            return ctrl.FitTF(self.ff, qnoise)
+            return filt.FitTF(self.ff, qnoise)
         else:
             return qnoise
 
@@ -1032,7 +1033,7 @@ class FinessePlant:
                 tf += pc * drive_pos * self._freqresp[doftype][probe][drive]
 
         if fit:
-            return ctrl.FitTF(self.ff, tf)
+            return filt.FitTF(self.ff, tf)
         else:
             return tf
 
@@ -1078,7 +1079,7 @@ class FinessePlant:
 
         tf = self._mechmod[doftype_in][out_det][drive_in]
         if fit:
-            return ctrl.FitTF(self.ff, tf)
+            return filt.FitTF(self.ff, tf)
         else:
             return tf
 
@@ -1123,7 +1124,7 @@ class FinessePlant:
                 tf += c_in * c_out * plant.computeFilter(self.ff) * mmech
 
         if fit:
-            return ctrl.FitTF(self.ff, tf)
+            return filt.FitTF(self.ff, tf)
         else:
             return tf
 
@@ -1152,7 +1153,7 @@ class FinessePlant:
             print('Warning: some quantum noise spectra are complex')
 
         if fit:
-            return ctrl.FitTF(self.ff, np.real(qnoise))
+            return filt.FitTF(self.ff, np.real(qnoise))
         else:
             return np.real(qnoise)
 
@@ -1399,7 +1400,7 @@ def _mech_plants_to_hdf5(dictionary, path, h5file):
         if isinstance(val, dict):
             _mech_plants_to_hdf5(val, fpath, h5file)
             h5file[fpath].attrs['isfilter'] = False
-        elif isinstance(val, ctrl.Filter):
+        elif isinstance(val, filt.Filter):
             val.to_hdf5(path + '/' + key, h5file)
             h5file[fpath].attrs['isfilter'] = True
         else:
@@ -1411,7 +1412,7 @@ def _mech_plants_from_hdf5(h5_group, h5file):
     for key, val in h5_group.items():
         if isinstance(val, h5py.Group):
             if val.attrs['isfilter']:
-                plants[key] = ctrl.filt_from_hdf5(val.name, h5file)
+                plants[key] = filt.ZPKFilter.from_hdf5(val.name, h5file)
             else:
                 plants[key] = _mech_plants_from_hdf5(val, h5file)
         else:

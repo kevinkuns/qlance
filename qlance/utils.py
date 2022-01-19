@@ -5,6 +5,7 @@ Some misc. functions.
 import numpy as np
 from collections import OrderedDict
 from copy import deepcopy
+from numbers import Number
 
 
 def normalizeDOF(dof):
@@ -147,6 +148,19 @@ def assertType(data, dtype):
         elif dtype == OrderedDict:
             data = OrderedDict({data: 1})
     return data
+
+
+def assertArr(arr):
+    """Ensure that the input is an array
+    """
+    if isinstance(arr, Number):
+        return [arr]
+    elif isinstance(arr, list) or isinstance(arr, np.ndarray):
+        return arr
+    elif isinstance(arr, tuple):
+        return list(arr)
+    else:
+        raise ValueError('Unrecognized data dtype')
 
 
 def append_str_if_unique(array, elements):
