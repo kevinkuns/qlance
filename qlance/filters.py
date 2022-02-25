@@ -583,6 +583,7 @@ class FilterBank(ABC):
     def __init__(self):
         self._filter_modules = []
         self._state = np.array([], dtype=bool)
+        self.name = ''
 
     @property
     def filter_modules(self):
@@ -689,7 +690,7 @@ class SOSFilterBank(SOSFilter, FilterBank):
         for filter_module in foton_filterbank.values():
             filt = SOSFilter(filter_module['sos_coeffs'], filter_module['fs'])
             filterbank.addFilterModule(filt, name=filter_module['name'])
-
+        filterbank.name = filterbank_name
         return filterbank
 
     def _update(self):
