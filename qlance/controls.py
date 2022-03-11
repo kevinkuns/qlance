@@ -131,8 +131,18 @@ class DegreeOfFreedom:
 
         # append the type of dof to the names of the drives
         in_drives = assertType(drives, dict).copy()
-        self._drives = OrderedDict(
-            {k + '.' + doftype: v for k, v in in_drives.items()})
+        # self._drives = OrderedDict(
+        #     {k + '.' + doftype: v for k, v in in_drives.items()})
+        self._drives = OrderedDict()
+        for drive, cc in in_drives.items():
+            drive_data = drive.split('.')
+            if len(drive_data) == 1:
+                name = drive_data[0] + '.' + doftype
+            elif len(drive_data) == 2:
+                name = drive
+            else:
+                raise ValueError('Incorrect drive specificiation')
+            self._drives[name] = cc
 
     @property
     def name(self):
@@ -162,8 +172,9 @@ class DegreeOfFreedom:
         """Iterator over the drives returned as DegreeOfFreedom instances
         """
         for drive, cc in self.drives.items():
-            name = drive.split('.')[0]
-            dof = DegreeOfFreedom(drives=name, doftype=self.doftype, name=name)
+            name, doftype = drive.split('.')
+            dof = DegreeOfFreedom(
+                drives=name, doftype=doftype, name=name, probes=self.probes)
             yield dof, cc
 
     def probes2dof(self, probeList):
