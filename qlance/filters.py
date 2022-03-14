@@ -678,11 +678,12 @@ class ZPKFilterBank(ZPKFilter, FilterBank):
             new_filt = catfilt(*self.engaged_filters)
             self._zs = new_filt._zs
             self._ps = new_filt._ps
-            self._k = new_filt._k * self.gain
+            self._k = new_filt._k
         else:
             self._zs = []
             self._ps = []
             self._k = 1
+        self._k *= gain
 
 
 class SOSFilterBank(SOSFilter, FilterBank):
@@ -710,9 +711,9 @@ class SOSFilterBank(SOSFilter, FilterBank):
         if self.num_engaged:
             new_filt = catfilt(*self.engaged_filters)
             self._sos = new_filt.sos
-            self._sos[0, :3] *= self.gain
         else:
             self._sos = SOSFilter.empty_sos
+        self._sos[0, :3] *= self.gain
 
 
 class FreqFilterBank(FreqFilter, FilterBank):
@@ -725,4 +726,4 @@ class FreqFilterBank(FreqFilter, FilterBank):
             new_filt = catfilt(*self.engaged_filters)
             self._filter_function = lambda ff: new_filt(ff) * self.gain
         else:
-            self._filter_function = FreqFilter.empty_filt
+            self._filter_function = FreqFilter.empty_filt * self.gain
