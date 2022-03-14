@@ -584,10 +584,23 @@ class FilterBank(ABC):
         self._filter_modules = []
         self._state = np.array([], dtype=bool)
         self.name = ''
+        self._gain = 1
 
     @property
     def filter_modules(self):
         return self._filter_modules
+
+    @property
+    def gain(self):
+        """Overal gain of the filter bank
+        """
+        return self._gain
+
+    @gain.setter
+    def gain(self, val):
+        assert isinstance(val, Number)
+        self._gain = val
+        self._update()
 
     @property
     def nfilters(self):
@@ -665,7 +678,7 @@ class ZPKFilterBank(ZPKFilter, FilterBank):
             new_filt = catfilt(*self.engaged_filters)
             self._zs = new_filt._zs
             self._ps = new_filt._ps
-            self._k = new_filt._k
+            self._k = new_filt._k * self.gain
         else:
             self._zs = []
             self._ps = []
@@ -697,6 +710,7 @@ class SOSFilterBank(SOSFilter, FilterBank):
         if self.num_engaged:
             new_filt = catfilt(*self.engaged_filters)
             self._sos = new_filt.sos
+            self._sos[0, :3] *= self.gain
         else:
             self._sos = SOSFilter.empty_sos
 
@@ -709,6 +723,6 @@ class FreqFilterBank(FreqFilter, FilterBank):
     def _update(self):
         if self.num_engaged:
             new_filt = catfilt(*self.engaged_filters)
-            self._filter_function = lambda ff: new_filt(ff)
+            self._filter_function = lambda ff: new_filt(ff) * self.gain
         else:
             self._filter_function = FreqFilter.empty_filt
