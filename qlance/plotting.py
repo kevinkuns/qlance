@@ -68,6 +68,7 @@ def plotTF(ff, tf, mag_ax=None, phase_ax=None, dB=False, **kwargs):
     else:
         mag_ax.loglog(ff, np.abs(tf), **kwargs)
         mag_ax.set_ylabel('Magnitude')
+        mag_ax.autoscale(enable=True, axis='y')
         magTF = np.abs(tf)
         # If the TF is close to being constant magnitude, increase ylims
         # in order to show y tick labels and avoid a misleading plot.
