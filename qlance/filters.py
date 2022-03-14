@@ -683,7 +683,7 @@ class ZPKFilterBank(ZPKFilter, FilterBank):
             self._zs = []
             self._ps = []
             self._k = 1
-        self._k *= gain
+        self._k *= self.gain
 
 
 class SOSFilterBank(SOSFilter, FilterBank):
