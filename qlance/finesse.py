@@ -1195,12 +1195,12 @@ def showfDC(basekat, freqs, verbose=False):
     for link in links:
         for fi, freq in enumerate(freqs):
             power = np.abs(out['{:s}_f{:d}'.format(link, fi)])**2
-            pow_str = '{:0.1f} {:s}W'.format(*siPrefix(power)[::-1])
+            pow_str = '{:0.1f} {:s}W'.format(*siPrefix(power))
             # key = '{:s} -> {:s}'.format(space.nodes[0].name,
             #                             space.nodes[1].name)
             fDC[link2key(link)].append(pow_str)
 
-    index = ['{:0.0f} {:s}Hz'.format(*siPrefix(freq)[::-1]) for freq in freqs]
+    index = ['{:0.0f} {:s}Hz'.format(*siPrefix(freq)) for freq in freqs]
     fDC = pd.DataFrame(fDC, index=index).T
     with pd.option_context('display.max_rows', None,
                            'display.max_columns', None):
@@ -1218,7 +1218,7 @@ def showsigDC(basekat, verbose=False):
     for det_name, det in kat.detectors.items():
         if isinstance(det, kdet.pd):
             power = np.abs(out[det_name])
-            sigDC[det_name] = '{:0.1f} {:s}W'.format(*siPrefix(power)[::-1])
+            sigDC[det_name] = '{:0.1f} {:s}W'.format(*siPrefix(power))
 
     sigDC = pd.DataFrame(sigDC, index=['Power']).T
     with pd.option_context('display.max_rows', None,

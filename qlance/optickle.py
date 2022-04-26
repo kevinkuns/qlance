@@ -1007,11 +1007,11 @@ class Optickle(plant.OpticklePlant):
                 pass
 
             beam_properties[source + ' --> ' + sink] = [
-                '{:0.2f} {:s}m'.format(*utils.siPrefix(w)[::-1]),
-                '{:0.2f} {:s}m'.format(*utils.siPrefix(zR)[::-1]),
-                '{:0.2f} {:s}m'.format(*utils.siPrefix(z)[::-1]),
-                '{:0.2f} {:s}m'.format(*utils.siPrefix(w0)[::-1]),
-                '{:0.2f} {:s}m'.format(*utils.siPrefix(R)[::-1]),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(w)),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(zR)),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(z)),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(w0)),
+                '{:0.2f} {:s}m'.format(*utils.siPrefix(R)),
                 '{:0.0f} deg'.format(dpsi)]
 
         beam_properties = pd.DataFrame(
@@ -1200,9 +1200,9 @@ class Optickle(plant.OpticklePlant):
             probes = self.probes
         for pi, probe in enumerate(probes):
             try:
-                pref, num = utils.siPrefix(self._sigDC_tickle[pi])
+                num, pref = utils.siPrefix(self._sigDC_tickle[pi])
             except IndexError:
-                pref, num = utils.siPrefix(self._sigDC_tickle)
+                num, pref = utils.siPrefix(self._sigDC_tickle)
             pad3 = pad2 - len(pref) - 2
             print('{:{pad1}s}| {:{pad3}.1f} {:s}W|'.format(
                 probe, num, pref, pad1=pad1, pad3=pad3))

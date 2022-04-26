@@ -94,36 +94,39 @@ def mag2db(arr, pow=False):
 def siPrefix(num, tex=False):
     """Breaks a number up in SI notation
 
-    Returns:
-      pref: the SI prefix, e.g. k for kilo, n for nano, etc.
-      num: the base number
+    Inputs:
+      num: the number
       tex: if True the micro prefix is '$\mu$' instead of 'u'
 
+    Returns:
+      num: the base number
+      pref: the SI prefix, e.g. k for kilo, n for nano, etc.
+
     Example
-      siPrefix(1300) = 'k', 1.3
-      siPrefix(2e-10) = 'p', 200
+      siPrefix(1300) = 1.3, 'k'
+      siPrefix(2e-10) = 200, 'p'
     """
     if num == 0:
         exp = 0
     else:
         exp = np.floor(np.log10(np.abs(num)))
-    posPrefixes = ['', 'k', 'M', 'G', 'T']
-    negPrefixes = ['m', 'u', 'n', 'p']
+    posPrefixes = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
+    negPrefixes = ['m', 'u', 'n', 'p', 'f', 'a', 'z', 'y']
     try:
         if np.sign(exp) >= 0:
             ind = int(np.abs(exp) // 3)
             pref = posPrefixes[ind]
-            num = num / np.power(10, 3*ind)
+            num = num / 10**(3*ind)
         else:
             ind = int((np.abs(exp) - 1) // 3)
             pref = negPrefixes[ind]
-            num = num * np.power(10, 3*(ind + 1))
+            num = num * 10**(3*(ind + 1))
     except IndexError:
         pref = ''
     if tex:
         if pref == 'u':
             pref = r'$\mu$'
-    return pref, num
+    return num, pref
 
 
 def assertType(data, dtype):
@@ -206,7 +209,7 @@ def printLine(arr, pad):
     """
     line = ''
     for elem in arr:
-        pref, num = siPrefix(np.abs(elem)**2)
+        num, pref = siPrefix(np.abs(elem)**2)
         pad1 = pad - len(pref)
         line += '{:{pad1}.1f} {:s}W|'.format(num, pref, pad1=pad1)
     return line
@@ -219,7 +222,7 @@ def printHeader(freqs, pad):
     if len(freqs.shape) == 0:
         freqs = [freqs]
     for freq in freqs:
-        pref, freq = siPrefix(freq)
+        freq, pref = siPrefix(freq)
         freq = round(freq)
         pad1 = pad - len(pref)
         if freq == 0:

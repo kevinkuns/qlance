@@ -775,13 +775,13 @@ class OpticklePlant:
         if len(ind) == 0:
             msg = 'There are no sidebands with frequency '
             msg += '{:0.0f} {:s}Hz'.format(
-                *utils.siPrefix(freq)[::-1])
+                *utils.siPrefix(freq))
             raise ValueError(msg)
 
         elif len(ind) > 1:
             msg = 'There are {:d} sidebands with '.format(len(ind))
             msg += 'frequency {:0.0f} {:s}Hz'.format(
-                *utils.siPrefix(freq)[::-1])
+                *utils.siPrefix(freq))
             raise ValueError(msg)
 
         else:

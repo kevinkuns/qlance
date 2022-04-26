@@ -726,9 +726,9 @@ class ControlSystem:
         margins = {}
         for dof in self.dofs.keys():
             ugf, pm, fms, sm = self.compute_margins(dof, dof, tstpnt)
-            margins[dof] = ['{:0.2f} {:s}Hz'.format(*siPrefix(ugf)[::-1]),
+            margins[dof] = ['{:0.2f} {:s}Hz'.format(*siPrefix(ugf)),
                             '{:0.2f} deg'.format(pm),
-                            '{:0.2f} {:s}Hz'.format(*siPrefix(fms)[::-1]),
+                            '{:0.2f} {:s}Hz'.format(*siPrefix(fms)),
                             '{:0.2f}'.format(sm)]
 
         margins = pd.DataFrame(
