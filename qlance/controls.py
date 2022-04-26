@@ -476,8 +476,12 @@ class ControlSystem:
                 driveName = driveData[0]
                 doftype = driveData[-1]
                 # FIXME: make work with finesse and non-front surfaces
-                drive2bsm[si, di] = self.plant_model.computeBeamSpotMotion(
-                    opticName, 'fr', driveName, doftype)
+                try:
+                    drive2bsm[si, di] = self.plant_model.computeBeamSpotMotion(
+                        opticName, 'fr', driveName, doftype)
+                except KeyError:
+                    drive2bsm[si, di] = self.plant_model.computeBeamSpotMotion(
+                        opticName, 'frA', driveName, doftype)
 
         self._drive2bsm = drive2bsm
 
