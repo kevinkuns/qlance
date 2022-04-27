@@ -51,6 +51,8 @@ class Optickle(plant.OpticklePlant):
         self._lambda0 = mat2py(self.eng.eval(self._optName + ".lambda"))
         self._vRF = mat2py(self._eval(self._optName + ".vFrf", 1))
         self._pol = np.array(pol)
+        if len(self._vRF.shape) == 0:
+            self._vRF = np.array([self._vRF])
 
         # Track whether the probe basis has been rotated.
         # If it has, do not let any more probes be added
