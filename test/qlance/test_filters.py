@@ -189,3 +189,7 @@ def test_FilterBank_repr(fpath_join, pprint):
     fbank.turn_off(8)
     fbank.turn_on(4, 7)
     pprint(fbank)
+    pprint('')
+    fbank.engage(2, 7, 9)
+    fbank.gain = -28
+    pprint(fbank)

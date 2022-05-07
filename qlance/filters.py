@@ -619,23 +619,68 @@ class FilterBank(ABC):
 
     @property
     def num_engaged(self):
+        """Number of engaged filters
+        """
         return len(self.engaged_filters)
 
     def addFilterModule(self, filt, name=''):
+        """Add a filter module to the filter bank
+
+        Inputs:
+          filt: the filter
+          name: name of the filter module (Optional)
+        """
         if not isinstance(filt, Filter):
             raise ValueError('Filter modules must be a type of filter')
         self._filter_modules.append((name, filt))
         self._state = np.concatenate((self._state, [False]))
 
     def turn_on(self, *args):
+        """Turn on a list of filter modules indexed by their number
+
+        Existing engaged filters are not turned off
+        The numbers are the number of the filter bank, i.e. 1-based
+
+        Example:
+          Turn on filter banks 2, 5, and 8
+            fbank.turn_on(2, 5, 8)
+          if filter bank 4 was previously on, banks 2, 4, 5, an 8 are on
+        """
         self._state[self._get_filter_inds(*args)] = True
         self._update()
 
     def turn_off(self, *args):
+        """Turn off a list of filter modules indexed by their number
+
+        The numbers are the number of the filter bank, i.e. 1-based
+
+        Example:
+          Turn off filter banks 2, 5, and 8
+            fbank.turn_off(2, 5, 8)
+          if filter bank 4 was previously on, bank 4 is the only bank on
+        """
         self._state[self._get_filter_inds(*args)] = False
         self._update()
 
+    def engage(self, *args):
+        """Specify which filter modules are engaged indexed by their number
+
+        This sets the state of the filter bank, so previously engaged modules
+        modules are turned off and only those explicity listed are turned on
+        The numbers are the number of the filter bank, i.e. 1-based
+
+        Example:
+          Engage only filter banks 2, 5, and 8
+            fbank.engage(2, 5, 8)
+        """
+        self.turn_off('all')
+        self.turn_on(*args)
+
     def toggle(self, *args):
+        """Toggle the state of filter modules indexed by their number
+
+        The numbers are the number of the filter bank, i.e. 1-based
+        """
         state = self._state.astype(int)
         state[self._get_filter_inds(*args)] += 1
         self._state = np.mod(state, 2).astype(bool)
@@ -708,6 +753,19 @@ class SOSFilterBank(SOSFilter, FilterBank):
 
     @classmethod
     def from_foton_file(cls, file_name, filterbank_name):
+        """Load a filter bank from a foton file
+
+        Inputs:
+          file_name: the path to the foton file
+          filterbank_name: the name of the filter bank to load
+
+        Returns:
+          the filter bank
+
+        Example:
+          Load the H1 DARM1 filter
+            fbank = SOSFilterBank.from_foton_file('H1OMC.txt', 'LSC_DARM1')
+        """
         foton_filterbanks = io.read_foton_file(file_name)
         try:
             foton_filterbank = foton_filterbanks[filterbank_name]
