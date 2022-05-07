@@ -645,6 +645,20 @@ class FilterBank(ABC):
     def _update(self):
         pass
 
+    def __str__(self):
+        fb_str = self.name + '\n'
+        for num, (name, module) in enumerate(self.filter_modules):
+            if self._state[num] == True:
+                fm_state = 'On'
+            else:
+                fm_state = 'Off'
+            fb_str += '{:<2d} | {:<3s} | {:s}\n'.format(num + 1, fm_state, name)
+        fb_str += 'gain: ' + str(self.gain)
+        return fb_str
+
+    def __repr__(self):
+        return self.__str__()
+
     def _get_filter_inds(self, *args):
         if self.nfilters == 0:
             raise ValueError('There are no filters defined')

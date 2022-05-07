@@ -176,3 +176,16 @@ class TestFilters:
         zpk1 = self.filt2a.get_zpk()
         zpk2 = self.filt2r.get_zpk()
         assert np.all(check_zpk_equality(zpk1, zpk2))
+
+
+def test_FilterBank_repr(fpath_join, pprint):
+    fname = fpath_join('data/H1OMC.txt')
+    fbank = filt.SOSFilterBank.from_foton_file(fname, 'LSC_DARM1')
+    pprint(fbank)
+    pprint('')
+    fbank.turn_on(1, 8, 3)
+    pprint(fbank)
+    pprint('')
+    fbank.turn_off(8)
+    fbank.turn_on(4, 7)
+    pprint(fbank)
