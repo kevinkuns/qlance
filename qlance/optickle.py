@@ -535,7 +535,9 @@ class Optickle(plant.OpticklePlant):
             + str(phase) + ");"
         self._eval(cmd, nargout=0)
 
-    def addGouyReadout(self, name, phaseA, dphaseB=90):
+    def addGouyReadout(
+            self, name, phaseA, freqs=None, phasesA=None, phasesB=None,
+            names=None, dphaseB=90):
         """Add Gouy phases and sinks for WFS readout
 
         Inputs:
@@ -558,6 +560,14 @@ class Optickle(plant.OpticklePlant):
         self.addLink(name + '_WFS_BS', 'bk', name + '_GouyB', 'in', 0)
         self.addLink(name + '_GouyA', 'out', name + '_A', 'in', 0)
         self.addLink(name + '_GouyB', 'out', name + '_B', 'in', 0)
+
+        if freqs is not None:
+            if (phasesA is None) or (phasesB is None):
+                msg = 'when trying to add probes, need to specify both '
+                msg += 'frequencies and phases'
+                raise ValueError(msg)
+            self.addReadout(name + '_A', freqs, phasesA, names=names)
+            self.addReadout(name + '_B', freqs, phasesB, names=names)
 
     def monitorBeamSpotMotion(self, opticName, spotPort):
         """Add a DC probe to an optic to monitor beam spot motion
