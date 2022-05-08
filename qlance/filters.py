@@ -464,7 +464,7 @@ class ZPKFilter(Filter):
 
 class SOSFilter(Filter):
 
-    empty_sos = np.array([[1, 0, 0, 1, 0, 0]])
+    empty_sos = np.array([[1, 0, 0, 1, 0, 0]], dtype=float)
 
     def __init__(self, sos, fs=16384):
         self._sos = sos
@@ -600,7 +600,7 @@ class FilterBank(ABC):
     @gain.setter
     def gain(self, val):
         assert isinstance(val, Number)
-        self._gain = val
+        self._gain = float(val)
         self._update()
 
     @property
