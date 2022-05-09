@@ -9,7 +9,8 @@ from collections import OrderedDict
 from .utils import (assertType, siPrefix, append_str_if_unique,
                     get_default_kwargs)
 from itertools import cycle
-import IIRrational.AAA as AAA
+# import IIRrational.AAA as AAA
+import wavestate.AAA as AAA
 import matplotlib.pyplot as plt
 
 
