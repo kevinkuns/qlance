@@ -5,7 +5,8 @@ Control filters
 import numpy as np
 import scipy.signal as sig
 # import IIRrational.AAA as AAA
-import wavestate.AAA as AAA
+# import wavestate.AAA as AAA
+from . import AAA
 from functools import partial
 from .utils import assertArr
 from . import io
