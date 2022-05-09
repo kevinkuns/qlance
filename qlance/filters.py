@@ -581,10 +581,10 @@ class FitTF(ZPKFilter):
 
 
 class FilterBank(ABC):
-    def __init__(self):
+    def __init__(self, name=''):
         self._filter_modules = []
         self._state = np.array([], dtype=bool)
-        self.name = ''
+        self.name = name
         self._gain = 1
 
     @property
@@ -729,9 +729,9 @@ class FilterBank(ABC):
 
 
 class ZPKFilterBank(ZPKFilter, FilterBank):
-    def __init__(self):
+    def __init__(self, name=''):
         ZPKFilter.__init__(self, [], [], 1)
-        FilterBank.__init__(self)
+        FilterBank.__init__(self, name=name)
 
     def _update(self):
         if self.num_engaged:
@@ -747,9 +747,9 @@ class ZPKFilterBank(ZPKFilter, FilterBank):
 
 
 class SOSFilterBank(SOSFilter, FilterBank):
-    def __init__(self):
+    def __init__(self, name=''):
         SOSFilter.__init__(self, SOSFilter.empty_sos)
-        FilterBank.__init__(self)
+        FilterBank.__init__(self, name=name)
 
     @classmethod
     def from_foton_file(cls, file_name, filterbank_name):
@@ -790,9 +790,9 @@ class SOSFilterBank(SOSFilter, FilterBank):
 
 
 class FreqFilterBank(FreqFilter, FilterBank):
-    def __init__(self):
+    def __init__(self, name=''):
         FreqFilter.__init__(self, FreqFilter.empty_filt)
-        FilterBank.__init__(self)
+        FilterBank.__init__(self, name=name)
 
     def _update(self):
         if self.num_engaged:
