@@ -15,6 +15,7 @@ from collections import OrderedDict
 from numbers import Number
 import scipy.signal as sig
 from abc import ABC, abstractmethod
+from copy import deepcopy
 import matplotlib.pyplot as plt
 from . import plotting
 
@@ -468,7 +469,7 @@ class SOSFilter(Filter):
     empty_sos = np.array([[1, 0, 0, 1, 0, 0]], dtype=float)
 
     def __init__(self, sos, fs=16384):
-        self._sos = sos
+        self._sos = deepcopy(sos)
         self._fs = fs
 
     @property
@@ -786,7 +787,7 @@ class SOSFilterBank(SOSFilter, FilterBank):
             new_filt = catfilt(*self.engaged_filters)
             self._sos = new_filt.sos
         else:
-            self._sos = SOSFilter.empty_sos
+            self._sos = deepcopy(SOSFilter.empty_sos)
         self._sos[0, :3] *= self.gain
 
 
