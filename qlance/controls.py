@@ -455,16 +455,18 @@ class ControlSystem:
             driveData = driveTo.split('.')
             driveToName = driveData[0]
             dofToType = driveData[-1]
+            driveTo = DegreeOfFreedom(driveToName, doftype=dofToType)
             for djf, driveFrom in enumerate(self.drives):
                 driveData = driveFrom.split('.')
                 driveFromName = driveData[0]
                 dofFromType = driveData[-1]
-                if dofFromType != dofToType:
-                    msg = 'Input and output drives should be the same ' \
-                          + 'degree of freedom (pos, pitch, or yaw)'
-                    raise ValueError(msg)
+                driveFrom = DegreeOfFreedom(driveFromName, doftype=dofFromType)
+                # if dofFromType != dofToType:
+                #     msg = 'Input and output drives should be the same ' \
+                #           + 'degree of freedom (pos, pitch, or yaw)'
+                #     raise ValueError(msg)
                 mMech[dit, djf, :] = self.plant_model.getMechMod(
-                    driveToName, driveFromName, dofToType)
+                    driveTo, driveFrom)
         return mMech
 
     def _computeBeamSpotMotion(self):
