@@ -1170,34 +1170,51 @@ def showfDC(basekat, freqs, verbose=False):
         freqs = np.array([freqs])
     freqs.sort()
 
+    def link2keys(link):
+        space = kat.components[link]
+        keys = []
+        keys.append('{:s}_to_{:s}'.format(space.nodes[0].name,
+                                          space.nodes[1].name)
+                    )
+        keys.append('{:s}_to_{:s}'.format(space.nodes[1].name,
+                                          space.nodes[0].name)
+        )
+        return keys
+
+    def key_to_probe(key, fi):
+        return '{:s}_f{:d}'.format(key, fi)
+
+    def nodes_to_keyFDC(nodes):
+        return nodes[0] + '  -->  ' + nodes[1]
+
+    fDC_keys = []
     links = []
     for comp in kat.components.values():
         if isinstance(comp, kcmp.space):
             name = comp.name
-            end_node = comp.nodes[0].name
             links.append(name)
-            for fi, freq in enumerate(freqs):
-                probe_name = '{:s}_f{:d}'.format(name, fi)
-                kat.add(kdet.ad(probe_name, freq, end_node))
-
+            keys = link2keys(name)
+            for key in keys:
+                nodes = key.split('_to_')
+                fDC_keys.append(nodes_to_keyFDC(nodes))  #nodes[0] + '  -->  ' + nodes[1])
+                for fi, freq in enumerate(freqs):
+                    probe_name = key_to_probe(key, fi) #'{:s}_f{:d}'.format(key, fi)
+                    kat.add(kdet.ad(probe_name, freq, nodes[0]))
+            
     kat.noxaxis = True
     kat.verbose = verbose
     out = kat.run()
 
-    def link2key(link):
-        space = kat.components[link]
-        key = '{:s}  -->  {:s}'.format(space.nodes[0].name,
-                                       space.nodes[1].name)
-        return key
-
-    fDC = {link2key(link): [] for link in links}
+    fDC = {k: [] for k in fDC_keys}
     for link in links:
-        for fi, freq in enumerate(freqs):
-            power = np.abs(out['{:s}_f{:d}'.format(link, fi)])**2
-            pow_str = '{:0.1f} {:s}W'.format(*siPrefix(power)[::-1])
-            # key = '{:s} -> {:s}'.format(space.nodes[0].name,
-            #                             space.nodes[1].name)
-            fDC[link2key(link)].append(pow_str)
+        keys = link2keys(link)
+        for key in keys:
+            nodes = key .split('_to_')
+            for fi, freq in enumerate(freqs):
+                probe_name = key_to_probe(key, fi)
+                power = np.abs(out[probe_name])**2
+                pow_str = '{:0.1f} {:s}W'.format(*siPrefix(power)[::-1])
+                fDC[nodes_to_keyFDC(nodes)].append(pow_str)
 
     index = ['{:0.0f} {:s}Hz'.format(*siPrefix(freq)[::-1]) for freq in freqs]
     fDC = pd.DataFrame(fDC, index=index).T
