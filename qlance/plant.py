@@ -1376,7 +1376,10 @@ class FinessePlant:
         self._amp_detectors = io.byte2str(data['amp_detectors'][()])
         self._pos_detectors = io.byte2str(data['pos_detectors'][()])
         self._bp_detectors = io.byte2str(data['bp_detectors'][()])
-        self._freqresp = io.hdf5_to_dict(data['freqresp'])
+        try:
+            self._freqresp = io.hdf5_to_dict(data['freqresp'])
+        except KeyError:
+            self._freqresp = {}
         if isinstance(data['mech_plants'], h5py.Group):
             # self.mechmod = io.hdf5_to_dict(data['mechmod'])
             self._mechmod = io.hdf5_to_possible_none('mechmod', data)
