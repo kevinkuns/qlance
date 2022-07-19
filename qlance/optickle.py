@@ -306,9 +306,9 @@ class Optickle(plant.OpticklePlant):
           opt.addSource('Laser', np.sqrt(10)*(vRF == 0))
         """
         if isinstance(ampRF, np.ndarray):
-            self.eng.workspace['ampRF'] = py2mat(ampRF)
+            self.eng.workspace['ampRF'] = py2mat(ampRF, is_complex=True)
         else:
-            self.eng.workspace['ampRF'] = py2mat([ampRF])
+            self.eng.workspace['ampRF'] = py2mat([ampRF], is_complex=True)
         cmd = self.optName + ".addSource("
         cmd += str2mat(name) + ", ampRF);"
         self._eval(cmd, nargout=0)
