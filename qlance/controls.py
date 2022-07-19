@@ -11,6 +11,7 @@ from .utils import (assertType, siPrefix, append_str_if_unique,
 from itertools import cycle
 # import IIRrational.AAA as AAA
 # import wavestate.AAA as AAA
+from .filters import FitTF
 from . import AAA
 import matplotlib.pyplot as plt
 
