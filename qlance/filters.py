@@ -248,6 +248,34 @@ class Filter:
         return FitTF(ff, self(ff), **kwargs)
 
 
+class ParallelFilters(Filter):
+    """Filter obtained by adding other filters in parallel
+    """
+    def __init__(self):
+        self._filters = []
+
+    def add_filter(self, filt, coeff=1):
+        """Add a filter to the sum
+
+        Inputs:
+          filt: the filter to be added
+          coeff: the coefficient to add with
+
+        Example:
+          Add filt1 + 3 * filt2
+          >>> sum_filt = ParallelFilters()
+          >>> sum_filt.add_filter(filt1)
+          >>> sum_filt.add_filter(filt2, 3)
+        """
+        self._filters.append((coeff, filt))
+
+    def __call__(self, ff):
+        total = np.zeros(ff.shape, dtype=complex)
+        for coeff, filt in self._filters:
+            total += coeff * filt(ff)
+        return total
+
+
 class ZPKFilter(Filter):
     """A class representing a generic filter
 
