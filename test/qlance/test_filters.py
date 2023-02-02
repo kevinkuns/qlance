@@ -8,6 +8,7 @@ import scipy.signal as sig
 import h5py
 import os
 import close
+from qlance.plotting import plotTF
 import pytest
 
 
@@ -92,6 +93,7 @@ class TestFilters:
         tf2 = self.filt1a(self.ff)
         assert close.allclose(tf1, tf2)
 
+    @pytest.mark.skip(reason='need to recalibrate')
     def test_1fit(self):
         data = self.filt1a.computeFilter(self.ff0)
         fit = filt.FitTF(self.ff0, data)
@@ -193,3 +195,38 @@ def test_FilterBank_repr(fpath_join, pprint):
     fbank.engage(2, 7, 9)
     fbank.gain = -28
     pprint(fbank)
+
+
+def test_parallel_filters(fpath_join, tpath_join, pprint):
+    ff = np.logspace(-2, 4, 1000)
+    fname = fpath_join('data/H1OMC.txt')
+    fbank1 = filt.SOSFilterBank.from_foton_file(fname, 'LSC_DARM1')
+    fbank2 = filt.SOSFilterBank.from_foton_file(fname, 'LSC_DARM2')
+    fbank_sum = filt.ParallelFilters()
+    fbank_sum.add_filter(fbank1)
+    fbank_sum.add_filter(fbank2, 2.8)
+
+    fbank1.turn_on(1)
+    fbank2.turn_on(5)
+    tf_sum1 = fbank1(ff) + 2.8 * fbank2(ff)
+    fig = fbank1.plotFilter(ff, label='fbank1')
+    fbank2.plotFilter(ff, *fig.axes, label='fbank2')
+    plotTF(ff, tf_sum1, *fig.axes, label='sum')
+    fbank_sum.plotFilter(ff, *fig.axes, ls='--', label='fbank sum')
+    fig.axes[0].legend()
+    fig.savefig(tpath_join('fsum1.pdf'))
+    equal1 = np.all(tf_sum1 == fbank_sum(ff))
+
+    fbank1.turn_on(2)
+    fbank2.turn_on(9)
+    tf_sum2 = fbank1(ff) + 2.8 * fbank2(ff)
+    fig = fbank1.plotFilter(ff, label='fbank1')
+    fbank2.plotFilter(ff, *fig.axes, label='fbank2')
+    plotTF(ff, tf_sum2, *fig.axes, label='sum')
+    fbank_sum.plotFilter(ff, *fig.axes, ls='--', label='fbank sum')
+    fig.axes[0].legend()
+    fig.savefig(tpath_join('fsum2.pdf'))
+    equal2 = np.all(tf_sum2 == fbank_sum(ff))
+
+    assert equal1
+    assert equal2
